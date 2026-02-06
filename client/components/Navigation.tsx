@@ -86,12 +86,15 @@ export default function Navigation() {
               Contact
             </a>
             <div className="flex flex-col gap-2 pt-4 border-t border-border mt-4">
-              <button className="text-foreground hover:text-primary transition-colors font-medium text-left">
+              <Link
+                to="/login"
+                className="text-foreground hover:text-primary transition-colors font-medium text-left"
+              >
                 Sign In
-              </button>
-              <button className="btn-primary w-full">
+              </Link>
+              <Link to="/properties" className="btn-primary w-full text-center">
                 Book Now
-              </button>
+              </Link>
             </div>
           </div>
         )}
