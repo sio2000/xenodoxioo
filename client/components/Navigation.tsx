@@ -43,12 +43,15 @@ export default function Navigation() {
 
           {/* Auth & Actions */}
           <div className="hidden md:flex items-center gap-4">
-            <button className="text-foreground hover:text-primary transition-colors font-medium">
+            <Link
+              to="/login"
+              className="text-foreground hover:text-primary transition-colors font-medium"
+            >
               Sign In
-            </button>
-            <button className="btn-primary">
+            </Link>
+            <Link to="/properties" className="btn-primary">
               Book Now
-            </button>
+            </Link>
           </div>
 
           {/* Mobile Menu Button */}
