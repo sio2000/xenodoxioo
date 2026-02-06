@@ -1,0 +1,482 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ==================== USERS ====================
+
+model User {
+  id                    String     @id @default(cuid())
+  email                 String     @unique
+  firstName             String
+  lastName              String
+  password              String     // hashed password
+  phone                 String?
+  role                  UserRole   @default(CUSTOMER)
+  
+  // Profile
+  profileImage          String?
+  bio                   String?
+  
+  // Address
+  address               String?
+  city                  String?
+  zipCode               String?
+  country               String?
+  
+  // Status
+  isEmailVerified       Boolean    @default(false)
+  isPhoneVerified       Boolean    @default(false)
+  status                UserStatus @default(ACTIVE)
+  
+  // Relations
+  bookings              Booking[]
+  reviews               Review[]
+  payments              Payment[]
+  adminLogs             AdminLog[]
+  passwordResets        PasswordReset[]
+  sessions              Session[]
+  
+  createdAt             DateTime   @default(now())
+  updatedAt             DateTime   @updatedAt
+
+  @@index([email])
+  @@index([status])
+}
+
+enum UserRole {
+  CUSTOMER
+  ADMIN
+}
+
+enum UserStatus {
+  ACTIVE
+  SUSPENDED
+  DELETED
+}
+
+model Session {
+  id                    String     @id @default(cuid())
+  userId                String
+  user                  User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  token                 String     @unique
+  refreshToken          String?    @unique
+  expiresAt             DateTime
+  isRevoked             Boolean    @default(false)
+  ipAddress             String?
+  userAgent             String?
+  
+  createdAt             DateTime   @default(now())
+  updatedAt             DateTime   @updatedAt
+
+  @@index([userId])
+  @@index([token])
+}
+
+model PasswordReset {
+  id                    String     @id @default(cuid())
+  userId                String
+  user                  User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  token                 String     @unique
+  expiresAt             DateTime
+  isUsed                Boolean    @default(false)
+  
+  createdAt             DateTime   @default(now())
+
+  @@index([userId])
+  @@index([token])
+}
+
+// ==================== PROPERTIES & UNITS ====================
+
+model Property {
+  id                    String     @id @default(cuid())
+  name                  String
+  description           String
+  location              String
+  country               String     @default("Greece")
+  city                  String
+  zipCode               String?
+  latitude              Float?
+  longitude             Float?
+  
+  // Details
+  slug                  String     @unique
+  mainImage             String
+  galleryImages         String[]   @default([])
+  
+  // Status
+  isActive              Boolean    @default(true)
+  
+  // Relations
+  units                 Unit[]
+  amenities             Amenity[]
+  reviews               Review[]
+  blockages             DateBlockage[]
+  seasonalPricings      SeasonalPricing[]
+  
+  createdAt             DateTime   @default(now())
+  updatedAt             DateTime   @updatedAt
+
+  @@index([isActive])
+  @@index([slug])
+}
+
+model Unit {
+  id                    String     @id @default(cuid())
+  propertyId            String
+  property              Property   @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  
+  // Details
+  name                  String     // e.g., "Villa A", "Unit 1"
+  slug                  String
+  description           String?
+  
+  // Capacity
+  maxGuests             Int
+  bedrooms              Int
+  bathrooms             Int
+  beds                  Int
+  
+  // Pricing
+  basePrice             Float      // price per night in USD
+  cleaningFee           Float      @default(0)
+  
+  // Status
+  isActive              Boolean    @default(true)
+  
+  // Relations
+  bookings              Booking[]
+  images                String[]   @default([])
+  minStayDays           Int        @default(1)
+  
+  createdAt             DateTime   @default(now())
+  updatedAt             DateTime   @updatedAt
+
+  @@unique([propertyId, slug])
+  @@index([propertyId])
+  @@index([isActive])
+}
+
+model Amenity {
+  id                    String     @id @default(cuid())
+  propertyId            String
+  property              Property   @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  
+  name                  String
+  description           String?
+  icon                  String?    // lucide icon name
+  
+  createdAt             DateTime   @default(now())
+
+  @@unique([propertyId, name])
+  @@index([propertyId])
+}
+
+// ==================== BOOKINGS ====================
+
+model Booking {
+  id                    String     @id @default(cuid())
+  bookingNumber         String     @unique
+  unitId                String
+  unit                  Unit       @relation(fields: [unitId], references: [id])
+  userId                String
+  user                  User       @relation(fields: [userId], references: [id])
+  
+  // Dates
+  checkInDate           DateTime
+  checkOutDate          DateTime
+  nights                Int
+  
+  // Pricing
+  basePrice             Float      // price per night
+  totalNights           Float      // may include fractional for calculations
+  subtotal              Float      // basePrice * nights
+  cleaningFee           Float      @default(0)
+  taxes                 Float      @default(0)
+  discountAmount        Float      @default(0)
+  totalPrice            Float      // final amount
+  
+  // Guests
+  guests                Int
+  guestName             String
+  guestEmail            String
+  guestPhone            String?
+  
+  // Additional info
+  specialRequests       String?
+  notes                 String?
+  
+  // Status
+  status                BookingStatus @default(PENDING)
+  cancellationReason    String?
+  cancelledAt           DateTime?
+  
+  // Relations
+  payments              Payment[]
+  review                Review?
+  
+  createdAt             DateTime   @default(now())
+  updatedAt             DateTime   @updatedAt
+
+  @@unique([bookingNumber])
+  @@index([unitId])
+  @@index([userId])
+  @@index([status])
+  @@index([checkInDate])
+  @@index([checkOutDate])
+}
+
+enum BookingStatus {
+  PENDING           // Awaiting payment
+  DEPOSIT_PAID      // 25% deposit received, awaiting balance
+  CONFIRMED         // Fully paid
+  CHECKED_IN        // Guest arrived
+  CHECKED_OUT       // Guest left
+  CANCELLED         // Booking cancelled
+  NO_SHOW           // Guest didn't arrive
+}
+
+model DateBlockage {
+  id                    String     @id @default(cuid())
+  propertyId            String
+  property              Property   @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  
+  startDate             DateTime
+  endDate               DateTime
+  reason                String?    // e.g., "Maintenance", "Owner block"
+  
+  createdAt             DateTime   @default(now())
+
+  @@index([propertyId])
+  @@index([startDate])
+}
+
+// ==================== PRICING ====================
+
+model SeasonalPricing {
+  id                    String     @id @default(cuid())
+  propertyId            String
+  property              Property   @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  
+  name                  String     // e.g., "Summer", "Winter"
+  startDate             DateTime
+  endDate               DateTime
+  pricePerNight         Float
+  minStayDays           Int        @default(1)
+  
+  createdAt             DateTime   @default(now())
+  updatedAt             DateTime   @updatedAt
+
+  @@index([propertyId])
+  @@index([startDate])
+}
+
+model LongStayDiscount {
+  id                    String     @id @default(cuid())
+  name                  String     // e.g., "7+ nights", "30+ nights"
+  minNights             Int
+  discountPercentage    Float      // 0-100
+  
+  isActive              Boolean    @default(true)
+  
+  createdAt             DateTime   @default(now())
+  updatedAt             DateTime   @updatedAt
+}
+
+model Coupon {
+  id                    String     @id @default(cuid())
+  code                  String     @unique
+  description           String?
+  
+  // Discount
+  discountType          DiscountType  // PERCENTAGE or FIXED
+  discountValue         Float         // percentage (0-100) or fixed amount
+  
+  // Conditions
+  minBookingAmount      Float?        // minimum booking total
+  maxUses               Int?          // null = unlimited
+  usedCount             Int           @default(0)
+  
+  // Validity
+  validFrom             DateTime
+  validUntil            DateTime
+  isActive              Boolean       @default(true)
+  
+  createdAt             DateTime      @default(now())
+  updatedAt             DateTime      @updatedAt
+
+  @@index([code])
+  @@index([isActive])
+}
+
+enum DiscountType {
+  PERCENTAGE
+  FIXED
+}
+
+// ==================== PAYMENTS ====================
+
+model Payment {
+  id                    String     @id @default(cuid())
+  bookingId             String
+  booking               Booking    @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  userId                String
+  user                  User       @relation(fields: [userId], references: [id])
+  
+  // Payment details
+  amount                Float      // amount in USD
+  currency              String     @default("USD")
+  paymentType           PaymentType  // DEPOSIT or BALANCE
+  
+  // Stripe integration
+  stripePaymentIntentId String?    @unique
+  stripeChargeId        String?    @unique
+  stripeRefundId        String?
+  
+  // Status
+  status                PaymentStatus @default(PENDING)
+  
+  // Schedule (for balance payment)
+  scheduledFor          DateTime?
+  
+  // Metadata
+  description           String?
+  metadata              String?    // JSON string for Stripe metadata
+  
+  // Error handling
+  lastError             String?
+  failureCount          Int        @default(0)
+  
+  createdAt             DateTime   @default(now())
+  updatedAt             DateTime   @updatedAt
+
+  @@index([bookingId])
+  @@index([userId])
+  @@index([status])
+  @@index([stripePaymentIntentId])
+}
+
+enum PaymentType {
+  DEPOSIT
+  BALANCE
+  FULL
+  REFUND
+}
+
+enum PaymentStatus {
+  PENDING
+  PROCESSING
+  SUCCEEDED
+  FAILED
+  REFUNDED
+  CANCELLED
+}
+
+// ==================== REVIEWS ====================
+
+model Review {
+  id                    String     @id @default(cuid())
+  bookingId             String     @unique
+  booking               Booking    @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  propertyId            String
+  property              Property   @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  userId                String
+  user                  User       @relation(fields: [userId], references: [id])
+  
+  rating                Int        // 1-5
+  title                 String?
+  comment               String?
+  
+  isVisible             Boolean    @default(true)
+  
+  createdAt             DateTime   @default(now())
+  updatedAt             DateTime   @updatedAt
+
+  @@index([propertyId])
+  @@index([userId])
+}
+
+// ==================== ADMIN & LOGGING ====================
+
+model AdminLog {
+  id                    String     @id @default(cuid())
+  adminId               String
+  admin                 User       @relation(fields: [adminId], references: [id])
+  
+  action                String     // e.g., "CREATED_PROPERTY", "CANCELLED_BOOKING"
+  entityType            String     // e.g., "PROPERTY", "BOOKING", "USER"
+  entityId              String?
+  description           String?
+  changes               String?    // JSON of what changed
+  
+  createdAt             DateTime   @default(now())
+
+  @@index([adminId])
+  @@index([action])
+}
+
+model SystemConfig {
+  id                    String     @id @default(cuid())
+  key                   String     @unique
+  value                 String     // JSON string
+  description           String?
+  
+  updatedAt             DateTime   @updatedAt
+}
+
+// ==================== EMAIL ====================
+
+model EmailLog {
+  id                    String     @id @default(cuid())
+  to                    String
+  subject               String
+  type                  EmailType
+  
+  // Related entity
+  userId                String?
+  bookingId             String?
+  
+  // Status
+  status                EmailStatus @default(PENDING)
+  sentAt                DateTime?
+  openedAt              DateTime?
+  clickedAt             DateTime?
+  
+  // Error handling
+  error                 String?
+  retryCount            Int        @default(0)
+  
+  createdAt             DateTime   @default(now())
+
+  @@index([to])
+  @@index([type])
+  @@index([status])
+}
+
+enum EmailType {
+  WELCOME
+  BOOKING_CONFIRMATION
+  PAYMENT_RECEIPT
+  PAYMENT_REMINDER
+  CANCELLATION_CONFIRMATION
+  PASSWORD_RESET
+  ARRIVAL_REMINDER
+  REVIEW_REQUEST
+  ADMIN_ALERT
+}
+
+enum EmailStatus {
+  PENDING
+  SENT
+  FAILED
+  BOUNCED
+  OPENED
+}
