@@ -1,18 +1,18 @@
-import Layout from '@/components/Layout';
-import { useSearchParams, Link } from 'react-router-dom';
-import { useState } from 'react';
-import { CreditCard, Lock } from 'lucide-react';
+import Layout from "@/components/Layout";
+import { useSearchParams, Link } from "react-router-dom";
+import { useState } from "react";
+import { CreditCard, Lock } from "lucide-react";
 
 export default function Checkout() {
   const [searchParams] = useSearchParams();
   const [isProcessing, setIsProcessing] = useState(false);
 
-  const propertyId = searchParams.get('property');
+  const propertyId = searchParams.get("property");
 
   // Mock property data
   const property = {
     id: 1,
-    name: 'The Lykoskufi Villas - Villa A',
+    name: "The Lykoskufi Villas - Villa A",
     price: 280,
     cleaningFee: 50,
     nights: 3,
@@ -24,14 +24,14 @@ export default function Checkout() {
   const total = subtotal + property.cleaningFee + tax;
 
   const [formData, setFormData] = useState({
-    firstName: '',
-    lastName: '',
-    email: '',
-    phone: '',
-    address: '',
-    city: '',
-    zipCode: '',
-    country: '',
+    firstName: "",
+    lastName: "",
+    email: "",
+    phone: "",
+    address: "",
+    city: "",
+    zipCode: "",
+    country: "",
   });
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -42,13 +42,18 @@ export default function Checkout() {
     setTimeout(() => {
       setIsProcessing(false);
       // In production, redirect to confirmation page
-      alert('Booking confirmed! Confirmation email will be sent to ' + formData.email);
+      alert(
+        "Booking confirmed! Confirmation email will be sent to " +
+          formData.email,
+      );
     }, 2000);
   };
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+  const handleInputChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>,
+  ) => {
     const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
+    setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
   return (
@@ -56,7 +61,10 @@ export default function Checkout() {
       <div className="container-max py-12">
         {/* Header */}
         <div className="mb-12">
-          <Link to={`/properties/${propertyId}`} className="text-primary hover:text-primary/80 mb-4 inline-block">
+          <Link
+            to={`/properties/${propertyId}`}
+            className="text-primary hover:text-primary/80 mb-4 inline-block"
+          >
             ← Back to property
           </Link>
           <h1 className="text-3xl md:text-4xl font-bold text-foreground">
@@ -225,7 +233,8 @@ export default function Checkout() {
                 <div className="p-4 bg-primary/5 rounded-lg mb-4 flex items-center gap-2">
                   <Lock size={18} className="text-primary" />
                   <p className="text-sm text-foreground">
-                    Your payment information is encrypted and secure. We use Stripe for secure processing.
+                    Your payment information is encrypted and secure. We use
+                    Stripe for secure processing.
                   </p>
                 </div>
 
@@ -269,17 +278,13 @@ export default function Checkout() {
               {/* Terms & Policies */}
               <div className="space-y-4">
                 <label className="flex items-start gap-3 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    required
-                    className="mt-1 w-4 h-4"
-                  />
+                  <input type="checkbox" required className="mt-1 w-4 h-4" />
                   <span className="text-sm text-foreground">
-                    I agree to the{' '}
+                    I agree to the{" "}
                     <a href="#" className="text-primary hover:underline">
                       Cancellation Policy
-                    </a>
-                    {' '}and{' '}
+                    </a>{" "}
+                    and{" "}
                     <a href="#" className="text-primary hover:underline">
                       Terms of Service
                     </a>
@@ -287,12 +292,10 @@ export default function Checkout() {
                 </label>
 
                 <label className="flex items-start gap-3 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    className="mt-1 w-4 h-4"
-                  />
+                  <input type="checkbox" className="mt-1 w-4 h-4" />
                   <span className="text-sm text-foreground">
-                    Send me booking confirmation and important updates to my email
+                    Send me booking confirmation and important updates to my
+                    email
                   </span>
                 </label>
               </div>
@@ -303,11 +306,12 @@ export default function Checkout() {
                 disabled={isProcessing}
                 className="btn-primary w-full justify-center text-lg py-3 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {isProcessing ? 'Processing Payment...' : 'Complete Booking'}
+                {isProcessing ? "Processing Payment..." : "Complete Booking"}
               </button>
 
               <p className="text-xs text-muted-foreground text-center">
-                Only ${depositAmount} will be charged now. Remaining ${total - depositAmount} will be charged 30 days before arrival.
+                Only ${depositAmount} will be charged now. Remaining $
+                {total - depositAmount} will be charged 30 days before arrival.
               </p>
             </form>
           </div>
@@ -315,21 +319,31 @@ export default function Checkout() {
           {/* Booking Summary */}
           <div className="lg:col-span-1">
             <div className="sticky top-20 bg-card border border-border rounded-lg p-6">
-              <h3 className="text-lg font-bold text-foreground mb-6">Booking Summary</h3>
+              <h3 className="text-lg font-bold text-foreground mb-6">
+                Booking Summary
+              </h3>
 
               <div className="space-y-4 mb-6 pb-6 border-b border-border">
                 <div>
                   <p className="text-sm text-muted-foreground">Property</p>
-                  <p className="font-semibold text-foreground">{property.name}</p>
+                  <p className="font-semibold text-foreground">
+                    {property.name}
+                  </p>
                 </div>
 
                 <div>
-                  <p className="text-sm text-muted-foreground">Check-in - Check-out</p>
-                  <p className="font-semibold text-foreground">Dec 15 - Dec 18 (3 nights)</p>
+                  <p className="text-sm text-muted-foreground">
+                    Check-in - Check-out
+                  </p>
+                  <p className="font-semibold text-foreground">
+                    Dec 15 - Dec 18 (3 nights)
+                  </p>
                 </div>
 
                 <div>
-                  <p className="text-sm text-muted-foreground">Number of Guests</p>
+                  <p className="text-sm text-muted-foreground">
+                    Number of Guests
+                  </p>
                   <p className="font-semibold text-foreground">2 guests</p>
                 </div>
               </div>
@@ -340,14 +354,20 @@ export default function Checkout() {
                   <span className="text-muted-foreground">
                     {property.nights} nights × ${property.price}
                   </span>
-                  <span className="font-semibold text-foreground">${subtotal}</span>
+                  <span className="font-semibold text-foreground">
+                    ${subtotal}
+                  </span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Cleaning fee</span>
-                  <span className="font-semibold text-foreground">${property.cleaningFee}</span>
+                  <span className="font-semibold text-foreground">
+                    ${property.cleaningFee}
+                  </span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">Taxes & fees (15%)</span>
+                  <span className="text-muted-foreground">
+                    Taxes & fees (15%)
+                  </span>
                   <span className="font-semibold text-foreground">${tax}</span>
                 </div>
               </div>
@@ -356,7 +376,9 @@ export default function Checkout() {
               <div className="mb-6">
                 <div className="flex justify-between items-baseline mb-2">
                   <span className="font-semibold text-foreground">Total</span>
-                  <span className="text-3xl font-bold text-primary">${total}</span>
+                  <span className="text-3xl font-bold text-primary">
+                    ${total}
+                  </span>
                 </div>
                 <p className="text-xs text-muted-foreground">
                   Deposit due: ${depositAmount}
@@ -365,11 +387,15 @@ export default function Checkout() {
 
               {/* Payment Schedule */}
               <div className="bg-primary/5 rounded-lg p-4 mb-6">
-                <h4 className="font-semibold text-foreground mb-3 text-sm">Payment Schedule</h4>
+                <h4 className="font-semibold text-foreground mb-3 text-sm">
+                  Payment Schedule
+                </h4>
                 <div className="space-y-2 text-xs">
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Deposit (25%)</span>
-                    <span className="font-semibold text-foreground">${depositAmount}</span>
+                    <span className="font-semibold text-foreground">
+                      ${depositAmount}
+                    </span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">

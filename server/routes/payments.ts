@@ -1,25 +1,25 @@
 /**
  * STRIPE PAYMENT ROUTES - Implementation Guide
- * 
+ *
  * This file contains the scaffold for Stripe payment endpoints.
  * To implement, you'll need:
- * 
+ *
  * 1. Install Stripe Node SDK:
  *    pnpm add stripe
- * 
+ *
  * 2. Set environment variables:
  *    STRIPE_SECRET_KEY=sk_live_xxxxx
  *    STRIPE_WEBHOOK_SECRET=whsec_xxxxx
- * 
+ *
  * 3. Implement the following endpoints:
  */
 
-import { RequestHandler } from 'express';
+import { RequestHandler } from "express";
 
 /**
  * POST /api/create-payment-intent
  * Create a Stripe payment intent for the deposit
- * 
+ *
  * Expected body:
  * {
  *   amount: number,
@@ -52,11 +52,12 @@ export const handleCreatePaymentIntent: RequestHandler = async (req, res) => {
     // res.json({ clientSecret: paymentIntent.client_secret });
 
     res.status(501).json({
-      error: 'Not implemented. See server/routes/payments.ts for setup instructions.',
+      error:
+        "Not implemented. See server/routes/payments.ts for setup instructions.",
     });
   } catch (error) {
-    console.error('Error creating payment intent:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    console.error("Error creating payment intent:", error);
+    res.status(500).json({ error: "Internal server error" });
   }
 };
 
@@ -69,11 +70,12 @@ export const handleConfirmPayment: RequestHandler = async (req, res) => {
     // TODO: Implement payment confirmation
     // This would verify the payment with Stripe and update the booking status
     res.status(501).json({
-      error: 'Not implemented. See server/routes/payments.ts for setup instructions.',
+      error:
+        "Not implemented. See server/routes/payments.ts for setup instructions.",
     });
   } catch (error) {
-    console.error('Error confirming payment:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    console.error("Error confirming payment:", error);
+    res.status(500).json({ error: "Internal server error" });
   }
 };
 
@@ -89,11 +91,12 @@ export const handleRefundPayment: RequestHandler = async (req, res) => {
     // 3. Create Stripe refund
     // 4. Update booking status
     res.status(501).json({
-      error: 'Not implemented. See server/routes/payments.ts for setup instructions.',
+      error:
+        "Not implemented. See server/routes/payments.ts for setup instructions.",
     });
   } catch (error) {
-    console.error('Error refunding payment:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    console.error("Error refunding payment:", error);
+    res.status(500).json({ error: "Internal server error" });
   }
 };
 
@@ -107,11 +110,12 @@ export const handleSchedulePayment: RequestHandler = async (req, res) => {
     // This would create a scheduled payment that charges automatically
     // 30 days before the guest's check-in date
     res.status(501).json({
-      error: 'Not implemented. See server/routes/payments.ts for setup instructions.',
+      error:
+        "Not implemented. See server/routes/payments.ts for setup instructions.",
     });
   } catch (error) {
-    console.error('Error scheduling payment:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    console.error("Error scheduling payment:", error);
+    res.status(500).json({ error: "Internal server error" });
   }
 };
 
@@ -129,11 +133,12 @@ export const handleStripeWebhook: RequestHandler = async (req, res) => {
     // - charge.refunded
     // - customer.subscription.created
     res.status(501).json({
-      error: 'Not implemented. See server/routes/payments.ts for setup instructions.',
+      error:
+        "Not implemented. See server/routes/payments.ts for setup instructions.",
     });
   } catch (error) {
-    console.error('Error handling webhook:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    console.error("Error handling webhook:", error);
+    res.status(500).json({ error: "Internal server error" });
   }
 };
 
@@ -146,11 +151,12 @@ export const handleGetPaymentHistory: RequestHandler = async (req, res) => {
     // TODO: Implement payment history retrieval
     // Query database for all payments related to a booking
     res.status(501).json({
-      error: 'Not implemented. See server/routes/payments.ts for setup instructions.',
+      error:
+        "Not implemented. See server/routes/payments.ts for setup instructions.",
     });
   } catch (error) {
-    console.error('Error fetching payment history:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    console.error("Error fetching payment history:", error);
+    res.status(500).json({ error: "Internal server error" });
   }
 };
 

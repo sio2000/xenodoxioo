@@ -1,5 +1,5 @@
-import { Mail, Phone, MapPin } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Mail, Phone, MapPin } from "lucide-react";
+import { Link } from "react-router-dom";
 
 export default function Footer() {
   const currentYear = new Date().getFullYear();
@@ -28,17 +28,26 @@ export default function Footer() {
             <h4 className="font-semibold text-foreground mb-4">Properties</h4>
             <ul className="space-y-2">
               <li>
-                <Link to="/properties" className="text-muted-foreground hover:text-primary transition-colors text-sm">
+                <Link
+                  to="/properties"
+                  className="text-muted-foreground hover:text-primary transition-colors text-sm"
+                >
                   Browse All
                 </Link>
               </li>
               <li>
-                <a href="#" className="text-muted-foreground hover:text-primary transition-colors text-sm">
+                <a
+                  href="#"
+                  className="text-muted-foreground hover:text-primary transition-colors text-sm"
+                >
                   Featured
                 </a>
               </li>
               <li>
-                <a href="#" className="text-muted-foreground hover:text-primary transition-colors text-sm">
+                <a
+                  href="#"
+                  className="text-muted-foreground hover:text-primary transition-colors text-sm"
+                >
                   New Listings
                 </a>
               </li>
@@ -50,17 +59,26 @@ export default function Footer() {
             <h4 className="font-semibold text-foreground mb-4">Company</h4>
             <ul className="space-y-2">
               <li>
-                <a href="#about" className="text-muted-foreground hover:text-primary transition-colors text-sm">
+                <a
+                  href="#about"
+                  className="text-muted-foreground hover:text-primary transition-colors text-sm"
+                >
                   About Us
                 </a>
               </li>
               <li>
-                <a href="#" className="text-muted-foreground hover:text-primary transition-colors text-sm">
+                <a
+                  href="#"
+                  className="text-muted-foreground hover:text-primary transition-colors text-sm"
+                >
                   Blog
                 </a>
               </li>
               <li>
-                <a href="#" className="text-muted-foreground hover:text-primary transition-colors text-sm">
+                <a
+                  href="#"
+                  className="text-muted-foreground hover:text-primary transition-colors text-sm"
+                >
                   FAQs
                 </a>
               </li>
@@ -73,13 +91,19 @@ export default function Footer() {
             <ul className="space-y-3">
               <li className="flex items-center gap-2 text-muted-foreground text-sm">
                 <Mail size={16} />
-                <a href="mailto:info@leonidionhouses.com" className="hover:text-primary transition-colors">
+                <a
+                  href="mailto:info@leonidionhouses.com"
+                  className="hover:text-primary transition-colors"
+                >
                   info@leonidionhouses.com
                 </a>
               </li>
               <li className="flex items-center gap-2 text-muted-foreground text-sm">
                 <Phone size={16} />
-                <a href="tel:+302754051234" className="hover:text-primary transition-colors">
+                <a
+                  href="tel:+302754051234"
+                  className="hover:text-primary transition-colors"
+                >
                   +30 27540 51234
                 </a>
               </li>

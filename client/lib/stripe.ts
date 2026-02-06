@@ -1,15 +1,15 @@
 /**
  * Stripe Integration Foundation for LEONIDIONHOUSES
- * 
+ *
  * TO SET UP STRIPE:
  * 1. Install @stripe/react-stripe-js:
  *    npm install @stripe/react-stripe-js @stripe/js
- * 
+ *
  * 2. Get your Stripe Publishable Key from https://dashboard.stripe.com/keys
- * 
+ *
  * 3. Create a .env.local file with:
  *    VITE_STRIPE_PUBLISHABLE_KEY=pk_live_xxxxx
- * 
+ *
  * 4. Create backend endpoints in server/routes/payments.ts for:
  *    - POST /api/create-payment-intent
  *    - POST /api/confirm-payment
@@ -18,8 +18,8 @@
 
 // Stripe configuration
 export const STRIPE_CONFIG = {
-  publishableKey: import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY || '',
-  apiVersion: '2024-01-01',
+  publishableKey: import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY || "",
+  apiVersion: "2024-01-01",
 };
 
 // Payment intents configuration
@@ -29,14 +29,16 @@ export const PAYMENT_CONFIG = {
   // Charge remaining 75% 30 days before check-in
   remainingDaysBeforeCharge: 30,
   // Currency
-  currency: 'usd',
+  currency: "usd",
 } as const;
 
 /**
  * Calculate payment amounts based on total booking cost
  */
 export function calculatePaymentAmounts(totalCost: number) {
-  const depositAmount = Math.round(totalCost * PAYMENT_CONFIG.depositPercentage);
+  const depositAmount = Math.round(
+    totalCost * PAYMENT_CONFIG.depositPercentage,
+  );
   const remainingAmount = totalCost - depositAmount;
 
   return {
@@ -44,7 +46,9 @@ export function calculatePaymentAmounts(totalCost: number) {
     depositAmount,
     remainingAmount,
     depositPercentage: (PAYMENT_CONFIG.depositPercentage * 100).toFixed(0),
-    remainingPercentage: ((1 - PAYMENT_CONFIG.depositPercentage) * 100).toFixed(0),
+    remainingPercentage: ((1 - PAYMENT_CONFIG.depositPercentage) * 100).toFixed(
+      0,
+    ),
   };
 }
 
@@ -60,20 +64,20 @@ export function calculateRefund(
   policy: string;
 } {
   let refundPercentage = 0;
-  let policy = '';
+  let policy = "";
 
   if (daysBeforeCheckIn > 60) {
     // Cancel more than 60 days before: keep 25% (the deposit)
     refundPercentage = 0.75;
-    policy = 'Cancel >60 days: 75% refund, 25% retained';
+    policy = "Cancel >60 days: 75% refund, 25% retained";
   } else if (daysBeforeCheckIn > 30) {
     // Cancel 30-60 days before: keep 50%
-    refundPercentage = 0.50;
-    policy = 'Cancel 30-60 days: 50% refund, 50% retained';
+    refundPercentage = 0.5;
+    policy = "Cancel 30-60 days: 50% refund, 50% retained";
   } else {
     // Cancel less than 30 days before: no refund
     refundPercentage = 0;
-    policy = 'Cancel <30 days: No refund';
+    policy = "Cancel <30 days: No refund";
   }
 
   const refundAmount = Math.round(totalCost * refundPercentage);
@@ -107,7 +111,7 @@ export interface BookingPayment {
   remainingAmount: number;
   totalAmount: number;
   currency: string;
-  status: 'pending' | 'deposit_paid' | 'completed' | 'refunded';
+  status: "pending" | "deposit_paid" | "completed" | "refunded";
   depositPaymentIntentId?: string;
   remainingPaymentIntentId?: string;
   remainingPaymentDueDate?: Date;
@@ -118,8 +122,8 @@ export interface BookingPayment {
  * Stripe API endpoints
  */
 export const STRIPE_ENDPOINTS = {
-  createPaymentIntent: '/api/create-payment-intent',
-  confirmPayment: '/api/confirm-payment',
-  refundPayment: '/api/refund-payment',
-  webhookEvents: '/api/webhook/stripe',
+  createPaymentIntent: "/api/create-payment-intent",
+  confirmPayment: "/api/confirm-payment",
+  refundPayment: "/api/refund-payment",
+  webhookEvents: "/api/webhook/stripe",
 } as const;

@@ -1,41 +1,53 @@
-import Layout from '@/components/Layout';
-import { Link } from 'react-router-dom';
-import { Calendar, Users, MapPin, Search, Star, Wifi, Utensils, Waves } from 'lucide-react';
-import { useState } from 'react';
+import Layout from "@/components/Layout";
+import { Link } from "react-router-dom";
+import {
+  Calendar,
+  Users,
+  MapPin,
+  Search,
+  Star,
+  Wifi,
+  Utensils,
+  Waves,
+} from "lucide-react";
+import { useState } from "react";
 
 export default function Index() {
-  const [checkIn, setCheckIn] = useState('');
-  const [checkOut, setCheckOut] = useState('');
-  const [guests, setGuests] = useState('2');
+  const [checkIn, setCheckIn] = useState("");
+  const [checkOut, setCheckOut] = useState("");
+  const [guests, setGuests] = useState("2");
 
   // Featured properties data
   const featuredProperties = [
     {
       id: 1,
-      name: 'The Lykoskufi Villas',
-      description: 'Luxury villas with breathtaking sea views',
+      name: "The Lykoskufi Villas",
+      description: "Luxury villas with breathtaking sea views",
       units: 3,
-      image: 'https://images.unsplash.com/photo-1564013799919-ab600027ffc6?w=600&h=400&fit=crop',
+      image:
+        "https://images.unsplash.com/photo-1564013799919-ab600027ffc6?w=600&h=400&fit=crop",
       price: 250,
       rating: 4.8,
       reviews: 124,
     },
     {
       id: 2,
-      name: 'The Ogra House',
-      description: 'Elegant seaside retreat for families',
+      name: "The Ogra House",
+      description: "Elegant seaside retreat for families",
       units: 1,
-      image: 'https://images.unsplash.com/photo-1568605114967-8130f3a36994?w=600&h=400&fit=crop',
+      image:
+        "https://images.unsplash.com/photo-1568605114967-8130f3a36994?w=600&h=400&fit=crop",
       price: 180,
       rating: 4.9,
       reviews: 87,
     },
     {
       id: 3,
-      name: 'The Bungalows',
-      description: 'Modern, cozy bungalows nestled in nature',
+      name: "The Bungalows",
+      description: "Modern, cozy bungalows nestled in nature",
       units: 2,
-      image: 'https://images.unsplash.com/photo-1566073771259-6a8506099945?w=600&h=400&fit=crop',
+      image:
+        "https://images.unsplash.com/photo-1566073771259-6a8506099945?w=600&h=400&fit=crop",
       price: 150,
       rating: 4.7,
       reviews: 102,
@@ -43,19 +55,35 @@ export default function Index() {
   ];
 
   const amenities = [
-    { icon: Wifi, label: 'Fast WiFi', description: 'High-speed internet in all units' },
-    { icon: Utensils, label: 'Full Kitchen', description: 'Equipped for self-catering' },
-    { icon: Waves, label: 'Beach Access', description: 'Direct or nearby beach access' },
-    { icon: MapPin, label: 'Prime Location', description: 'Heart of Leonidion' },
+    {
+      icon: Wifi,
+      label: "Fast WiFi",
+      description: "High-speed internet in all units",
+    },
+    {
+      icon: Utensils,
+      label: "Full Kitchen",
+      description: "Equipped for self-catering",
+    },
+    {
+      icon: Waves,
+      label: "Beach Access",
+      description: "Direct or nearby beach access",
+    },
+    {
+      icon: MapPin,
+      label: "Prime Location",
+      description: "Heart of Leonidion",
+    },
   ];
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
     // Navigate to properties with filters
     const params = new URLSearchParams();
-    if (checkIn) params.set('checkIn', checkIn);
-    if (checkOut) params.set('checkOut', checkOut);
-    if (guests) params.set('guests', guests);
+    if (checkIn) params.set("checkIn", checkIn);
+    if (checkOut) params.set("checkOut", checkOut);
+    if (guests) params.set("guests", guests);
     window.location.href = `/properties?${params.toString()}`;
   };
 
@@ -71,19 +99,26 @@ export default function Index() {
         <div className="relative container-max py-20 md:py-32">
           <div className="max-w-3xl">
             <h1 className="text-4xl md:text-6xl font-bold mb-6 leading-tight">
-              Discover Your Perfect <span className="text-accent">Greek Escape</span>
+              Discover Your Perfect{" "}
+              <span className="text-accent">Greek Escape</span>
             </h1>
             <p className="text-lg md:text-xl text-white/90 mb-8">
-              Luxury villa rentals in Leonidion. Book your dream vacation today and experience authentic Greek hospitality.
+              Luxury villa rentals in Leonidion. Book your dream vacation today
+              and experience authentic Greek hospitality.
             </p>
           </div>
 
           {/* Search Bar */}
-          <form onSubmit={handleSearch} className="bg-white rounded-2xl shadow-2xl p-6 md:p-8 -mb-12 relative z-10">
+          <form
+            onSubmit={handleSearch}
+            className="bg-white rounded-2xl shadow-2xl p-6 md:p-8 -mb-12 relative z-10"
+          >
             <div className="grid md:grid-cols-5 gap-4 md:gap-3">
               {/* Check-in */}
               <div className="space-y-2">
-                <label className="block text-sm font-semibold text-foreground">Check In</label>
+                <label className="block text-sm font-semibold text-foreground">
+                  Check In
+                </label>
                 <div className="flex items-center gap-2 border border-border rounded-lg px-3 py-2">
                   <Calendar size={18} className="text-primary" />
                   <input
@@ -97,7 +132,9 @@ export default function Index() {
 
               {/* Check-out */}
               <div className="space-y-2">
-                <label className="block text-sm font-semibold text-foreground">Check Out</label>
+                <label className="block text-sm font-semibold text-foreground">
+                  Check Out
+                </label>
                 <div className="flex items-center gap-2 border border-border rounded-lg px-3 py-2">
                   <Calendar size={18} className="text-primary" />
                   <input
@@ -111,7 +148,9 @@ export default function Index() {
 
               {/* Guests */}
               <div className="space-y-2">
-                <label className="block text-sm font-semibold text-foreground">Guests</label>
+                <label className="block text-sm font-semibold text-foreground">
+                  Guests
+                </label>
                 <div className="flex items-center gap-2 border border-border rounded-lg px-3 py-2">
                   <Users size={18} className="text-primary" />
                   <select
@@ -119,8 +158,10 @@ export default function Index() {
                     onChange={(e) => setGuests(e.target.value)}
                     className="flex-1 outline-none text-foreground"
                   >
-                    {[1, 2, 3, 4, 5, 6, 7, 8].map(n => (
-                      <option key={n} value={n}>{n} {n === 1 ? 'Guest' : 'Guests'}</option>
+                    {[1, 2, 3, 4, 5, 6, 7, 8].map((n) => (
+                      <option key={n} value={n}>
+                        {n} {n === 1 ? "Guest" : "Guests"}
+                      </option>
                     ))}
                   </select>
                 </div>
@@ -169,7 +210,9 @@ export default function Index() {
                   className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
                 />
                 <div className="absolute top-4 right-4 bg-white rounded-lg px-3 py-1 shadow-lg">
-                  <span className="text-primary font-bold">${property.price}</span>
+                  <span className="text-primary font-bold">
+                    ${property.price}
+                  </span>
                   <span className="text-muted-foreground text-sm">/night</span>
                 </div>
               </div>
@@ -190,11 +233,15 @@ export default function Index() {
                       <Star
                         key={i}
                         size={16}
-                        className={i < 5 ? 'fill-accent text-accent' : 'text-border'}
+                        className={
+                          i < 5 ? "fill-accent text-accent" : "text-border"
+                        }
                       />
                     ))}
                   </div>
-                  <span className="font-semibold text-foreground">{property.rating}</span>
+                  <span className="font-semibold text-foreground">
+                    {property.rating}
+                  </span>
                   <span className="text-muted-foreground text-sm">
                     ({property.reviews} reviews)
                   </span>
@@ -202,7 +249,7 @@ export default function Index() {
 
                 {/* Units */}
                 <div className="text-sm text-muted-foreground">
-                  {property.units} unit{property.units > 1 ? 's' : ''} available
+                  {property.units} unit{property.units > 1 ? "s" : ""} available
                 </div>
               </div>
             </Link>
@@ -234,9 +281,7 @@ export default function Index() {
                   <h3 className="text-lg font-bold text-foreground mb-2">
                     {amenity.label}
                   </h3>
-                  <p className="text-muted-foreground">
-                    {amenity.description}
-                  </p>
+                  <p className="text-muted-foreground">{amenity.description}</p>
                 </div>
               );
             })}
@@ -251,7 +296,8 @@ export default function Index() {
             Trusted by Thousands of Guests
           </h2>
           <p className="text-muted-foreground text-lg mb-8 max-w-2xl mx-auto">
-            Since 2015, we've been providing unforgettable vacation experiences in Leonidion. Join our growing community of satisfied travelers.
+            Since 2015, we've been providing unforgettable vacation experiences
+            in Leonidion. Join our growing community of satisfied travelers.
           </p>
           <div className="grid md:grid-cols-3 gap-8">
             <div>
@@ -277,7 +323,8 @@ export default function Index() {
             Ready to Plan Your Escape?
           </h2>
           <p className="text-lg text-white/90 mb-8 max-w-2xl mx-auto">
-            Explore our beautiful properties and book your perfect getaway in Leonidion today.
+            Explore our beautiful properties and book your perfect getaway in
+            Leonidion today.
           </p>
           <Link
             to="/properties"

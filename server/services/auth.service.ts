@@ -1,19 +1,25 @@
-import prisma from '../lib/db';
-import { AuthError, ConflictError, NotFoundError, ValidationError } from '../lib/errors';
-import jwt from 'jsonwebtoken';
-import bcrypt from 'bcryptjs';
-import crypto from 'crypto';
+import prisma from "../lib/db";
+import {
+  AuthError,
+  ConflictError,
+  NotFoundError,
+  ValidationError,
+} from "../lib/errors";
+import jwt from "jsonwebtoken";
+import bcrypt from "bcryptjs";
+import crypto from "crypto";
 
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
-const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || 'your-refresh-secret';
-const JWT_EXPIRY = process.env.JWT_EXPIRY || '7d';
-const JWT_REFRESH_EXPIRY = process.env.JWT_REFRESH_EXPIRY || '30d';
-const BCRYPT_ROUNDS = parseInt(process.env.BCRYPT_ROUNDS || '10', 10);
+const JWT_SECRET = process.env.JWT_SECRET || "your-secret-key";
+const JWT_REFRESH_SECRET =
+  process.env.JWT_REFRESH_SECRET || "your-refresh-secret";
+const JWT_EXPIRY = process.env.JWT_EXPIRY || "7d";
+const JWT_REFRESH_EXPIRY = process.env.JWT_REFRESH_EXPIRY || "30d";
+const BCRYPT_ROUNDS = parseInt(process.env.BCRYPT_ROUNDS || "10", 10);
 
 export interface JwtPayload {
   userId: string;
   email: string;
-  role: 'CUSTOMER' | 'ADMIN';
+  role: "CUSTOMER" | "ADMIN";
 }
 
 /**
@@ -28,7 +34,7 @@ export async function hashPassword(password: string): Promise<string> {
  */
 export async function comparePassword(
   password: string,
-  hash: string
+  hash: string,
 ): Promise<boolean> {
   return bcrypt.compare(password, hash);
 }
@@ -36,7 +42,10 @@ export async function comparePassword(
 /**
  * Generate JWT token
  */
-export function generateToken(payload: JwtPayload, expiresIn: string = JWT_EXPIRY): string {
+export function generateToken(
+  payload: JwtPayload,
+  expiresIn: string = JWT_EXPIRY,
+): string {
   return jwt.sign(payload, JWT_SECRET, { expiresIn });
 }
 
@@ -44,7 +53,9 @@ export function generateToken(payload: JwtPayload, expiresIn: string = JWT_EXPIR
  * Generate refresh token
  */
 export function generateRefreshToken(payload: JwtPayload): string {
-  return jwt.sign(payload, JWT_REFRESH_SECRET, { expiresIn: JWT_REFRESH_EXPIRY });
+  return jwt.sign(payload, JWT_REFRESH_SECRET, {
+    expiresIn: JWT_REFRESH_EXPIRY,
+  });
 }
 
 /**
@@ -54,7 +65,7 @@ export function verifyToken(token: string): JwtPayload {
   try {
     return jwt.verify(token, JWT_SECRET) as JwtPayload;
   } catch (error) {
-    throw new AuthError('Invalid or expired token');
+    throw new AuthError("Invalid or expired token");
   }
 }
 
@@ -65,7 +76,7 @@ export function verifyRefreshToken(token: string): JwtPayload {
   try {
     return jwt.verify(token, JWT_REFRESH_SECRET) as JwtPayload;
   } catch (error) {
-    throw new AuthError('Invalid or expired refresh token');
+    throw new AuthError("Invalid or expired refresh token");
   }
 }
 
@@ -76,15 +87,15 @@ export async function registerUser(
   email: string,
   firstName: string,
   lastName: string,
-  password: string
+  password: string,
 ) {
   // Validate input
   if (!email || !firstName || !lastName || !password) {
-    throw new ValidationError('Missing required fields');
+    throw new ValidationError("Missing required fields");
   }
 
   if (password.length < 8) {
-    throw new ValidationError('Password must be at least 8 characters long');
+    throw new ValidationError("Password must be at least 8 characters long");
   }
 
   // Check if user exists
@@ -93,7 +104,7 @@ export async function registerUser(
   });
 
   if (existingUser) {
-    throw new ConflictError('User with this email already exists');
+    throw new ConflictError("User with this email already exists");
   }
 
   // Hash password
@@ -123,7 +134,7 @@ export async function registerUser(
  */
 export async function loginUser(email: string, password: string) {
   if (!email || !password) {
-    throw new ValidationError('Email and password are required');
+    throw new ValidationError("Email and password are required");
   }
 
   const user = await prisma.user.findUnique({
@@ -131,12 +142,12 @@ export async function loginUser(email: string, password: string) {
   });
 
   if (!user) {
-    throw new AuthError('Invalid email or password');
+    throw new AuthError("Invalid email or password");
   }
 
   const isPasswordValid = await comparePassword(password, user.password);
   if (!isPasswordValid) {
-    throw new AuthError('Invalid email or password');
+    throw new AuthError("Invalid email or password");
   }
 
   const payload: JwtPayload = {
@@ -183,7 +194,7 @@ export async function refreshAccessToken(refreshToken: string) {
   });
 
   if (!session || session.isRevoked) {
-    throw new AuthError('Invalid refresh token');
+    throw new AuthError("Invalid refresh token");
   }
 
   const user = await prisma.user.findUnique({
@@ -191,7 +202,7 @@ export async function refreshAccessToken(refreshToken: string) {
   });
 
   if (!user) {
-    throw new NotFoundError('User not found');
+    throw new NotFoundError("User not found");
   }
 
   const newPayload: JwtPayload = {
@@ -219,7 +230,7 @@ export async function requestPasswordReset(email: string) {
   }
 
   // Generate reset token
-  const resetToken = crypto.randomBytes(32).toString('hex');
+  const resetToken = crypto.randomBytes(32).toString("hex");
   const expiresAt = new Date(Date.now() + 1 * 60 * 60 * 1000); // 1 hour
 
   await prisma.passwordReset.create({
@@ -240,12 +251,9 @@ export async function requestPasswordReset(email: string) {
 /**
  * Reset password with token
  */
-export async function resetPassword(
-  token: string,
-  newPassword: string
-) {
+export async function resetPassword(token: string, newPassword: string) {
   if (!newPassword || newPassword.length < 8) {
-    throw new ValidationError('Password must be at least 8 characters long');
+    throw new ValidationError("Password must be at least 8 characters long");
   }
 
   const resetRecord = await prisma.passwordReset.findUnique({
@@ -253,11 +261,11 @@ export async function resetPassword(
   });
 
   if (!resetRecord || resetRecord.isUsed) {
-    throw new AuthError('Invalid or expired reset token');
+    throw new AuthError("Invalid or expired reset token");
   }
 
   if (new Date() > resetRecord.expiresAt) {
-    throw new AuthError('Reset token has expired');
+    throw new AuthError("Reset token has expired");
   }
 
   const hashedPassword = await hashPassword(newPassword);
@@ -311,7 +319,7 @@ export async function getUserById(userId: string) {
   });
 
   if (!user) {
-    throw new NotFoundError('User not found');
+    throw new NotFoundError("User not found");
   }
 
   return user;
@@ -330,7 +338,7 @@ export async function updateUserProfile(
     city?: string;
     zipCode?: string;
     country?: string;
-  }
+  },
 ) {
   const user = await prisma.user.update({
     where: { id: userId },
@@ -361,10 +369,10 @@ export async function updateUserProfile(
 export async function changePassword(
   userId: string,
   currentPassword: string,
-  newPassword: string
+  newPassword: string,
 ) {
   if (!newPassword || newPassword.length < 8) {
-    throw new ValidationError('Password must be at least 8 characters long');
+    throw new ValidationError("Password must be at least 8 characters long");
   }
 
   const user = await prisma.user.findUnique({
@@ -372,12 +380,12 @@ export async function changePassword(
   });
 
   if (!user) {
-    throw new NotFoundError('User not found');
+    throw new NotFoundError("User not found");
   }
 
   const isPasswordValid = await comparePassword(currentPassword, user.password);
   if (!isPasswordValid) {
-    throw new AuthError('Current password is incorrect');
+    throw new AuthError("Current password is incorrect");
   }
 
   const hashedPassword = await hashPassword(newPassword);

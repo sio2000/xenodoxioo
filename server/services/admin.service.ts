@@ -1,5 +1,5 @@
-import prisma from '../lib/db';
-import { NotFoundError, ValidationError, AppError } from '../lib/errors';
+import prisma from "../lib/db";
+import { NotFoundError, ValidationError, AppError } from "../lib/errors";
 
 /**
  * Get admin dashboard statistics
@@ -14,13 +14,13 @@ export async function getAdminStats() {
     properties,
   ] = await Promise.all([
     prisma.booking.count(),
-    prisma.booking.count({ where: { status: 'CONFIRMED' } }),
-    prisma.booking.count({ where: { status: 'PENDING' } }),
+    prisma.booking.count({ where: { status: "CONFIRMED" } }),
+    prisma.booking.count({ where: { status: "PENDING" } }),
     prisma.payment.aggregate({
-      where: { status: 'SUCCEEDED' },
+      where: { status: "SUCCEEDED" },
       _sum: { amount: true },
     }),
-    prisma.user.count({ where: { role: 'CUSTOMER' } }),
+    prisma.user.count({ where: { role: "CUSTOMER" } }),
     prisma.property.findMany({
       include: {
         _count: {
@@ -37,13 +37,13 @@ export async function getAdminStats() {
       const bookedDays = await prisma.booking.aggregate({
         where: {
           unit: { propertyId: prop.id },
-          status: { in: ['CONFIRMED', 'CHECKED_IN', 'CHECKED_OUT'] },
+          status: { in: ["CONFIRMED", "CHECKED_IN", "CHECKED_OUT"] },
         },
         _sum: { nights: true },
       });
 
       const occupancyPercentage = Math.round(
-        ((bookedDays._sum.nights || 0) / (totalDays * prop._count.units)) * 100
+        ((bookedDays._sum.nights || 0) / (totalDays * prop._count.units)) * 100,
       );
 
       return {
@@ -52,7 +52,7 @@ export async function getAdminStats() {
         units: prop._count.units,
         occupancyPercentage,
       };
-    })
+    }),
   );
 
   return {
@@ -77,7 +77,7 @@ export async function getAllBookings(
     propertyId?: string;
     startDate?: Date;
     endDate?: Date;
-  } = {}
+  } = {},
 ) {
   const skip = (page - 1) * pageSize;
 
@@ -102,7 +102,7 @@ export async function getAllBookings(
         user: true,
         payments: true,
       },
-      orderBy: { createdAt: 'desc' },
+      orderBy: { createdAt: "desc" },
       skip,
       take: pageSize,
     }),
@@ -126,7 +126,7 @@ export async function getAllUsers(page: number = 1, pageSize: number = 20) {
 
   const [users, total] = await Promise.all([
     prisma.user.findMany({
-      where: { role: 'CUSTOMER' },
+      where: { role: "CUSTOMER" },
       select: {
         id: true,
         email: true,
@@ -137,11 +137,11 @@ export async function getAllUsers(page: number = 1, pageSize: number = 20) {
         createdAt: true,
         _count: { select: { bookings: true } },
       },
-      orderBy: { createdAt: 'desc' },
+      orderBy: { createdAt: "desc" },
       skip,
       take: pageSize,
     }),
-    prisma.user.count({ where: { role: 'CUSTOMER' } }),
+    prisma.user.count({ where: { role: "CUSTOMER" } }),
   ]);
 
   return {
@@ -167,14 +167,14 @@ export async function createProperty(data: {
 }) {
   // Validate
   if (!data.name || !data.description || !data.city) {
-    throw new ValidationError('Missing required property fields');
+    throw new ValidationError("Missing required property fields");
   }
 
   // Create property
   const slug = data.name
     .toLowerCase()
-    .replace(/\s+/g, '-')
-    .replace(/[^\w-]/g, '');
+    .replace(/\s+/g, "-")
+    .replace(/[^\w-]/g, "");
 
   const property = await prisma.property.create({
     data: {
@@ -182,7 +182,7 @@ export async function createProperty(data: {
       description: data.description,
       location: data.location,
       city: data.city,
-      country: data.country || 'Greece',
+      country: data.country || "Greece",
       mainImage: data.mainImage,
       galleryImages: data.galleryImages || [],
       slug,
@@ -210,7 +210,7 @@ export async function updateProperty(
     city?: string;
     mainImage?: string;
     galleryImages?: string[];
-  }
+  },
 ) {
   const property = await prisma.property.update({
     where: { id: propertyId },
@@ -235,11 +235,11 @@ export async function createUnit(
     basePrice: number;
     cleaningFee?: number;
     images?: string[];
-  }
+  },
 ) {
   // Validate
   if (!data.name || !data.maxGuests || !data.basePrice) {
-    throw new ValidationError('Missing required unit fields');
+    throw new ValidationError("Missing required unit fields");
   }
 
   // Check property exists
@@ -248,13 +248,13 @@ export async function createUnit(
   });
 
   if (!property) {
-    throw new NotFoundError('Property not found');
+    throw new NotFoundError("Property not found");
   }
 
   const slug = data.name
     .toLowerCase()
-    .replace(/\s+/g, '-')
-    .replace(/[^\w-]/g, '');
+    .replace(/\s+/g, "-")
+    .replace(/[^\w-]/g, "");
 
   const unit = await prisma.unit.create({
     data: {
@@ -282,10 +282,10 @@ export async function blockDates(
   propertyId: string,
   startDate: Date,
   endDate: Date,
-  reason?: string
+  reason?: string,
 ) {
   if (startDate >= endDate) {
-    throw new ValidationError('End date must be after start date');
+    throw new ValidationError("End date must be after start date");
   }
 
   const property = await prisma.property.findUnique({
@@ -293,7 +293,7 @@ export async function blockDates(
   });
 
   if (!property) {
-    throw new NotFoundError('Property not found');
+    throw new NotFoundError("Property not found");
   }
 
   const blockage = await prisma.dateBlockage.create({
@@ -330,14 +330,14 @@ export async function createSeasonalPricing(
     endDate: Date;
     pricePerNight: number;
     minStayDays?: number;
-  }
+  },
 ) {
   if (!data.name || !data.pricePerNight) {
-    throw new ValidationError('Missing required pricing fields');
+    throw new ValidationError("Missing required pricing fields");
   }
 
   if (data.startDate >= data.endDate) {
-    throw new ValidationError('End date must be after start date');
+    throw new ValidationError("End date must be after start date");
   }
 
   const property = await prisma.property.findUnique({
@@ -345,7 +345,7 @@ export async function createSeasonalPricing(
   });
 
   if (!property) {
-    throw new NotFoundError('Property not found');
+    throw new NotFoundError("Property not found");
   }
 
   const pricing = await prisma.seasonalPricing.create({
@@ -371,7 +371,7 @@ export async function updateSeasonalPricing(
     name?: string;
     pricePerNight?: number;
     minStayDays?: number;
-  }
+  },
 ) {
   const pricing = await prisma.seasonalPricing.update({
     where: { id: pricingId },
@@ -398,7 +398,7 @@ export async function deleteSeasonalPricing(pricingId: string) {
 export async function createCoupon(data: {
   code: string;
   description?: string;
-  discountType: 'PERCENTAGE' | 'FIXED';
+  discountType: "PERCENTAGE" | "FIXED";
   discountValue: number;
   validFrom: Date;
   validUntil: Date;
@@ -433,7 +433,7 @@ export async function updateCoupon(
     validUntil?: Date;
     maxUses?: number;
     isActive?: boolean;
-  }
+  },
 ) {
   const coupon = await prisma.coupon.update({
     where: { id: couponId },
@@ -454,7 +454,7 @@ export async function modifyBooking(
   data: {
     notes?: string;
     specialRequests?: string;
-  }
+  },
 ) {
   const booking = await prisma.booking.update({
     where: { id: bookingId },
@@ -473,7 +473,7 @@ export async function logAdminAction(
   entityType: string,
   entityId?: string,
   description?: string,
-  changes?: any
+  changes?: any,
 ) {
   const log = await prisma.adminLog.create({
     data: {
@@ -495,7 +495,7 @@ export async function logAdminAction(
 export async function getAdminLogs(
   page: number = 1,
   pageSize: number = 50,
-  filters: { adminId?: string; action?: string; entityType?: string } = {}
+  filters: { adminId?: string; action?: string; entityType?: string } = {},
 ) {
   const skip = (page - 1) * pageSize;
 
@@ -507,8 +507,10 @@ export async function getAdminLogs(
   const [logs, total] = await Promise.all([
     prisma.adminLog.findMany({
       where,
-      include: { admin: { select: { email: true, firstName: true, lastName: true } } },
-      orderBy: { createdAt: 'desc' },
+      include: {
+        admin: { select: { email: true, firstName: true, lastName: true } },
+      },
+      orderBy: { createdAt: "desc" },
       skip,
       take: pageSize,
     }),

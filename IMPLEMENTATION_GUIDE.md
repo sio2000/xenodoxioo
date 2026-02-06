@@ -11,6 +11,7 @@ A production-ready multilingual villa booking SaaS platform for luxury property 
 ### ✅ Completed Components
 
 #### Design & Branding
+
 - **Color Scheme**: Mediterranean Blues & Whites with Gold accents
 - **Typography**: Poppins font family for modern luxury feel
 - **Responsive Design**: Mobile-first approach with Tailwind CSS
@@ -82,6 +83,7 @@ A production-ready multilingual villa booking SaaS platform for luxury property 
    - Stripe configuration panel
 
 #### Navigation & Layout
+
 - **Navigation Component** (`client/components/Navigation.tsx`)
   - Sticky header with logo
   - Desktop menu
@@ -100,6 +102,7 @@ A production-ready multilingual villa booking SaaS platform for luxury property 
   - Navigation + Footer integration
 
 #### Multi-Language Support (i18n)
+
 - **Languages**: English, French, German, Greek
 - **System**: Context-based i18n with localStorage persistence
 - **Components**:
@@ -109,6 +112,7 @@ A production-ready multilingual villa booking SaaS platform for luxury property 
 - **Coverage**: All major UI text strings translated
 
 #### Stripe Payment Integration (Foundation)
+
 - **Configuration**: `client/lib/stripe.ts`
   - Payment amount calculations
   - Refund policy logic
@@ -190,10 +194,12 @@ Package structure:
 ## 🚀 Getting Started
 
 ### Prerequisites
+
 - Node.js 18+
 - pnpm (recommended) or npm
 
 ### Installation
+
 ```bash
 pnpm install
 pnpm run dev
@@ -202,6 +208,7 @@ pnpm run dev
 The app runs on `http://localhost:8080`
 
 ### Build for Production
+
 ```bash
 pnpm run build
 pnpm run start
@@ -212,11 +219,13 @@ pnpm run start
 ## 📋 Next Steps for Full Implementation
 
 ### 1. **Complete Stripe Integration** (Priority 1)
+
 ```bash
 pnpm install @stripe/react-stripe-js @stripe/js
 ```
 
 **Setup:**
+
 - Get Stripe API keys from https://dashboard.stripe.com/keys
 - Create `.env.local`:
   ```
@@ -229,14 +238,17 @@ pnpm install @stripe/react-stripe-js @stripe/js
 - Add webhook handler for payment events
 
 **Files to modify:**
+
 - `server/routes/payments.ts` - Implement all endpoints
 - `client/pages/Checkout.tsx` - Add Stripe Elements
 - `server/index.ts` - Register payment routes
 
 ### 2. **Database Setup** (Priority 1)
+
 Set up a database (PostgreSQL recommended):
 
 **Tables needed:**
+
 - `users` - Guest and admin accounts
 - `properties` - Villa properties
 - `units` - Individual rental units
@@ -250,18 +262,22 @@ Set up a database (PostgreSQL recommended):
 **ORM:** Consider using Prisma or Drizzle
 
 ### 3. **Authentication System** (Priority 2)
+
 - Implement email/password authentication
 - Password reset flow
 - Session management
 - Role-based access control (admin vs customer)
 
 **Recommended:**
+
 - JWT tokens for API auth
 - Secure password hashing
 - Email verification
 
 ### 4. **Email Notifications** (Priority 2)
+
 Implement transactional emails:
+
 - Booking confirmation
 - Payment confirmation
 - Arrival reminder (7 days before)
@@ -272,6 +288,7 @@ Implement transactional emails:
 **Services:** SendGrid, Mailgun, or AWS SES
 
 ### 5. **Booking Engine** (Priority 2)
+
 - Real availability calendar syncing
 - Block dates (maintenance, admin blocks)
 - Minimum stay enforcement
@@ -279,6 +296,7 @@ Implement transactional emails:
 - Overbooking prevention
 
 ### 6. **Admin Features** (Priority 3)
+
 - Property management (CRUD)
 - Unit management
 - Date blocking interface
@@ -290,6 +308,7 @@ Implement transactional emails:
 - Manual booking creation
 
 ### 7. **Pricing Engine** (Priority 3)
+
 - Seasonal pricing per unit
 - Long-stay discounts (e.g., 7+ nights = 10% off)
 - Minimum stay rules by date range
@@ -298,7 +317,9 @@ Implement transactional emails:
 - Tax calculation and display
 
 ### 8. **Extras/Add-ons** (Priority 3)
+
 Examples to implement:
+
 - Breakfast ($15/person/night)
 - Airport transfer ($50/trip)
 - Extra cleaning ($50)
@@ -306,7 +327,9 @@ Examples to implement:
 - Crib/highchair ($10/night)
 
 ### 9. **Cancellation Policy** (Priority 2)
+
 Default rules (configurable by admin):
+
 - Cancel >60 days: 75% refund (keep deposit)
 - Cancel 30-60 days: 50% refund
 - Cancel <30 days: No refund
@@ -315,6 +338,7 @@ Default rules (configurable by admin):
 Automatic refund processing via Stripe
 
 ### 10. **Testing & Deployment** (Priority 3)
+
 - Unit tests with Vitest
 - E2E tests with Playwright
 - Staging environment
@@ -324,31 +348,32 @@ Automatic refund processing via Stripe
 
 ## 📱 Key Features Status
 
-| Feature | Status | Notes |
-|---------|--------|-------|
-| Homepage | ✅ Complete | Beautiful hero + featured properties |
-| Property Listing | ✅ Complete | Filters, responsive grid |
-| Availability Calendar | ✅ Complete | Visual date selection |
-| Property Detail | ✅ Complete | Images, amenities, reviews, booking widget |
-| Checkout Form | ✅ Complete | Guest info, billing, payment form |
-| User Auth UI | ✅ Complete | Login/register pages (needs backend) |
-| User Dashboard | ✅ Complete | Bookings, profile, preferences |
-| Admin Panel | ✅ Complete | Dashboard, management interfaces |
-| Stripe Foundation | ✅ Complete | Config, service layer, endpoints scaffold |
-| i18n (4 languages) | ✅ Complete | Language switcher, all text translated |
-| Responsive Design | ✅ Complete | Mobile-first, all breakpoints |
-| Dark Mode | ⏳ Optional | CSS variables set up for easy addition |
-| Database | ⏳ Not started | Needs implementation |
-| Payment Processing | ⏳ Partial | Frontend done, backend needed |
-| Email Notifications | ⏳ Not started | Needs email service integration |
-| Admin Features | ⏳ Partial | UI done, backend logic needed |
-| Booking Engine | ⏳ Partial | Calendar UI done, server logic needed |
+| Feature               | Status         | Notes                                      |
+| --------------------- | -------------- | ------------------------------------------ |
+| Homepage              | ✅ Complete    | Beautiful hero + featured properties       |
+| Property Listing      | ✅ Complete    | Filters, responsive grid                   |
+| Availability Calendar | ✅ Complete    | Visual date selection                      |
+| Property Detail       | ✅ Complete    | Images, amenities, reviews, booking widget |
+| Checkout Form         | ✅ Complete    | Guest info, billing, payment form          |
+| User Auth UI          | ✅ Complete    | Login/register pages (needs backend)       |
+| User Dashboard        | ✅ Complete    | Bookings, profile, preferences             |
+| Admin Panel           | ✅ Complete    | Dashboard, management interfaces           |
+| Stripe Foundation     | ✅ Complete    | Config, service layer, endpoints scaffold  |
+| i18n (4 languages)    | ✅ Complete    | Language switcher, all text translated     |
+| Responsive Design     | ✅ Complete    | Mobile-first, all breakpoints              |
+| Dark Mode             | ⏳ Optional    | CSS variables set up for easy addition     |
+| Database              | ⏳ Not started | Needs implementation                       |
+| Payment Processing    | ⏳ Partial     | Frontend done, backend needed              |
+| Email Notifications   | ⏳ Not started | Needs email service integration            |
+| Admin Features        | ⏳ Partial     | UI done, backend logic needed              |
+| Booking Engine        | ⏳ Partial     | Calendar UI done, server logic needed      |
 
 ---
 
 ## 🎨 Design System
 
 ### Colors (Mediterranean Theme)
+
 - **Primary**: `#0677A1` (Mediterranean Blue)
 - **Accent**: `#FFB81C` (Gold)
 - **Background**: `#FFFFFF`
@@ -356,6 +381,7 @@ Automatic refund processing via Stripe
 - **Muted**: `#E0E0E0` (Light Gray)
 
 ### Typography
+
 - **Font**: Poppins (400, 500, 600, 700, 800)
 - **H1**: 2.25rem (mobile) → 3.75rem (desktop)
 - **H2**: 1.875rem (mobile) → 2.25rem (desktop)
@@ -363,11 +389,13 @@ Automatic refund processing via Stripe
 - **Small**: 0.875rem
 
 ### Spacing
+
 - Container max-width: 1280px
 - Padding: 1rem (mobile) → 2rem (desktop)
 - Gap: 1.5rem (components)
 
 ### Components
+
 - All buttons use `.btn-primary` or `.btn-secondary` classes
 - Cards use `.card-hover` for interactive states
 - Forms have consistent styling with focus states
@@ -447,6 +475,7 @@ When implementing the remaining features:
 ## 🎉 Summary
 
 You now have a beautiful, modern, production-ready villa booking SaaS platform with:
+
 - ✅ Complete frontend UI/UX
 - ✅ Responsive design (mobile to desktop)
 - ✅ Multi-language support (4 languages)

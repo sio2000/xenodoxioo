@@ -1,8 +1,8 @@
-import { Link } from 'react-router-dom';
-import { Menu, X } from 'lucide-react';
-import { useState } from 'react';
-import { useLanguage } from '@/hooks/useLanguage';
-import LanguageSwitcher from './LanguageSwitcher';
+import { Link } from "react-router-dom";
+import { Menu, X } from "lucide-react";
+import { useState } from "react";
+import { useLanguage } from "@/hooks/useLanguage";
+import LanguageSwitcher from "./LanguageSwitcher";
 
 export default function Navigation() {
   const [isOpen, setIsOpen] = useState(false);
@@ -28,19 +28,19 @@ export default function Navigation() {
               to="/properties"
               className="text-foreground hover:text-primary transition-colors font-medium"
             >
-              {t('nav.properties')}
+              {t("nav.properties")}
             </Link>
             <a
               href="#about"
               className="text-foreground hover:text-primary transition-colors font-medium"
             >
-              {t('nav.about')}
+              {t("nav.about")}
             </a>
             <a
               href="#contact"
               className="text-foreground hover:text-primary transition-colors font-medium"
             >
-              {t('nav.contact')}
+              {t("nav.contact")}
             </a>
           </div>
 
@@ -51,10 +51,10 @@ export default function Navigation() {
               to="/login"
               className="text-foreground hover:text-primary transition-colors font-medium"
             >
-              {t('nav.signIn')}
+              {t("nav.signIn")}
             </Link>
             <Link to="/properties" className="btn-primary">
-              {t('nav.bookNow')}
+              {t("nav.bookNow")}
             </Link>
           </div>
 
@@ -78,29 +78,29 @@ export default function Navigation() {
               to="/properties"
               className="block py-2 text-foreground hover:text-primary transition-colors"
             >
-              {t('nav.properties')}
+              {t("nav.properties")}
             </Link>
             <a
               href="#about"
               className="block py-2 text-foreground hover:text-primary transition-colors"
             >
-              {t('nav.about')}
+              {t("nav.about")}
             </a>
             <a
               href="#contact"
               className="block py-2 text-foreground hover:text-primary transition-colors"
             >
-              {t('nav.contact')}
+              {t("nav.contact")}
             </a>
             <div className="flex flex-col gap-2 pt-4 border-t border-border mt-4">
               <Link
                 to="/login"
                 className="text-foreground hover:text-primary transition-colors font-medium text-left"
               >
-                {t('nav.signIn')}
+                {t("nav.signIn")}
               </Link>
               <Link to="/properties" className="btn-primary w-full text-center">
-                {t('nav.bookNow')}
+                {t("nav.bookNow")}
               </Link>
             </div>
           </div>

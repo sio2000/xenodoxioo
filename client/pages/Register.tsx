@@ -1,20 +1,20 @@
-import Layout from '@/components/Layout';
-import { Link } from 'react-router-dom';
-import { Mail, Lock, User } from 'lucide-react';
-import { useState } from 'react';
+import Layout from "@/components/Layout";
+import { Link } from "react-router-dom";
+import { Mail, Lock, User } from "lucide-react";
+import { useState } from "react";
 
 export default function Register() {
   const [formData, setFormData] = useState({
-    firstName: '',
-    lastName: '',
-    email: '',
-    password: '',
-    confirmPassword: '',
+    firstName: "",
+    lastName: "",
+    email: "",
+    password: "",
+    confirmPassword: "",
   });
   const [isLoading, setIsLoading] = useState(false);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setFormData(prev => ({
+    setFormData((prev) => ({
       ...prev,
       [e.target.name]: e.target.value,
     }));
@@ -23,14 +23,14 @@ export default function Register() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (formData.password !== formData.confirmPassword) {
-      alert('Passwords do not match!');
+      alert("Passwords do not match!");
       return;
     }
     setIsLoading(true);
     // Mock registration
     setTimeout(() => {
       setIsLoading(false);
-      alert('Account created! Please check your email to verify.');
+      alert("Account created! Please check your email to verify.");
     }, 1500);
   };
 
@@ -57,7 +57,10 @@ export default function Register() {
                   First Name
                 </label>
                 <div className="relative">
-                  <User size={18} className="absolute left-3 top-3 text-muted-foreground" />
+                  <User
+                    size={18}
+                    className="absolute left-3 top-3 text-muted-foreground"
+                  />
                   <input
                     type="text"
                     name="firstName"
@@ -74,7 +77,10 @@ export default function Register() {
                   Last Name
                 </label>
                 <div className="relative">
-                  <User size={18} className="absolute left-3 top-3 text-muted-foreground" />
+                  <User
+                    size={18}
+                    className="absolute left-3 top-3 text-muted-foreground"
+                  />
                   <input
                     type="text"
                     name="lastName"
@@ -94,7 +100,10 @@ export default function Register() {
                 Email Address
               </label>
               <div className="relative">
-                <Mail size={18} className="absolute left-3 top-3 text-muted-foreground" />
+                <Mail
+                  size={18}
+                  className="absolute left-3 top-3 text-muted-foreground"
+                />
                 <input
                   type="email"
                   name="email"
@@ -113,7 +122,10 @@ export default function Register() {
                 Password
               </label>
               <div className="relative">
-                <Lock size={18} className="absolute left-3 top-3 text-muted-foreground" />
+                <Lock
+                  size={18}
+                  className="absolute left-3 top-3 text-muted-foreground"
+                />
                 <input
                   type="password"
                   name="password"
@@ -132,7 +144,10 @@ export default function Register() {
                 Confirm Password
               </label>
               <div className="relative">
-                <Lock size={18} className="absolute left-3 top-3 text-muted-foreground" />
+                <Lock
+                  size={18}
+                  className="absolute left-3 top-3 text-muted-foreground"
+                />
                 <input
                   type="password"
                   name="confirmPassword"
@@ -149,11 +164,11 @@ export default function Register() {
             <label className="flex items-start gap-2 cursor-pointer">
               <input type="checkbox" required className="mt-1 w-4 h-4" />
               <span className="text-sm text-foreground">
-                I agree to the{' '}
+                I agree to the{" "}
                 <a href="#" className="text-primary hover:underline">
                   Terms of Service
-                </a>
-                {' '}and{' '}
+                </a>{" "}
+                and{" "}
                 <a href="#" className="text-primary hover:underline">
                   Privacy Policy
                 </a>
@@ -166,14 +181,17 @@ export default function Register() {
               disabled={isLoading}
               className="btn-primary w-full justify-center mt-6 disabled:opacity-50"
             >
-              {isLoading ? 'Creating Account...' : 'Create Account'}
+              {isLoading ? "Creating Account..." : "Create Account"}
             </button>
           </form>
 
           {/* Sign In Link */}
           <p className="text-center text-sm text-muted-foreground mt-6">
-            Already have an account?{' '}
-            <Link to="/login" className="text-primary font-semibold hover:underline">
+            Already have an account?{" "}
+            <Link
+              to="/login"
+              className="text-primary font-semibold hover:underline"
+            >
               Sign in
             </Link>
           </p>

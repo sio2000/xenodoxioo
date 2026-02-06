@@ -1,11 +1,11 @@
-import Layout from '@/components/Layout';
-import { Link } from 'react-router-dom';
-import { Mail, Lock } from 'lucide-react';
-import { useState } from 'react';
+import Layout from "@/components/Layout";
+import { Link } from "react-router-dom";
+import { Mail, Lock } from "lucide-react";
+import { useState } from "react";
 
 export default function Login() {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -14,7 +14,7 @@ export default function Login() {
     // Mock authentication
     setTimeout(() => {
       setIsLoading(false);
-      alert('Login successful! Redirect to dashboard.');
+      alert("Login successful! Redirect to dashboard.");
     }, 1500);
   };
 
@@ -40,7 +40,10 @@ export default function Login() {
                 Email Address
               </label>
               <div className="relative">
-                <Mail size={18} className="absolute left-3 top-3 text-muted-foreground" />
+                <Mail
+                  size={18}
+                  className="absolute left-3 top-3 text-muted-foreground"
+                />
                 <input
                   type="email"
                   value={email}
@@ -58,7 +61,10 @@ export default function Login() {
                 Password
               </label>
               <div className="relative">
-                <Lock size={18} className="absolute left-3 top-3 text-muted-foreground" />
+                <Lock
+                  size={18}
+                  className="absolute left-3 top-3 text-muted-foreground"
+                />
                 <input
                   type="password"
                   value={password}
@@ -76,7 +82,10 @@ export default function Login() {
                 <input type="checkbox" className="w-4 h-4" />
                 <span className="text-foreground">Remember me</span>
               </label>
-              <a href="/forgot-password" className="text-primary hover:underline">
+              <a
+                href="/forgot-password"
+                className="text-primary hover:underline"
+              >
                 Forgot password?
               </a>
             </div>
@@ -87,7 +96,7 @@ export default function Login() {
               disabled={isLoading}
               className="btn-primary w-full justify-center disabled:opacity-50"
             >
-              {isLoading ? 'Signing In...' : 'Sign In'}
+              {isLoading ? "Signing In..." : "Sign In"}
             </button>
           </form>
 
@@ -105,8 +114,11 @@ export default function Login() {
 
           {/* Sign Up Link */}
           <p className="text-center text-sm text-muted-foreground">
-            Don't have an account?{' '}
-            <Link to="/register" className="text-primary font-semibold hover:underline">
+            Don't have an account?{" "}
+            <Link
+              to="/register"
+              className="text-primary font-semibold hover:underline"
+            >
               Create one
             </Link>
           </p>

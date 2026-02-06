@@ -37,7 +37,7 @@ export interface LoginResponse {
     email: string;
     firstName: string;
     lastName: string;
-    role: 'CUSTOMER' | 'ADMIN';
+    role: "CUSTOMER" | "ADMIN";
   };
   accessToken?: string;
   refreshToken?: string;
@@ -179,7 +179,7 @@ export interface BookingsListResponse {
 
 export interface CreatePaymentIntentRequest {
   bookingId: string;
-  paymentType: 'DEPOSIT' | 'BALANCE' | 'FULL';
+  paymentType: "DEPOSIT" | "BALANCE" | "FULL";
   amount: number;
 }
 
@@ -288,7 +288,7 @@ export interface SeasonalPricingRequest {
 export interface CouponRequest {
   code: string;
   description?: string;
-  discountType: 'PERCENTAGE' | 'FIXED';
+  discountType: "PERCENTAGE" | "FIXED";
   discountValue: number;
   validFrom: string;
   validUntil: string;

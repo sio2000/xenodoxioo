@@ -1,11 +1,11 @@
-import prisma from '../lib/db';
+import prisma from "../lib/db";
 import {
   NotFoundError,
   ValidationError,
   ConflictError,
   AppError,
-} from '../lib/errors';
-import { nanoid } from 'nanoid';
+} from "../lib/errors";
+import { nanoid } from "nanoid";
 
 /**
  * Check if dates are available for a unit
@@ -13,16 +13,19 @@ import { nanoid } from 'nanoid';
 export async function checkAvailability(
   unitId: string,
   checkInDate: Date,
-  checkOutDate: Date
+  checkOutDate: Date,
 ): Promise<{ isAvailable: boolean; reason?: string }> {
   // Validate dates
   if (checkInDate >= checkOutDate) {
-    return { isAvailable: false, reason: 'Check-out date must be after check-in date' };
+    return {
+      isAvailable: false,
+      reason: "Check-out date must be after check-in date",
+    };
   }
 
   const unit = await prisma.unit.findUnique({ where: { id: unitId } });
   if (!unit) {
-    return { isAvailable: false, reason: 'Unit not found' };
+    return { isAvailable: false, reason: "Unit not found" };
   }
 
   // Get property for date blockages
@@ -31,7 +34,7 @@ export async function checkAvailability(
   });
 
   if (!property) {
-    return { isAvailable: false, reason: 'Property not found' };
+    return { isAvailable: false, reason: "Property not found" };
   }
 
   // Check for overlapping bookings
@@ -39,7 +42,7 @@ export async function checkAvailability(
     where: {
       unitId,
       status: {
-        in: ['CONFIRMED', 'DEPOSIT_PAID', 'CHECKED_IN'],
+        in: ["CONFIRMED", "DEPOSIT_PAID", "CHECKED_IN"],
       },
       OR: [
         {
@@ -53,7 +56,7 @@ export async function checkAvailability(
   if (conflictingBookings.length > 0) {
     return {
       isAvailable: false,
-      reason: 'Unit is not available for selected dates',
+      reason: "Unit is not available for selected dates",
     };
   }
 
@@ -73,7 +76,7 @@ export async function checkAvailability(
   if (blockages.length > 0) {
     return {
       isAvailable: false,
-      reason: 'Unit is blocked for selected dates',
+      reason: "Unit is blocked for selected dates",
     };
   }
 
@@ -87,7 +90,7 @@ export async function calculatePrice(
   unitId: string,
   checkInDate: Date,
   checkOutDate: Date,
-  couponCode?: string
+  couponCode?: string,
 ) {
   const unit = await prisma.unit.findUnique({
     where: { id: unitId },
@@ -95,16 +98,16 @@ export async function calculatePrice(
   });
 
   if (!unit) {
-    throw new NotFoundError('Unit not found');
+    throw new NotFoundError("Unit not found");
   }
 
   // Calculate nights
   const nights = Math.ceil(
-    (checkOutDate.getTime() - checkInDate.getTime()) / (1000 * 60 * 60 * 24)
+    (checkOutDate.getTime() - checkInDate.getTime()) / (1000 * 60 * 60 * 24),
   );
 
   if (nights < 1) {
-    throw new ValidationError('Minimum stay is 1 night');
+    throw new ValidationError("Minimum stay is 1 night");
   }
 
   // Get applicable pricing (seasonal if exists)
@@ -130,7 +133,7 @@ export async function calculatePrice(
       minNights: { lte: nights },
       isActive: true,
     },
-    orderBy: { minNights: 'desc' },
+    orderBy: { minNights: "desc" },
   });
 
   if (longStayDiscount) {
@@ -151,8 +154,9 @@ export async function calculatePrice(
       new Date() <= coupon.validUntil &&
       (!coupon.maxUses || coupon.usedCount < coupon.maxUses)
     ) {
-      if (coupon.discountType === 'PERCENTAGE') {
-        couponDiscount = ((subtotal - discountAmount) * coupon.discountValue) / 100;
+      if (coupon.discountType === "PERCENTAGE") {
+        couponDiscount =
+          ((subtotal - discountAmount) * coupon.discountValue) / 100;
       } else {
         couponDiscount = coupon.discountValue;
       }
@@ -195,18 +199,22 @@ export async function createBooking(
   guestEmail: string,
   guestPhone?: string,
   specialRequests?: string,
-  couponCode?: string
+  couponCode?: string,
 ) {
   // Validate input
   if (!unitId || !userId || !guestName || !guestEmail || guests < 1) {
-    throw new ValidationError('Missing required booking fields');
+    throw new ValidationError("Missing required booking fields");
   }
 
   // Check availability
-  const availabilityCheck = await checkAvailability(unitId, checkInDate, checkOutDate);
+  const availabilityCheck = await checkAvailability(
+    unitId,
+    checkInDate,
+    checkOutDate,
+  );
   if (!availabilityCheck.isAvailable) {
     throw new ConflictError(
-      availabilityCheck.reason || 'Unit not available for selected dates'
+      availabilityCheck.reason || "Unit not available for selected dates",
     );
   }
 
@@ -216,15 +224,22 @@ export async function createBooking(
   });
 
   if (!unit) {
-    throw new NotFoundError('Unit not found');
+    throw new NotFoundError("Unit not found");
   }
 
   if (guests > unit.maxGuests) {
-    throw new ValidationError(`Maximum guests for this unit is ${unit.maxGuests}`);
+    throw new ValidationError(
+      `Maximum guests for this unit is ${unit.maxGuests}`,
+    );
   }
 
   // Calculate pricing
-  const pricing = await calculatePrice(unitId, checkInDate, checkOutDate, couponCode);
+  const pricing = await calculatePrice(
+    unitId,
+    checkInDate,
+    checkOutDate,
+    couponCode,
+  );
 
   // Create booking
   const bookingNumber = `BK-${Date.now()}-${nanoid(6)}`.toUpperCase();
@@ -249,7 +264,7 @@ export async function createBooking(
       guestEmail,
       guestPhone,
       specialRequests,
-      status: 'PENDING',
+      status: "PENDING",
     },
   });
 
@@ -283,12 +298,12 @@ export async function getBookingById(bookingId: string, userId?: string) {
   });
 
   if (!booking) {
-    throw new NotFoundError('Booking not found');
+    throw new NotFoundError("Booking not found");
   }
 
   // Check access if userId provided
   if (userId && booking.userId !== userId) {
-    throw new AppError(403, 'You do not have access to this booking');
+    throw new AppError(403, "You do not have access to this booking");
   }
 
   return booking;
@@ -297,7 +312,11 @@ export async function getBookingById(bookingId: string, userId?: string) {
 /**
  * Get user bookings
  */
-export async function getUserBookings(userId: string, page: number = 1, pageSize: number = 20) {
+export async function getUserBookings(
+  userId: string,
+  page: number = 1,
+  pageSize: number = 20,
+) {
   const skip = (page - 1) * pageSize;
 
   const [bookings, total] = await Promise.all([
@@ -307,7 +326,7 @@ export async function getUserBookings(userId: string, page: number = 1, pageSize
         unit: { include: { property: true } },
         payments: true,
       },
-      orderBy: { createdAt: 'desc' },
+      orderBy: { createdAt: "desc" },
       skip,
       take: pageSize,
     }),
@@ -329,17 +348,18 @@ export async function getUserBookings(userId: string, page: number = 1, pageSize
 export async function cancelBooking(
   bookingId: string,
   userId: string,
-  reason?: string
+  reason?: string,
 ) {
   const booking = await getBookingById(bookingId, userId);
 
-  if (!['PENDING', 'DEPOSIT_PAID', 'CONFIRMED'].includes(booking.status)) {
-    throw new ConflictError('This booking cannot be cancelled');
+  if (!["PENDING", "DEPOSIT_PAID", "CONFIRMED"].includes(booking.status)) {
+    throw new ConflictError("This booking cannot be cancelled");
   }
 
   // Calculate refund based on cancellation policy
   const daysBeforeCheckIn = Math.ceil(
-    (booking.checkInDate.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)
+    (booking.checkInDate.getTime() - new Date().getTime()) /
+      (1000 * 60 * 60 * 24),
   );
 
   let refundPercentage = 0;
@@ -351,13 +371,14 @@ export async function cancelBooking(
     refundPercentage = 0; // No refund
   }
 
-  const refundAmount = Math.round(booking.totalPrice * refundPercentage * 100) / 100;
+  const refundAmount =
+    Math.round(booking.totalPrice * refundPercentage * 100) / 100;
 
   // Update booking
   const updatedBooking = await prisma.booking.update({
     where: { id: bookingId },
     data: {
-      status: 'CANCELLED',
+      status: "CANCELLED",
       cancellationReason: reason,
       cancelledAt: new Date(),
     },
@@ -393,7 +414,7 @@ export async function getAvailableUnits(
   checkInDate: Date,
   checkOutDate: Date,
   guests: number,
-  propertyId?: string
+  propertyId?: string,
 ) {
   let units = await prisma.unit.findMany({
     where: {
@@ -407,7 +428,11 @@ export async function getAvailableUnits(
   // Filter by availability
   const availableUnits = [];
   for (const unit of units) {
-    const { isAvailable } = await checkAvailability(unit.id, checkInDate, checkOutDate);
+    const { isAvailable } = await checkAvailability(
+      unit.id,
+      checkInDate,
+      checkOutDate,
+    );
     if (isAvailable) {
       availableUnits.push(unit);
     }

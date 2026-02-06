@@ -1,50 +1,48 @@
-import Layout from '@/components/Layout';
-import { Link } from 'react-router-dom';
-import { Calendar, User, Settings, LogOut, Edit } from 'lucide-react';
-import { useState } from 'react';
+import Layout from "@/components/Layout";
+import { Link } from "react-router-dom";
+import { Calendar, User, Settings, LogOut, Edit } from "lucide-react";
+import { useState } from "react";
 
 export default function Dashboard() {
-  const [activeTab, setActiveTab] = useState('bookings');
+  const [activeTab, setActiveTab] = useState("bookings");
 
   // Mock user data
   const user = {
-    name: 'John Doe',
-    email: 'john@example.com',
-    phone: '+1 (555) 123-4567',
-    joinDate: '2024-01-15',
+    name: "John Doe",
+    email: "john@example.com",
+    phone: "+1 (555) 123-4567",
+    joinDate: "2024-01-15",
   };
 
   // Mock bookings
   const bookings = [
     {
       id: 1,
-      property: 'The Lykoskufi Villas - Villa A',
-      checkIn: '2024-12-15',
-      checkOut: '2024-12-18',
-      status: 'confirmed',
+      property: "The Lykoskufi Villas - Villa A",
+      checkIn: "2024-12-15",
+      checkOut: "2024-12-18",
+      status: "confirmed",
       total: 850,
     },
     {
       id: 2,
-      property: 'The Ogra House',
-      checkIn: '2024-01-20',
-      checkOut: '2024-01-27',
-      status: 'pending',
+      property: "The Ogra House",
+      checkIn: "2024-01-20",
+      checkOut: "2024-01-27",
+      status: "pending",
       total: 1540,
     },
   ];
 
   const handleLogout = () => {
-    alert('Logged out! Redirect to home.');
-    window.location.href = '/';
+    alert("Logged out! Redirect to home.");
+    window.location.href = "/";
   };
 
   return (
     <Layout>
       <div className="container-max py-12">
-        <h1 className="text-3xl font-bold text-foreground mb-8">
-          My Account
-        </h1>
+        <h1 className="text-3xl font-bold text-foreground mb-8">My Account</h1>
 
         <div className="grid lg:grid-cols-4 gap-8">
           {/* Sidebar */}
@@ -58,7 +56,9 @@ export default function Dashboard() {
                   </div>
                   <div>
                     <p className="font-bold text-foreground">{user.name}</p>
-                    <p className="text-sm text-muted-foreground">{user.email}</p>
+                    <p className="text-sm text-muted-foreground">
+                      {user.email}
+                    </p>
                   </div>
                 </div>
               </div>
@@ -66,10 +66,10 @@ export default function Dashboard() {
               {/* Menu */}
               <nav className="space-y-2">
                 {[
-                  { id: 'bookings', label: 'My Bookings', icon: Calendar },
-                  { id: 'profile', label: 'Profile Settings', icon: User },
-                  { id: 'preferences', label: 'Preferences', icon: Settings },
-                ].map(item => {
+                  { id: "bookings", label: "My Bookings", icon: Calendar },
+                  { id: "profile", label: "Profile Settings", icon: User },
+                  { id: "preferences", label: "Preferences", icon: Settings },
+                ].map((item) => {
                   const Icon = item.icon;
                   return (
                     <button
@@ -77,8 +77,8 @@ export default function Dashboard() {
                       onClick={() => setActiveTab(item.id)}
                       className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
                         activeTab === item.id
-                          ? 'bg-primary text-white'
-                          : 'text-foreground hover:bg-muted'
+                          ? "bg-primary text-white"
+                          : "text-foreground hover:bg-muted"
                       }`}
                     >
                       <Icon size={18} />
@@ -102,11 +102,13 @@ export default function Dashboard() {
           {/* Main Content */}
           <div className="lg:col-span-3">
             {/* Bookings Tab */}
-            {activeTab === 'bookings' && (
+            {activeTab === "bookings" && (
               <div>
-                <h2 className="text-2xl font-bold text-foreground mb-6">My Bookings</h2>
+                <h2 className="text-2xl font-bold text-foreground mb-6">
+                  My Bookings
+                </h2>
                 <div className="space-y-4">
-                  {bookings.map(booking => (
+                  {bookings.map((booking) => (
                     <div
                       key={booking.id}
                       className="bg-card border border-border rounded-lg p-6"
@@ -121,12 +123,15 @@ export default function Dashboard() {
                           </p>
                         </div>
                         <div className="text-right">
-                          <span className={`inline-block px-3 py-1 rounded-full text-xs font-semibold ${
-                            booking.status === 'confirmed'
-                              ? 'bg-green-100 text-green-700'
-                              : 'bg-yellow-100 text-yellow-700'
-                          }`}>
-                            {booking.status.charAt(0).toUpperCase() + booking.status.slice(1)}
+                          <span
+                            className={`inline-block px-3 py-1 rounded-full text-xs font-semibold ${
+                              booking.status === "confirmed"
+                                ? "bg-green-100 text-green-700"
+                                : "bg-yellow-100 text-yellow-700"
+                            }`}
+                          >
+                            {booking.status.charAt(0).toUpperCase() +
+                              booking.status.slice(1)}
                           </span>
                           <p className="text-2xl font-bold text-primary mt-2">
                             ${booking.total}
@@ -146,7 +151,7 @@ export default function Dashboard() {
                         >
                           View Details
                         </Link>
-                        {booking.status === 'confirmed' && (
+                        {booking.status === "confirmed" && (
                           <button className="px-4 py-2 border border-destructive text-destructive rounded-lg hover:bg-destructive/10 transition-colors text-sm font-semibold">
                             Cancel Booking
                           </button>
@@ -158,7 +163,9 @@ export default function Dashboard() {
 
                 {bookings.length === 0 && (
                   <div className="text-center py-12">
-                    <p className="text-muted-foreground mb-4">No bookings yet</p>
+                    <p className="text-muted-foreground mb-4">
+                      No bookings yet
+                    </p>
                     <Link to="/properties" className="btn-primary">
                       Browse Properties
                     </Link>
@@ -168,9 +175,11 @@ export default function Dashboard() {
             )}
 
             {/* Profile Tab */}
-            {activeTab === 'profile' && (
+            {activeTab === "profile" && (
               <div>
-                <h2 className="text-2xl font-bold text-foreground mb-6">Profile Settings</h2>
+                <h2 className="text-2xl font-bold text-foreground mb-6">
+                  Profile Settings
+                </h2>
                 <div className="bg-card border border-border rounded-lg p-6 space-y-6 max-w-md">
                   <div>
                     <label className="block text-sm font-semibold text-foreground mb-2">
@@ -219,14 +228,18 @@ export default function Dashboard() {
             )}
 
             {/* Preferences Tab */}
-            {activeTab === 'preferences' && (
+            {activeTab === "preferences" && (
               <div>
-                <h2 className="text-2xl font-bold text-foreground mb-6">Preferences</h2>
+                <h2 className="text-2xl font-bold text-foreground mb-6">
+                  Preferences
+                </h2>
                 <div className="bg-card border border-border rounded-lg p-6 space-y-6 max-w-md">
                   <label className="flex items-center gap-3 cursor-pointer">
                     <input type="checkbox" defaultChecked className="w-4 h-4" />
                     <div>
-                      <p className="font-semibold text-foreground">Email Notifications</p>
+                      <p className="font-semibold text-foreground">
+                        Email Notifications
+                      </p>
                       <p className="text-sm text-muted-foreground">
                         Booking confirmations and reminders
                       </p>
@@ -236,7 +249,9 @@ export default function Dashboard() {
                   <label className="flex items-center gap-3 cursor-pointer">
                     <input type="checkbox" defaultChecked className="w-4 h-4" />
                     <div>
-                      <p className="font-semibold text-foreground">Marketing Emails</p>
+                      <p className="font-semibold text-foreground">
+                        Marketing Emails
+                      </p>
                       <p className="text-sm text-muted-foreground">
                         Special offers and new properties
                       </p>
@@ -246,7 +261,9 @@ export default function Dashboard() {
                   <label className="flex items-center gap-3 cursor-pointer">
                     <input type="checkbox" className="w-4 h-4" />
                     <div>
-                      <p className="font-semibold text-foreground">SMS Notifications</p>
+                      <p className="font-semibold text-foreground">
+                        SMS Notifications
+                      </p>
                       <p className="text-sm text-muted-foreground">
                         Important booking updates via SMS
                       </p>

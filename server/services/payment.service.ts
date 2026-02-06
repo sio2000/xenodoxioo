@@ -1,9 +1,9 @@
-import prisma from '../lib/db';
-import { NotFoundError, AppError, ValidationError } from '../lib/errors';
-import Stripe from 'stripe';
+import prisma from "../lib/db";
+import { NotFoundError, AppError, ValidationError } from "../lib/errors";
+import Stripe from "stripe";
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '', {
-  apiVersion: '2024-01-01',
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || "", {
+  apiVersion: "2024-01-01",
 });
 
 /**
@@ -12,7 +12,7 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '', {
 export async function createPaymentIntent(
   bookingId: string,
   userId: string,
-  paymentType: 'DEPOSIT' | 'BALANCE' | 'FULL' = 'DEPOSIT'
+  paymentType: "DEPOSIT" | "BALANCE" | "FULL" = "DEPOSIT",
 ) {
   const booking = await prisma.booking.findUnique({
     where: { id: bookingId },
@@ -20,31 +20,31 @@ export async function createPaymentIntent(
   });
 
   if (!booking) {
-    throw new NotFoundError('Booking not found');
+    throw new NotFoundError("Booking not found");
   }
 
   if (booking.userId !== userId) {
-    throw new AppError(403, 'Unauthorized access to this booking');
+    throw new AppError(403, "Unauthorized access to this booking");
   }
 
   // Calculate amount based on payment type
   let amount = booking.totalPrice;
-  if (paymentType === 'DEPOSIT') {
+  if (paymentType === "DEPOSIT") {
     amount = Math.round(booking.totalPrice * 0.25 * 100); // 25% deposit
-  } else if (paymentType === 'BALANCE') {
+  } else if (paymentType === "BALANCE") {
     amount = Math.round(booking.totalPrice * 0.75 * 100); // 75% balance
   } else {
     amount = Math.round(booking.totalPrice * 100);
   }
 
   if (amount < 50) {
-    throw new ValidationError('Payment amount is too small');
+    throw new ValidationError("Payment amount is too small");
   }
 
   // Create Stripe payment intent
   const paymentIntent = await stripe.paymentIntents.create({
     amount, // in cents
-    currency: 'usd',
+    currency: "usd",
     metadata: {
       bookingId,
       bookingNumber: booking.bookingNumber,
@@ -61,10 +61,10 @@ export async function createPaymentIntent(
       bookingId,
       userId,
       amount: amount / 100, // convert back to dollars
-      currency: 'USD',
+      currency: "USD",
       paymentType: paymentType as any,
       stripePaymentIntentId: paymentIntent.id,
-      status: 'PROCESSING',
+      status: "PROCESSING",
       description: `${paymentType} payment for booking ${booking.bookingNumber}`,
       metadata: JSON.stringify({
         propertyId: booking.unit.propertyId,
@@ -77,7 +77,7 @@ export async function createPaymentIntent(
     clientSecret: paymentIntent.client_secret,
     paymentIntentId: paymentIntent.id,
     amount: amount / 100,
-    currency: 'USD',
+    currency: "USD",
   };
 }
 
@@ -88,7 +88,7 @@ export async function confirmPayment(paymentIntentId: string) {
   // Verify with Stripe
   const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
 
-  if (paymentIntent.status !== 'succeeded') {
+  if (paymentIntent.status !== "succeeded") {
     throw new AppError(400, `Payment status is ${paymentIntent.status}`);
   }
 
@@ -98,7 +98,7 @@ export async function confirmPayment(paymentIntentId: string) {
   });
 
   if (!payment) {
-    throw new NotFoundError('Payment not found');
+    throw new NotFoundError("Payment not found");
   }
 
   const stripeCharge = paymentIntent.charges.data[0];
@@ -106,7 +106,7 @@ export async function confirmPayment(paymentIntentId: string) {
   const updatedPayment = await prisma.payment.update({
     where: { id: payment.id },
     data: {
-      status: 'SUCCEEDED',
+      status: "SUCCEEDED",
       stripeChargeId: stripeCharge.id,
     },
   });
@@ -117,15 +117,15 @@ export async function confirmPayment(paymentIntentId: string) {
   });
 
   if (!booking) {
-    throw new NotFoundError('Booking not found');
+    throw new NotFoundError("Booking not found");
   }
 
-  let newStatus = 'DEPOSIT_PAID';
-  if (payment.paymentType === 'BALANCE' || payment.paymentType === 'FULL') {
-    newStatus = 'CONFIRMED';
+  let newStatus = "DEPOSIT_PAID";
+  if (payment.paymentType === "BALANCE" || payment.paymentType === "FULL") {
+    newStatus = "CONFIRMED";
 
     // Schedule balance payment if deposit was paid
-    if (payment.paymentType === 'DEPOSIT') {
+    if (payment.paymentType === "DEPOSIT") {
       const daysBeforeCheckIn = 30;
       const scheduledFor = new Date(booking.checkInDate);
       scheduledFor.setDate(scheduledFor.getDate() - daysBeforeCheckIn);
@@ -136,9 +136,9 @@ export async function confirmPayment(paymentIntentId: string) {
           bookingId: booking.id,
           userId: booking.userId,
           amount: Math.round(booking.totalPrice * 0.75 * 100) / 100,
-          currency: 'USD',
-          paymentType: 'BALANCE',
-          status: 'PENDING',
+          currency: "USD",
+          paymentType: "BALANCE",
+          status: "PENDING",
           scheduledFor,
           description: `Balance payment for booking ${booking.bookingNumber}`,
         },
@@ -165,13 +165,13 @@ export async function confirmPayment(paymentIntentId: string) {
  */
 export async function handleStripeWebhook(event: Stripe.Event) {
   switch (event.type) {
-    case 'payment_intent.succeeded': {
+    case "payment_intent.succeeded": {
       const paymentIntent = event.data.object as Stripe.PaymentIntent;
       await confirmPayment(paymentIntent.id);
       break;
     }
 
-    case 'payment_intent.payment_failed': {
+    case "payment_intent.payment_failed": {
       const paymentIntent = event.data.object as Stripe.PaymentIntent;
       const payment = await prisma.payment.findUnique({
         where: { stripePaymentIntentId: paymentIntent.id },
@@ -181,7 +181,7 @@ export async function handleStripeWebhook(event: Stripe.Event) {
         await prisma.payment.update({
           where: { id: payment.id },
           data: {
-            status: 'FAILED',
+            status: "FAILED",
             lastError: paymentIntent.last_payment_error?.message,
             failureCount: payment.failureCount + 1,
           },
@@ -190,7 +190,7 @@ export async function handleStripeWebhook(event: Stripe.Event) {
       break;
     }
 
-    case 'charge.refunded': {
+    case "charge.refunded": {
       const charge = event.data.object as Stripe.Charge;
       const payment = await prisma.payment.findUnique({
         where: { stripeChargeId: charge.id as string },
@@ -200,7 +200,7 @@ export async function handleStripeWebhook(event: Stripe.Event) {
         await prisma.payment.update({
           where: { id: payment.id },
           data: {
-            status: 'REFUNDED',
+            status: "REFUNDED",
             stripeRefundId: charge.refunds.data[0]?.id,
           },
         });
@@ -213,38 +213,43 @@ export async function handleStripeWebhook(event: Stripe.Event) {
 /**
  * Refund a payment
  */
-export async function refundPayment(bookingId: string, userId: string, reason?: string) {
+export async function refundPayment(
+  bookingId: string,
+  userId: string,
+  reason?: string,
+) {
   const booking = await prisma.booking.findUnique({
     where: { id: bookingId },
   });
 
   if (!booking) {
-    throw new NotFoundError('Booking not found');
+    throw new NotFoundError("Booking not found");
   }
 
   if (booking.userId !== userId) {
-    throw new AppError(403, 'Unauthorized access to this booking');
+    throw new AppError(403, "Unauthorized access to this booking");
   }
 
-  if (!['CONFIRMED', 'DEPOSIT_PAID'].includes(booking.status)) {
-    throw new AppError(400, 'This booking cannot be refunded');
+  if (!["CONFIRMED", "DEPOSIT_PAID"].includes(booking.status)) {
+    throw new AppError(400, "This booking cannot be refunded");
   }
 
   // Get successful payment
   const payment = await prisma.payment.findFirst({
     where: {
       bookingId,
-      status: 'SUCCEEDED',
+      status: "SUCCEEDED",
     },
   });
 
   if (!payment || !payment.stripeChargeId) {
-    throw new AppError(400, 'No successful payment found to refund');
+    throw new AppError(400, "No successful payment found to refund");
   }
 
   // Calculate refund based on cancellation policy
   const daysBeforeCheckIn = Math.ceil(
-    (booking.checkInDate.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)
+    (booking.checkInDate.getTime() - new Date().getTime()) /
+      (1000 * 60 * 60 * 24),
   );
 
   let refundPercentage = 0;
@@ -263,7 +268,7 @@ export async function refundPayment(bookingId: string, userId: string, reason?: 
       amount: refundAmount,
       metadata: {
         bookingId,
-        reason: reason || 'Cancellation',
+        reason: reason || "Cancellation",
       },
     });
 
@@ -271,7 +276,7 @@ export async function refundPayment(bookingId: string, userId: string, reason?: 
     await prisma.payment.update({
       where: { id: payment.id },
       data: {
-        status: 'REFUNDED',
+        status: "REFUNDED",
         stripeRefundId: refund.id,
       },
     });
@@ -281,7 +286,7 @@ export async function refundPayment(bookingId: string, userId: string, reason?: 
   await prisma.booking.update({
     where: { id: bookingId },
     data: {
-      status: 'CANCELLED',
+      status: "CANCELLED",
       cancellationReason: reason,
       cancelledAt: new Date(),
     },
@@ -300,7 +305,7 @@ export async function refundPayment(bookingId: string, userId: string, reason?: 
 export async function getPaymentHistory(bookingId: string) {
   const payments = await prisma.payment.findMany({
     where: { bookingId },
-    orderBy: { createdAt: 'desc' },
+    orderBy: { createdAt: "desc" },
   });
 
   return payments;
@@ -314,7 +319,7 @@ export async function processScheduledPayments() {
 
   const scheduledPayments = await prisma.payment.findMany({
     where: {
-      status: 'PENDING',
+      status: "PENDING",
       scheduledFor: { lte: now },
     },
   });
@@ -336,7 +341,7 @@ export async function processScheduledPayments() {
         where: { id: payment.id },
         data: {
           stripePaymentIntentId: paymentIntent.id,
-          status: 'PROCESSING',
+          status: "PROCESSING",
         },
       });
     } catch (error: any) {

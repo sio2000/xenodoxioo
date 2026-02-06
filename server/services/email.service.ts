@@ -1,9 +1,10 @@
-import prisma from '../lib/db';
-import sgMail from '@sendgrid/mail';
+import prisma from "../lib/db";
+import sgMail from "@sendgrid/mail";
 
 const API_KEY = process.env.SENDGRID_API_KEY;
-const FROM_EMAIL = process.env.SENDGRID_FROM_EMAIL || 'noreply@leonidionhouses.com';
-const FROM_NAME = process.env.SENDGRID_FROM_NAME || 'LEONIDIONHOUSES';
+const FROM_EMAIL =
+  process.env.SENDGRID_FROM_EMAIL || "noreply@leonidionhouses.com";
+const FROM_NAME = process.env.SENDGRID_FROM_NAME || "LEONIDIONHOUSES";
 
 if (API_KEY) {
   sgMail.setApiKey(API_KEY);
@@ -13,7 +14,16 @@ interface EmailOptions {
   to: string;
   subject: string;
   html: string;
-  type: 'WELCOME' | 'BOOKING_CONFIRMATION' | 'PAYMENT_RECEIPT' | 'PAYMENT_REMINDER' | 'CANCELLATION_CONFIRMATION' | 'PASSWORD_RESET' | 'ARRIVAL_REMINDER' | 'REVIEW_REQUEST' | 'ADMIN_ALERT';
+  type:
+    | "WELCOME"
+    | "BOOKING_CONFIRMATION"
+    | "PAYMENT_RECEIPT"
+    | "PAYMENT_REMINDER"
+    | "CANCELLATION_CONFIRMATION"
+    | "PASSWORD_RESET"
+    | "ARRIVAL_REMINDER"
+    | "REVIEW_REQUEST"
+    | "ADMIN_ALERT";
   userId?: string;
   bookingId?: string;
 }
@@ -33,7 +43,7 @@ async function sendEmail(options: EmailOptions) {
         type: type as any,
         userId,
         bookingId,
-        status: 'PENDING',
+        status: "PENDING",
       },
     });
 
@@ -53,16 +63,16 @@ async function sendEmail(options: EmailOptions) {
       // Mark as sent
       await prisma.emailLog.update({
         where: { id: emailLog.id },
-        data: { status: 'SENT', sentAt: new Date() },
+        data: { status: "SENT", sentAt: new Date() },
       });
     } else {
-      console.log('SendGrid not configured. Email would be sent to:', to);
-      console.log('Subject:', subject);
+      console.log("SendGrid not configured. Email would be sent to:", to);
+      console.log("Subject:", subject);
     }
 
     return emailLog;
   } catch (error: any) {
-    console.error('Error sending email:', error);
+    console.error("Error sending email:", error);
     throw error;
   }
 }
@@ -70,7 +80,11 @@ async function sendEmail(options: EmailOptions) {
 /**
  * Welcome email
  */
-export async function sendWelcomeEmail(email: string, firstName: string, userId?: string) {
+export async function sendWelcomeEmail(
+  email: string,
+  firstName: string,
+  userId?: string,
+) {
   const html = `
     <h1>Welcome to LEONIDIONHOUSES!</h1>
     <p>Dear ${firstName},</p>
@@ -82,9 +96,9 @@ export async function sendWelcomeEmail(email: string, firstName: string, userId?
 
   return sendEmail({
     to: email,
-    subject: 'Welcome to LEONIDIONHOUSES',
+    subject: "Welcome to LEONIDIONHOUSES",
     html,
-    type: 'WELCOME',
+    type: "WELCOME",
     userId,
   });
 }
@@ -95,7 +109,7 @@ export async function sendWelcomeEmail(email: string, firstName: string, userId?
 export async function sendBookingConfirmationEmail(
   email: string,
   booking: any,
-  userId?: string
+  userId?: string,
 ) {
   const html = `
     <h1>Booking Confirmation</h1>
@@ -122,7 +136,7 @@ export async function sendBookingConfirmationEmail(
     to: email,
     subject: `Booking Confirmation - ${booking.bookingNumber}`,
     html,
-    type: 'BOOKING_CONFIRMATION',
+    type: "BOOKING_CONFIRMATION",
     userId,
     bookingId: booking.id,
   });
@@ -135,14 +149,14 @@ export async function sendPaymentReceiptEmail(
   email: string,
   booking: any,
   payment: any,
-  userId?: string
+  userId?: string,
 ) {
   const paymentTypeText =
-    payment.paymentType === 'DEPOSIT'
-      ? 'Deposit (25%)'
-      : payment.paymentType === 'BALANCE'
-      ? 'Balance (75%)'
-      : 'Full Payment';
+    payment.paymentType === "DEPOSIT"
+      ? "Deposit (25%)"
+      : payment.paymentType === "BALANCE"
+        ? "Balance (75%)"
+        : "Full Payment";
 
   const html = `
     <h1>Payment Receipt</h1>
@@ -154,7 +168,7 @@ export async function sendPaymentReceiptEmail(
       <li><strong>Payment Type:</strong> ${paymentTypeText}</li>
       <li><strong>Amount:</strong> $${payment.amount.toFixed(2)}</li>
       <li><strong>Date:</strong> ${new Date(payment.createdAt).toLocaleDateString()}</li>
-      <li><strong>Transaction ID:</strong> ${payment.stripeChargeId || 'N/A'}</li>
+      <li><strong>Transaction ID:</strong> ${payment.stripeChargeId || "N/A"}</li>
     </ul>
     <p>Thank you for your payment!</p>
     <a href="${process.env.FRONTEND_URL}/dashboard" style="background-color: #0677A1; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">View Booking</a>
@@ -165,7 +179,7 @@ export async function sendPaymentReceiptEmail(
     to: email,
     subject: `Payment Receipt - ${booking.bookingNumber}`,
     html,
-    type: 'PAYMENT_RECEIPT',
+    type: "PAYMENT_RECEIPT",
     userId,
     bookingId: booking.id,
   });
@@ -174,7 +188,11 @@ export async function sendPaymentReceiptEmail(
 /**
  * Password reset email
  */
-export async function sendPasswordResetEmail(email: string, resetToken: string, userId?: string) {
+export async function sendPasswordResetEmail(
+  email: string,
+  resetToken: string,
+  userId?: string,
+) {
   const resetLink = `${process.env.FRONTEND_URL}/reset-password?token=${resetToken}`;
 
   const html = `
@@ -188,9 +206,9 @@ export async function sendPasswordResetEmail(email: string, resetToken: string, 
 
   return sendEmail({
     to: email,
-    subject: 'Password Reset - LEONIDIONHOUSES',
+    subject: "Password Reset - LEONIDIONHOUSES",
     html,
-    type: 'PASSWORD_RESET',
+    type: "PASSWORD_RESET",
     userId,
   });
 }
@@ -198,7 +216,11 @@ export async function sendPasswordResetEmail(email: string, resetToken: string, 
 /**
  * Arrival reminder email
  */
-export async function sendArrivalReminderEmail(email: string, booking: any, userId?: string) {
+export async function sendArrivalReminderEmail(
+  email: string,
+  booking: any,
+  userId?: string,
+) {
   const checkInDate = new Date(booking.checkInDate).toLocaleDateString();
 
   const html = `
@@ -222,7 +244,7 @@ export async function sendArrivalReminderEmail(email: string, booking: any, user
     to: email,
     subject: `Arrival Reminder - ${booking.bookingNumber}`,
     html,
-    type: 'ARRIVAL_REMINDER',
+    type: "ARRIVAL_REMINDER",
     userId,
     bookingId: booking.id,
   });
@@ -235,7 +257,7 @@ export async function sendCancellationConfirmationEmail(
   email: string,
   booking: any,
   refundAmount: number,
-  userId?: string
+  userId?: string,
 ) {
   const html = `
     <h1>Booking Cancelled</h1>
@@ -257,7 +279,7 @@ export async function sendCancellationConfirmationEmail(
     to: email,
     subject: `Booking Cancelled - ${booking.bookingNumber}`,
     html,
-    type: 'CANCELLATION_CONFIRMATION',
+    type: "CANCELLATION_CONFIRMATION",
     userId,
     bookingId: booking.id,
   });
@@ -266,7 +288,11 @@ export async function sendCancellationConfirmationEmail(
 /**
  * Review request email
  */
-export async function sendReviewRequestEmail(email: string, booking: any, userId?: string) {
+export async function sendReviewRequestEmail(
+  email: string,
+  booking: any,
+  userId?: string,
+) {
   const reviewLink = `${process.env.FRONTEND_URL}/dashboard/bookings/${booking.id}/review`;
 
   const html = `
@@ -282,7 +308,7 @@ export async function sendReviewRequestEmail(email: string, booking: any, userId
     to: email,
     subject: `Review Request - ${booking.unit.property.name}`,
     html,
-    type: 'REVIEW_REQUEST',
+    type: "REVIEW_REQUEST",
     userId,
     bookingId: booking.id,
   });
@@ -294,7 +320,7 @@ export async function sendReviewRequestEmail(email: string, booking: any, userId
 export async function sendAdminAlertEmail(
   subject: string,
   message: string,
-  adminEmail?: string
+  adminEmail?: string,
 ) {
   const email = adminEmail || process.env.ADMIN_EMAIL || FROM_EMAIL;
 
@@ -308,6 +334,6 @@ export async function sendAdminAlertEmail(
     to: email,
     subject: `ALERT: ${subject}`,
     html,
-    type: 'ADMIN_ALERT',
+    type: "ADMIN_ALERT",
   });
 }

@@ -1,4 +1,8 @@
-import { PaymentIntentData, STRIPE_ENDPOINTS, calculatePaymentAmounts } from './stripe';
+import {
+  PaymentIntentData,
+  STRIPE_ENDPOINTS,
+  calculatePaymentAmounts,
+} from "./stripe";
 
 /**
  * Payment Service
@@ -35,24 +39,24 @@ export async function createPaymentIntent(
 ): Promise<PaymentResponse> {
   try {
     const response = await fetch(STRIPE_ENDPOINTS.createPaymentIntent, {
-      method: 'POST',
+      method: "POST",
       headers: {
-        'Content-Type': 'application/json',
+        "Content-Type": "application/json",
       },
       body: JSON.stringify(request),
     });
 
     if (!response.ok) {
-      throw new Error('Failed to create payment intent');
+      throw new Error("Failed to create payment intent");
     }
 
     const data: PaymentResponse = await response.json();
     return data;
   } catch (error) {
-    console.error('Error creating payment intent:', error);
+    console.error("Error creating payment intent:", error);
     return {
       success: false,
-      error: error instanceof Error ? error.message : 'Unknown error',
+      error: error instanceof Error ? error.message : "Unknown error",
     };
   }
 }
@@ -67,9 +71,9 @@ export async function confirmPayment(
 ): Promise<PaymentResponse> {
   try {
     const response = await fetch(STRIPE_ENDPOINTS.confirmPayment, {
-      method: 'POST',
+      method: "POST",
       headers: {
-        'Content-Type': 'application/json',
+        "Content-Type": "application/json",
       },
       body: JSON.stringify({
         paymentIntentId,
@@ -77,16 +81,16 @@ export async function confirmPayment(
     });
 
     if (!response.ok) {
-      throw new Error('Failed to confirm payment');
+      throw new Error("Failed to confirm payment");
     }
 
     const data: PaymentResponse = await response.json();
     return data;
   } catch (error) {
-    console.error('Error confirming payment:', error);
+    console.error("Error confirming payment:", error);
     return {
       success: false,
-      error: error instanceof Error ? error.message : 'Unknown error',
+      error: error instanceof Error ? error.message : "Unknown error",
     };
   }
 }
@@ -103,9 +107,9 @@ export async function refundPayment(
 ): Promise<PaymentResponse> {
   try {
     const response = await fetch(STRIPE_ENDPOINTS.refundPayment, {
-      method: 'POST',
+      method: "POST",
       headers: {
-        'Content-Type': 'application/json',
+        "Content-Type": "application/json",
       },
       body: JSON.stringify({
         paymentIntentId,
@@ -114,16 +118,16 @@ export async function refundPayment(
     });
 
     if (!response.ok) {
-      throw new Error('Failed to refund payment');
+      throw new Error("Failed to refund payment");
     }
 
     const data: PaymentResponse = await response.json();
     return data;
   } catch (error) {
-    console.error('Error refunding payment:', error);
+    console.error("Error refunding payment:", error);
     return {
       success: false,
-      error: error instanceof Error ? error.message : 'Unknown error',
+      error: error instanceof Error ? error.message : "Unknown error",
     };
   }
 }
@@ -137,10 +141,10 @@ export async function scheduleRemainingPayment(
   checkInDate: Date,
 ): Promise<PaymentResponse> {
   try {
-    const response = await fetch('/api/schedule-payment', {
-      method: 'POST',
+    const response = await fetch("/api/schedule-payment", {
+      method: "POST",
       headers: {
-        'Content-Type': 'application/json',
+        "Content-Type": "application/json",
       },
       body: JSON.stringify({
         bookingId,
@@ -150,16 +154,16 @@ export async function scheduleRemainingPayment(
     });
 
     if (!response.ok) {
-      throw new Error('Failed to schedule payment');
+      throw new Error("Failed to schedule payment");
     }
 
     const data: PaymentResponse = await response.json();
     return data;
   } catch (error) {
-    console.error('Error scheduling payment:', error);
+    console.error("Error scheduling payment:", error);
     return {
       success: false,
-      error: error instanceof Error ? error.message : 'Unknown error',
+      error: error instanceof Error ? error.message : "Unknown error",
     };
   }
 }
@@ -172,7 +176,7 @@ export async function getPaymentHistory(bookingId: string) {
     const response = await fetch(`/api/payments/${bookingId}`);
 
     if (!response.ok) {
-      throw new Error('Failed to fetch payment history');
+      throw new Error("Failed to fetch payment history");
     }
 
     const data = await response.json();
@@ -181,10 +185,10 @@ export async function getPaymentHistory(bookingId: string) {
       payments: data,
     };
   } catch (error) {
-    console.error('Error fetching payment history:', error);
+    console.error("Error fetching payment history:", error);
     return {
       success: false,
-      error: error instanceof Error ? error.message : 'Unknown error',
+      error: error instanceof Error ? error.message : "Unknown error",
     };
   }
 }

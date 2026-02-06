@@ -1,11 +1,13 @@
-import { useState } from 'react';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { useState } from "react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 
 interface AvailabilityCalendarProps {
   onSelectDates?: (checkIn: Date, checkOut: Date) => void;
 }
 
-export default function AvailabilityCalendar({ onSelectDates }: AvailabilityCalendarProps) {
+export default function AvailabilityCalendar({
+  onSelectDates,
+}: AvailabilityCalendarProps) {
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [checkIn, setCheckIn] = useState<Date | null>(null);
   const [checkOut, setCheckOut] = useState<Date | null>(null);
@@ -19,9 +21,7 @@ export default function AvailabilityCalendar({ onSelectDates }: AvailabilityCale
     new Date(2024, 11, 21).toDateString(),
   ]);
 
-  const blockedDates = new Set([
-    new Date(2024, 11, 25).toDateString(),
-  ]);
+  const blockedDates = new Set([new Date(2024, 11, 25).toDateString()]);
 
   const daysInMonth = (date: Date) => {
     return new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
@@ -32,7 +32,11 @@ export default function AvailabilityCalendar({ onSelectDates }: AvailabilityCale
   };
 
   const handleDateClick = (day: number) => {
-    const selectedDate = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), day);
+    const selectedDate = new Date(
+      currentMonth.getFullYear(),
+      currentMonth.getMonth(),
+      day,
+    );
     const dateStr = selectedDate.toDateString();
 
     // Can't select booked or blocked dates
@@ -54,35 +58,61 @@ export default function AvailabilityCalendar({ onSelectDates }: AvailabilityCale
 
   const isInRange = (day: number) => {
     if (!checkIn || !checkOut) return false;
-    const date = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), day);
+    const date = new Date(
+      currentMonth.getFullYear(),
+      currentMonth.getMonth(),
+      day,
+    );
     return date > checkIn && date < checkOut;
   };
 
   const isSelected = (day: number) => {
-    const date = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), day);
+    const date = new Date(
+      currentMonth.getFullYear(),
+      currentMonth.getMonth(),
+      day,
+    );
     const dateStr = date.toDateString();
-    return checkIn?.toDateString() === dateStr || checkOut?.toDateString() === dateStr;
+    return (
+      checkIn?.toDateString() === dateStr ||
+      checkOut?.toDateString() === dateStr
+    );
   };
 
   const isBooked = (day: number) => {
-    const date = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), day);
+    const date = new Date(
+      currentMonth.getFullYear(),
+      currentMonth.getMonth(),
+      day,
+    );
     return bookedDates.has(date.toDateString());
   };
 
   const isBlocked = (day: number) => {
-    const date = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), day);
+    const date = new Date(
+      currentMonth.getFullYear(),
+      currentMonth.getMonth(),
+      day,
+    );
     return blockedDates.has(date.toDateString());
   };
 
-  const monthName = currentMonth.toLocaleString('default', { month: 'long', year: 'numeric' });
-  const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  const monthName = currentMonth.toLocaleString("default", {
+    month: "long",
+    year: "numeric",
+  });
+  const days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
   const handlePrevMonth = () => {
-    setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1));
+    setCurrentMonth(
+      new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1),
+    );
   };
 
   const handleNextMonth = () => {
-    setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1));
+    setCurrentMonth(
+      new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1),
+    );
   };
 
   const calendarDays = [];
@@ -118,8 +148,11 @@ export default function AvailabilityCalendar({ onSelectDates }: AvailabilityCale
         </div>
 
         <div className="grid grid-cols-7 gap-2 mb-4">
-          {days.map(day => (
-            <div key={day} className="text-center font-semibold text-xs text-muted-foreground py-2">
+          {days.map((day) => (
+            <div
+              key={day}
+              className="text-center font-semibold text-xs text-muted-foreground py-2"
+            >
               {day}
             </div>
           ))}
@@ -133,13 +166,14 @@ export default function AvailabilityCalendar({ onSelectDates }: AvailabilityCale
               disabled={!day || isBooked(day!) || isBlocked(day!)}
               className={`
                 aspect-square text-sm font-medium rounded transition-all
-                ${!day || isBooked(day!) || isBlocked(day!)
-                  ? 'bg-muted text-muted-foreground cursor-not-allowed opacity-50'
-                  : isSelected(day!)
-                  ? 'bg-primary text-white'
-                  : isInRange(day!)
-                  ? 'bg-primary/20 text-foreground'
-                  : 'hover:bg-muted text-foreground'
+                ${
+                  !day || isBooked(day!) || isBlocked(day!)
+                    ? "bg-muted text-muted-foreground cursor-not-allowed opacity-50"
+                    : isSelected(day!)
+                      ? "bg-primary text-white"
+                      : isInRange(day!)
+                        ? "bg-primary/20 text-foreground"
+                        : "hover:bg-muted text-foreground"
                 }
               `}
             >
@@ -173,7 +207,10 @@ export default function AvailabilityCalendar({ onSelectDates }: AvailabilityCale
             {checkIn.toLocaleDateString()} → {checkOut.toLocaleDateString()}
           </p>
           <p className="text-sm text-muted-foreground mt-2">
-            {Math.ceil((checkOut.getTime() - checkIn.getTime()) / (1000 * 60 * 60 * 24))} nights
+            {Math.ceil(
+              (checkOut.getTime() - checkIn.getTime()) / (1000 * 60 * 60 * 24),
+            )}{" "}
+            nights
           </p>
         </div>
       )}
