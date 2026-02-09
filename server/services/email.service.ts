@@ -90,7 +90,7 @@ export async function sendWelcomeEmail(
     <p>Dear ${firstName},</p>
     <p>Thank you for joining us. We're excited to have you on board.</p>
     <p>You can now browse our beautiful villa collection and make your first booking.</p>
-    <a href="${process.env.FRONTEND_URL}/properties" style="background-color: #0677A1; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Browse Properties</a>
+    <a href="${process.env.FRONTEND_URL}/properties" style="background-color: #0677A1; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Browse Rooms</a>
     <p>Best regards,<br/>The LEONIDIONHOUSES Team</p>
   `;
 
@@ -118,7 +118,7 @@ export async function sendBookingConfirmationEmail(
     <h2>Booking Details</h2>
     <ul>
       <li><strong>Booking Number:</strong> ${booking.bookingNumber}</li>
-      <li><strong>Property:</strong> ${booking.unit.property.name}</li>
+      <li><strong>Room:</strong> ${booking.unit.property.name}</li>
       <li><strong>Unit:</strong> ${booking.unit.name}</li>
       <li><strong>Check-in:</strong> ${new Date(booking.checkInDate).toLocaleDateString()}</li>
       <li><strong>Check-out:</strong> ${new Date(booking.checkOutDate).toLocaleDateString()}</li>
@@ -229,7 +229,7 @@ export async function sendArrivalReminderEmail(
     <p>This is a friendly reminder that your check-in is tomorrow at the ${booking.unit.property.name}!</p>
     <h2>Check-in Details</h2>
     <ul>
-      <li><strong>Property:</strong> ${booking.unit.property.name}</li>
+      <li><strong>Room:</strong> ${booking.unit.property.name}</li>
       <li><strong>Address:</strong> ${booking.unit.property.location}, ${booking.unit.property.city}</li>
       <li><strong>Check-in Date:</strong> ${checkInDate}</li>
       <li><strong>Check-in Time:</strong> 3:00 PM (or by arrangement)</li>
@@ -266,7 +266,7 @@ export async function sendCancellationConfirmationEmail(
     <h2>Cancellation Details</h2>
     <ul>
       <li><strong>Booking Number:</strong> ${booking.bookingNumber}</li>
-      <li><strong>Property:</strong> ${booking.unit.property.name}</li>
+      <li><strong>Room:</strong> ${booking.unit.property.name}</li>
       <li><strong>Original Check-in:</strong> ${new Date(booking.checkInDate).toLocaleDateString()}</li>
       <li><strong>Refund Amount:</strong> €${refundAmount.toFixed(2)}</li>
     </ul>

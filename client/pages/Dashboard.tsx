@@ -154,10 +154,10 @@ export default function Dashboard() {
                           {t("common.viewDetails")}
                         </Link>
                         {booking.status === "confirmed" && (
-                          <button className="px-4 py-2 border border-destructive text-destructive rounded-lg hover:bg-destructive/10 transition-colors text-sm font-semibold">
-                            Cancel Booking
-                          </button>
-                        )}
+                            <button className="px-4 py-2 border border-destructive text-destructive rounded-lg hover:bg-destructive/10 transition-colors text-sm font-semibold">
+                              {t("dashboard.cancelBooking")}
+                            </button>
+                          )}
                       </div>
                     </div>
                   ))}
@@ -255,7 +255,7 @@ export default function Dashboard() {
                         Marketing Emails
                       </p>
                       <p className="text-sm text-muted-foreground">
-                        Special offers and new properties
+                        {t("dashboard.specialOffers")}
                       </p>
                     </div>
                   </label>
