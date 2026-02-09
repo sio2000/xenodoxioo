@@ -2,6 +2,8 @@ import Layout from "@/components/Layout";
 import { Link } from "react-router-dom";
 import { Calendar, User, Settings, LogOut, Edit } from "lucide-react";
 import { useState } from "react";
+import { useLanguage } from "@/hooks/useLanguage";
+import formatCurrency from "@/lib/currency";
 
 export default function Dashboard() {
   const [activeTab, setActiveTab] = useState("bookings");
@@ -33,6 +35,7 @@ export default function Dashboard() {
       total: 1540,
     },
   ];
+  const { t, language } = useLanguage();
 
   const handleLogout = () => {
     alert("Logged out! Redirect to home.");
@@ -42,7 +45,7 @@ export default function Dashboard() {
   return (
     <Layout>
       <div className="container-max py-12">
-        <h1 className="text-3xl font-bold text-foreground mb-8">My Account</h1>
+        <h1 className="text-3xl font-bold text-foreground mb-8">{t("dashboard.title")}</h1>
 
         <div className="grid lg:grid-cols-4 gap-8">
           {/* Sidebar */}
@@ -66,9 +69,9 @@ export default function Dashboard() {
               {/* Menu */}
               <nav className="space-y-2">
                 {[
-                  { id: "bookings", label: "My Bookings", icon: Calendar },
-                  { id: "profile", label: "Profile Settings", icon: User },
-                  { id: "preferences", label: "Preferences", icon: Settings },
+                  { id: "bookings", label: t("dashboard.myBookings"), icon: Calendar },
+                  { id: "profile", label: t("dashboard.profileSettings"), icon: User },
+                  { id: "preferences", label: t("dashboard.preferences"), icon: Settings },
                 ].map((item) => {
                   const Icon = item.icon;
                   return (
@@ -94,7 +97,7 @@ export default function Dashboard() {
                 className="w-full flex items-center gap-3 px-4 py-3 text-destructive hover:bg-destructive/10 rounded-lg transition-colors font-semibold"
               >
                 <LogOut size={18} />
-                Logout
+                {t("dashboard.logout")}
               </button>
             </div>
           </div>
@@ -105,7 +108,7 @@ export default function Dashboard() {
             {activeTab === "bookings" && (
               <div>
                 <h2 className="text-2xl font-bold text-foreground mb-6">
-                  My Bookings
+                  {t("dashboard.myBookings")}
                 </h2>
                 <div className="space-y-4">
                   {bookings.map((booking) => (
@@ -119,7 +122,7 @@ export default function Dashboard() {
                             {booking.property}
                           </h3>
                           <p className="text-muted-foreground text-sm">
-                            Booking ID: #{booking.id}
+                            {t("dashboard.bookingId")} : #{booking.id}
                           </p>
                         </div>
                         <div className="text-right">
@@ -130,18 +133,17 @@ export default function Dashboard() {
                                 : "bg-yellow-100 text-yellow-700"
                             }`}
                           >
-                            {booking.status.charAt(0).toUpperCase() +
-                              booking.status.slice(1)}
+                            {t(`dashboard.${booking.status}`)}
                           </span>
                           <p className="text-2xl font-bold text-primary mt-2">
-                            ${booking.total}
+                            {formatCurrency(booking.total, language)}
                           </p>
                         </div>
                       </div>
 
                       <div className="flex items-center gap-6 text-sm text-muted-foreground mb-4 pb-4 border-b border-border">
-                        <span>Check-in: {booking.checkIn}</span>
-                        <span>Check-out: {booking.checkOut}</span>
+                        <span>{t("dashboard.checkIn")}: {booking.checkIn}</span>
+                        <span>{t("dashboard.checkOut")}: {booking.checkOut}</span>
                       </div>
 
                       <div className="flex gap-3">
@@ -149,7 +151,7 @@ export default function Dashboard() {
                           to={`/booking/${booking.id}`}
                           className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors text-sm font-semibold"
                         >
-                          View Details
+                          {t("common.viewDetails")}
                         </Link>
                         {booking.status === "confirmed" && (
                           <button className="px-4 py-2 border border-destructive text-destructive rounded-lg hover:bg-destructive/10 transition-colors text-sm font-semibold">
@@ -164,10 +166,10 @@ export default function Dashboard() {
                 {bookings.length === 0 && (
                   <div className="text-center py-12">
                     <p className="text-muted-foreground mb-4">
-                      No bookings yet
+                      {t("dashboard.noBookings")}
                     </p>
                     <Link to="/properties" className="btn-primary">
-                      Browse Properties
+                      {t("dashboard.browseProperties")}
                     </Link>
                   </div>
                 )}
@@ -178,12 +180,12 @@ export default function Dashboard() {
             {activeTab === "profile" && (
               <div>
                 <h2 className="text-2xl font-bold text-foreground mb-6">
-                  Profile Settings
+                  {t("dashboard.profileSettings")}
                 </h2>
                 <div className="bg-card border border-border rounded-lg p-6 space-y-6 max-w-md">
                   <div>
                     <label className="block text-sm font-semibold text-foreground mb-2">
-                      Full Name
+                      {t("dashboard.fullName")}
                     </label>
                     <div className="flex items-center gap-2">
                       <input
@@ -199,7 +201,7 @@ export default function Dashboard() {
 
                   <div>
                     <label className="block text-sm font-semibold text-foreground mb-2">
-                      Email Address
+                      {t("dashboard.emailAddress")}
                     </label>
                     <input
                       type="email"
@@ -211,7 +213,7 @@ export default function Dashboard() {
 
                   <div>
                     <label className="block text-sm font-semibold text-foreground mb-2">
-                      Phone Number
+                      {t("dashboard.phoneNumber")}
                     </label>
                     <input
                       type="tel"
@@ -221,7 +223,7 @@ export default function Dashboard() {
                   </div>
 
                   <button className="btn-primary w-full justify-center">
-                    Save Changes
+                    {t("dashboard.saveChanges")}
                   </button>
                 </div>
               </div>

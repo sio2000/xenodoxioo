@@ -2,11 +2,14 @@ import Layout from "@/components/Layout";
 import { Link, useSearchParams } from "react-router-dom";
 import { Star, MapPin, Users, Bed, Bath, Wifi } from "lucide-react";
 import { useState } from "react";
+import { useLanguage } from "@/hooks/useLanguage";
+import formatCurrency from "@/lib/currency";
 
 export default function Properties() {
   const [searchParams] = useSearchParams();
   const [priceFilter, setPriceFilter] = useState("all");
   const [bedroomFilter, setBedroomFilter] = useState("all");
+  const { language, t } = useLanguage();
 
   // All properties with units data
   const allProperties = [
@@ -14,7 +17,7 @@ export default function Properties() {
       id: 1,
       name: "The Lykoskufi Villas - Villa A",
       property: "The Lykoskufi Villas",
-      description: "Stunning sea view villa with modern amenities",
+      descriptionKey: "properties.sample1",
       bedrooms: 3,
       bathrooms: 2,
       maxGuests: 6,
@@ -23,13 +26,13 @@ export default function Properties() {
         "https://images.unsplash.com/photo-1564013799919-ab600027ffc6?w=600&h=400&fit=crop",
       rating: 4.9,
       reviews: 56,
-      amenities: ["WiFi", "AC", "Kitchen", "Pool View"],
+      amenities: ["amenities.fastWifi", "amenities.ac", "amenities.fullKitchen", "amenities.privatePool"],
     },
     {
       id: 2,
       name: "The Lykoskufi Villas - Villa B",
       property: "The Lykoskufi Villas",
-      description: "Luxurious villa with private terrace",
+      descriptionKey: "properties.sample2",
       bedrooms: 4,
       bathrooms: 3,
       maxGuests: 8,
@@ -38,13 +41,13 @@ export default function Properties() {
         "https://images.unsplash.com/photo-1566073771259-6a8506099945?w=600&h=400&fit=crop",
       rating: 4.8,
       reviews: 42,
-      amenities: ["WiFi", "AC", "Kitchen", "Private Pool"],
+      amenities: ["amenities.fastWifi", "amenities.ac", "amenities.fullKitchen", "amenities.privatePool"],
     },
     {
       id: 3,
       name: "The Lykoskufi Villas - Villa C",
       property: "The Lykoskufi Villas",
-      description: "Elegant villa perfect for families",
+      descriptionKey: "properties.sample3",
       bedrooms: 3,
       bathrooms: 2,
       maxGuests: 6,
@@ -53,13 +56,13 @@ export default function Properties() {
         "https://images.unsplash.com/photo-1568605114967-8130f3a36994?w=600&h=400&fit=crop",
       rating: 4.7,
       reviews: 38,
-      amenities: ["WiFi", "AC", "Kitchen", "Balcony"],
+      amenities: ["amenities.fastWifi", "amenities.ac", "amenities.fullKitchen", "amenities.balcony"],
     },
     {
       id: 4,
       name: "The Ogra House",
       property: "The Ogra House",
-      description: "Elegant seaside retreat for families",
+      descriptionKey: "properties.sample4",
       bedrooms: 4,
       bathrooms: 2,
       maxGuests: 8,
@@ -68,13 +71,13 @@ export default function Properties() {
         "https://images.unsplash.com/photo-1552321554-5fefe8c9ef14?w=600&h=400&fit=crop",
       rating: 4.9,
       reviews: 67,
-      amenities: ["WiFi", "AC", "Kitchen", "Beach Access"],
+      amenities: ["amenities.fastWifi", "amenities.ac", "amenities.fullKitchen", "amenities.beachAccess"],
     },
     {
       id: 5,
       name: "The Bungalows - Unit 1",
       property: "The Bungalows",
-      description: "Modern cozy bungalow in nature",
+      descriptionKey: "properties.sample5",
       bedrooms: 2,
       bathrooms: 1,
       maxGuests: 4,
@@ -83,13 +86,13 @@ export default function Properties() {
         "https://images.unsplash.com/photo-1512207736139-e54660a749a0?w=600&h=400&fit=crop",
       rating: 4.6,
       reviews: 44,
-      amenities: ["WiFi", "AC", "Kitchen", "Patio"],
+      amenities: ["amenities.fastWifi", "amenities.ac", "amenities.fullKitchen", "amenities.patio"],
     },
     {
       id: 6,
       name: "The Bungalows - Unit 2",
       property: "The Bungalows",
-      description: "Modern cozy bungalow with garden",
+      descriptionKey: "properties.sample6",
       bedrooms: 2,
       bathrooms: 1,
       maxGuests: 4,
@@ -98,7 +101,7 @@ export default function Properties() {
         "https://images.unsplash.com/photo-1464207687429-7505649dae38?w=600&h=400&fit=crop",
       rating: 4.7,
       reviews: 51,
-      amenities: ["WiFi", "AC", "Kitchen", "Garden"],
+      amenities: ["amenities.fastWifi", "amenities.ac", "amenities.fullKitchen", "amenities.garden"],
     },
   ];
 
@@ -131,10 +134,10 @@ export default function Properties() {
       <div className="bg-primary/5 border-b border-border">
         <div className="container-max py-8">
           <h1 className="text-3xl md:text-4xl font-bold text-foreground mb-2">
-            Luxury Villas in Leonidion
+            {t("properties.title")}
           </h1>
           <p className="text-muted-foreground">
-            {filtered.length} properties available
+            {filtered.length} {t("properties.available")}
             {checkIn && checkOut && ` • ${checkIn} to ${checkOut}`}
             {guests && ` • ${guests} guests`}
           </p>
@@ -148,20 +151,20 @@ export default function Properties() {
           <div className="lg:col-span-1">
             <div className="bg-card border border-border rounded-lg p-6 sticky top-20">
               <h3 className="text-lg font-bold text-foreground mb-6">
-                Filters
+                {t("common.select")}
               </h3>
 
               {/* Price Filter */}
               <div className="mb-8">
                 <h4 className="font-semibold text-foreground mb-4">
-                  Price per Night
+                  {t("properties.filter.price")}
                 </h4>
                 <div className="space-y-2">
                   {[
                     { value: "all", label: "All Prices" },
-                    { value: "0-150", label: "Under $150" },
-                    { value: "150-250", label: "$150 - $250" },
-                    { value: "250-500", label: "$250 - $500" },
+                    { value: "0-150", label: `Under ${formatCurrency(150, language)}` },
+                    { value: "150-250", label: `${formatCurrency(150, language)} - ${formatCurrency(250, language)}` },
+                    { value: "250-500", label: `${formatCurrency(250, language)} - ${formatCurrency(500, language)}` },
                   ].map((option) => (
                     <label
                       key={option.value}
@@ -185,7 +188,7 @@ export default function Properties() {
 
               {/* Bedroom Filter */}
               <div className="mb-8">
-                <h4 className="font-semibold text-foreground mb-4">Bedrooms</h4>
+                <h4 className="font-semibold text-foreground mb-4">{t("properties.filter.bedrooms")}</h4>
                 <div className="space-y-2">
                   {[
                     { value: "all", label: "All Bedrooms" },
@@ -222,7 +225,7 @@ export default function Properties() {
                   }}
                   className="w-full py-2 text-primary font-semibold hover:text-primary/80 transition-colors border-t border-border pt-4"
                 >
-                  Clear Filters
+                  {t("properties.filter.clearFilters")}
                 </button>
               )}
             </div>
@@ -233,7 +236,7 @@ export default function Properties() {
             {filtered.length === 0 ? (
               <div className="text-center py-16">
                 <p className="text-lg text-muted-foreground mb-4">
-                  No properties match your filters.
+                  {t("properties.noResults")}
                 </p>
                 <button
                   onClick={() => {
@@ -242,7 +245,7 @@ export default function Properties() {
                   }}
                   className="btn-secondary"
                 >
-                  Clear Filters
+                  {t("properties.filter.clearFilters")}
                 </button>
               </div>
             ) : (
@@ -278,7 +281,7 @@ export default function Properties() {
                           </div>
                           <div className="text-right">
                             <div className="text-2xl font-bold text-primary">
-                              ${property.price}
+                              {formatCurrency(property.price, language)}
                             </div>
                             <p className="text-muted-foreground text-sm">
                               per night
@@ -286,23 +289,23 @@ export default function Properties() {
                           </div>
                         </div>
 
-                        <p className="text-muted-foreground mb-4">
-                          {property.description}
+                            <p className="text-muted-foreground mb-4">
+                              {t(property.descriptionKey)}
                         </p>
 
                         {/* Details */}
                         <div className="flex flex-wrap gap-4 mb-4 text-sm">
                           <div className="flex items-center gap-2 text-foreground">
                             <Bed size={16} className="text-primary" />
-                            {property.bedrooms} Bedrooms
+                            {property.bedrooms} {property.bedrooms === 1 ? t("common.bedroom") : t("common.bedrooms")}
                           </div>
                           <div className="flex items-center gap-2 text-foreground">
                             <Bath size={16} className="text-primary" />
-                            {property.bathrooms} Bathrooms
+                            {property.bathrooms} {property.bathrooms === 1 ? t("common.bathroom") : t("common.bathrooms")}
                           </div>
                           <div className="flex items-center gap-2 text-foreground">
                             <Users size={16} className="text-primary" />
-                            {property.maxGuests} Guests
+                            {property.maxGuests} {t("common.guests")}
                           </div>
                         </div>
 
@@ -313,7 +316,7 @@ export default function Properties() {
                               key={i}
                               className="px-3 py-1 bg-primary/10 text-primary text-xs font-semibold rounded-full"
                             >
-                              {amenity}
+                              {t(amenity)}
                             </span>
                           ))}
                         </div>
@@ -333,9 +336,6 @@ export default function Properties() {
                           </div>
                           <span className="font-semibold text-foreground">
                             {property.rating}
-                          </span>
-                          <span className="text-muted-foreground text-sm">
-                            ({property.reviews} reviews)
                           </span>
                         </div>
                         <button className="btn-primary">View Details</button>

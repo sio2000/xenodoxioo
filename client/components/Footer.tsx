@@ -1,8 +1,10 @@
 import { Mail, Phone, MapPin } from "lucide-react";
 import { Link } from "react-router-dom";
+import { useLanguage } from "@/hooks/useLanguage";
 
 export default function Footer() {
   const currentYear = new Date().getFullYear();
+  const { t } = useLanguage();
 
   return (
     <footer className="bg-primary/5 border-t border-border mt-20">
@@ -18,21 +20,19 @@ export default function Footer() {
                 LEONIDION<span className="text-accent">HOUSES</span>
               </span>
             </div>
-            <p className="text-muted-foreground text-sm">
-              Luxury villa rentals in the heart of Greece
-            </p>
+            <p className="text-muted-foreground text-sm">{t("footer.brandSubtitle")}</p>
           </div>
 
           {/* Quick Links */}
           <div>
-            <h4 className="font-semibold text-foreground mb-4">Properties</h4>
+            <h4 className="font-semibold text-foreground mb-4">{t("footer.properties")}</h4>
             <ul className="space-y-2">
               <li>
                 <Link
                   to="/properties"
                   className="text-muted-foreground hover:text-primary transition-colors text-sm"
                 >
-                  Browse All
+                  {t("footer.browseAll")}
                 </Link>
               </li>
               <li>
@@ -40,7 +40,7 @@ export default function Footer() {
                   href="#"
                   className="text-muted-foreground hover:text-primary transition-colors text-sm"
                 >
-                  Featured
+                  {t("footer.featured")}
                 </a>
               </li>
               <li>
@@ -48,7 +48,7 @@ export default function Footer() {
                   href="#"
                   className="text-muted-foreground hover:text-primary transition-colors text-sm"
                 >
-                  New Listings
+                  {t("footer.newListings")}
                 </a>
               </li>
             </ul>
@@ -56,14 +56,14 @@ export default function Footer() {
 
           {/* Company */}
           <div>
-            <h4 className="font-semibold text-foreground mb-4">Company</h4>
+            <h4 className="font-semibold text-foreground mb-4">{t("footer.company")}</h4>
             <ul className="space-y-2">
               <li>
                 <a
                   href="#about"
                   className="text-muted-foreground hover:text-primary transition-colors text-sm"
                 >
-                  About Us
+                  {t("footer.about")}
                 </a>
               </li>
               <li>
@@ -71,7 +71,7 @@ export default function Footer() {
                   href="#"
                   className="text-muted-foreground hover:text-primary transition-colors text-sm"
                 >
-                  Blog
+                  {t("footer.blog")}
                 </a>
               </li>
               <li>
@@ -79,7 +79,7 @@ export default function Footer() {
                   href="#"
                   className="text-muted-foreground hover:text-primary transition-colors text-sm"
                 >
-                  FAQs
+                  {t("footer.faqs")}
                 </a>
               </li>
             </ul>
@@ -92,24 +92,24 @@ export default function Footer() {
               <li className="flex items-center gap-2 text-muted-foreground text-sm">
                 <Mail size={16} />
                 <a
-                  href="mailto:info@leonidionhouses.com"
+                  href={`mailto:${t("footer.email")}`}
                   className="hover:text-primary transition-colors"
                 >
-                  info@leonidionhouses.com
+                  {t("footer.email")}
                 </a>
               </li>
               <li className="flex items-center gap-2 text-muted-foreground text-sm">
                 <Phone size={16} />
                 <a
-                  href="tel:+302754051234"
+                  href={`tel:${t("footer.phone")}`}
                   className="hover:text-primary transition-colors"
                 >
-                  +30 27540 51234
+                  {t("footer.phone")}
                 </a>
               </li>
               <li className="flex items-start gap-2 text-muted-foreground text-sm">
                 <MapPin size={16} className="mt-0.5 flex-shrink-0" />
-                <span>Leonidion, Arcadia, Greece</span>
+                <span>{t("footer.address")}</span>
               </li>
             </ul>
           </div>
@@ -117,16 +117,18 @@ export default function Footer() {
 
         {/* Bottom */}
         <div className="border-t border-border pt-8 flex flex-col md:flex-row justify-between items-center gap-4 text-sm text-muted-foreground">
-          <p>&copy; {currentYear} LEONIDIONHOUSES. All rights reserved.</p>
+          <p>
+            &copy; {currentYear} LEONIDIONHOUSES. {t("footer.brandSubtitle")}
+          </p>
           <div className="flex gap-6">
             <a href="#" className="hover:text-primary transition-colors">
-              Privacy Policy
+              {t("footer.privacy")}
             </a>
             <a href="#" className="hover:text-primary transition-colors">
-              Terms of Service
+              {t("footer.terms")}
             </a>
             <a href="#" className="hover:text-primary transition-colors">
-              Cookies
+              {t("footer.cookies")}
             </a>
           </div>
         </div>

@@ -2,8 +2,10 @@ import Layout from "@/components/Layout";
 import { Link } from "react-router-dom";
 import { Mail, Lock, User } from "lucide-react";
 import { useState } from "react";
+import { useLanguage } from "@/hooks/useLanguage";
 
 export default function Register() {
+  const { t } = useLanguage();
   const [formData, setFormData] = useState({
     firstName: "",
     lastName: "",
@@ -23,7 +25,7 @@ export default function Register() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (formData.password !== formData.confirmPassword) {
-      alert("Passwords do not match!");
+      alert(t("auth.passwordMismatch"));
       return;
     }
     setIsLoading(true);
@@ -40,21 +42,19 @@ export default function Register() {
         <div className="w-full max-w-md">
           {/* Header */}
           <div className="mb-8 text-center">
-            <h1 className="text-3xl font-bold text-foreground mb-2">
-              Create Account
-            </h1>
-            <p className="text-muted-foreground">
-              Join LEONIDIONHOUSES and start booking
-            </p>
-          </div>
+                  <h1 className="text-3xl font-bold text-foreground mb-2">
+                    {t("auth.createAccount")}
+                  </h1>
+                  <p className="text-muted-foreground">{t("auth.joinMessage")}</p>
+                </div>
 
           {/* Form */}
           <form onSubmit={handleSubmit} className="space-y-4">
             {/* Name Fields */}
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-semibold text-foreground mb-2">
-                  First Name
+                  <label className="block text-sm font-semibold text-foreground mb-2">
+                  {t("checkout.firstName")}
                 </label>
                 <div className="relative">
                   <User
@@ -68,13 +68,13 @@ export default function Register() {
                     onChange={handleChange}
                     required
                     className="w-full pl-10 pr-4 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary text-foreground"
-                    placeholder="John"
+                    placeholder={t("auth.firstNamePlaceholder")}
                   />
                 </div>
               </div>
               <div>
-                <label className="block text-sm font-semibold text-foreground mb-2">
-                  Last Name
+                  <label className="block text-sm font-semibold text-foreground mb-2">
+                  {t("checkout.lastName")}
                 </label>
                 <div className="relative">
                   <User
@@ -88,7 +88,7 @@ export default function Register() {
                     onChange={handleChange}
                     required
                     className="w-full pl-10 pr-4 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary text-foreground"
-                    placeholder="Doe"
+                    placeholder={t("auth.lastNamePlaceholder")}
                   />
                 </div>
               </div>
@@ -97,7 +97,7 @@ export default function Register() {
             {/* Email */}
             <div>
               <label className="block text-sm font-semibold text-foreground mb-2">
-                Email Address
+                {t("checkout.email")}
               </label>
               <div className="relative">
                 <Mail
@@ -111,7 +111,7 @@ export default function Register() {
                   onChange={handleChange}
                   required
                   className="w-full pl-10 pr-4 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary text-foreground"
-                  placeholder="you@example.com"
+                  placeholder={t("auth.emailPlaceholder")}
                 />
               </div>
             </div>
@@ -119,7 +119,7 @@ export default function Register() {
             {/* Password */}
             <div>
               <label className="block text-sm font-semibold text-foreground mb-2">
-                Password
+                {t("auth.password")}
               </label>
               <div className="relative">
                 <Lock
@@ -133,7 +133,7 @@ export default function Register() {
                   onChange={handleChange}
                   required
                   className="w-full pl-10 pr-4 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary text-foreground"
-                  placeholder="••••••••"
+                  placeholder={t("auth.passwordPlaceholder")}
                 />
               </div>
             </div>
@@ -141,7 +141,7 @@ export default function Register() {
             {/* Confirm Password */}
             <div>
               <label className="block text-sm font-semibold text-foreground mb-2">
-                Confirm Password
+                {t("auth.confirmPassword")}
               </label>
               <div className="relative">
                 <Lock
@@ -155,7 +155,7 @@ export default function Register() {
                   onChange={handleChange}
                   required
                   className="w-full pl-10 pr-4 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary text-foreground"
-                  placeholder="••••••••"
+                  placeholder={t("auth.passwordPlaceholder")}
                 />
               </div>
             </div>
@@ -163,16 +163,7 @@ export default function Register() {
             {/* Terms */}
             <label className="flex items-start gap-2 cursor-pointer">
               <input type="checkbox" required className="mt-1 w-4 h-4" />
-              <span className="text-sm text-foreground">
-                I agree to the{" "}
-                <a href="#" className="text-primary hover:underline">
-                  Terms of Service
-                </a>{" "}
-                and{" "}
-                <a href="#" className="text-primary hover:underline">
-                  Privacy Policy
-                </a>
-              </span>
+              <span className="text-sm text-foreground">{t("auth.agreeTerms")}</span>
             </label>
 
             {/* Submit */}
@@ -181,19 +172,14 @@ export default function Register() {
               disabled={isLoading}
               className="btn-primary w-full justify-center mt-6 disabled:opacity-50"
             >
-              {isLoading ? "Creating Account..." : "Create Account"}
+              {isLoading ? t("auth.creatingAccount") : t("auth.createButton")}
             </button>
           </form>
 
           {/* Sign In Link */}
           <p className="text-center text-sm text-muted-foreground mt-6">
-            Already have an account?{" "}
-            <Link
-              to="/login"
-              className="text-primary font-semibold hover:underline"
-            >
-              Sign in
-            </Link>
+            {t("auth.haveAccount")} {" "}
+            <Link to="/login" className="text-primary font-semibold hover:underline">{t("auth.signIn")}</Link>
           </p>
         </div>
       </div>

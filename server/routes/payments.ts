@@ -1,170 +1,109 @@
-/**
- * STRIPE PAYMENT ROUTES - Implementation Guide
- *
- * This file contains the scaffold for Stripe payment endpoints.
- * To implement, you'll need:
- *
- * 1. Install Stripe Node SDK:
- *    pnpm add stripe
- *
- * 2. Set environment variables:
- *    STRIPE_SECRET_KEY=sk_live_xxxxx
- *    STRIPE_WEBHOOK_SECRET=whsec_xxxxx
- *
- * 3. Implement the following endpoints:
- */
 
-import { RequestHandler } from "express";
+import { Router, Request, Response, NextFunction } from "express";
+import { z } from "zod";
+import Stripe from "stripe";
+import { validate } from "../middleware/validation";
+import { authenticate } from "../middleware/auth";
+import * as paymentService from "../services/payment.service";
 
-/**
- * POST /api/create-payment-intent
- * Create a Stripe payment intent for the deposit
- *
- * Expected body:
- * {
- *   amount: number,
- *   bookingData: {
- *     propertyId: string,
- *     checkInDate: string,
- *     checkOutDate: string,
- *     guestName: string,
- *     guestEmail: string,
- *     nights: number,
- *     pricePerNight: number,
- *   }
- * }
- */
-export const handleCreatePaymentIntent: RequestHandler = async (req, res) => {
+const router = Router();
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || "", {
+  apiVersion: "2024-01-01",
+});
+
+// Schemas
+const createIntentSchema = z.object({
+  bookingId: z.string(),
+  paymentType: z.enum(["DEPOSIT", "BALANCE", "FULL"]).optional(),
+});
+
+const refundSchema = z.object({
+  bookingId: z.string(),
+  reason: z.string().optional(),
+});
+
+// Create Payment Intent
+router.post(
+  "/create-intent",
+  authenticate,
+  validate(createIntentSchema),
+  async (req, res, next) => {
+    try {
+      const { bookingId, paymentType } = req.body;
+      const result = await paymentService.createPaymentIntent(
+        bookingId,
+        req.user!.userId,
+        paymentType,
+      );
+      res.json({ success: true, data: result });
+    } catch (error) {
+      next(error);
+    }
+  },
+);
+
+// Refund Payment
+router.post(
+  "/refund",
+  authenticate,
+  validate(refundSchema),
+  async (req, res, next) => {
+    try {
+      const { bookingId, reason } = req.body;
+      const result = await paymentService.refundPayment(
+        bookingId,
+        req.user!.userId,
+        reason,
+      );
+      res.json({ success: true, data: result });
+    } catch (error) {
+      next(error);
+    }
+  },
+);
+
+// Get Payment History
+router.get("/history/:bookingId", authenticate, async (req, res, next) => {
   try {
-    // TODO: Implement Stripe payment intent creation
-    // Example:
-    // const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
-    // const paymentIntent = await stripe.paymentIntents.create({
-    //   amount: req.body.amount,
-    //   currency: 'usd',
-    //   metadata: {
-    //     bookingId: generateBookingId(),
-    //     propertyId: req.body.bookingData.propertyId,
-    //     guestEmail: req.body.bookingData.guestEmail,
-    //   },
-    //   receipt_email: req.body.bookingData.guestEmail,
-    // });
-    // res.json({ clientSecret: paymentIntent.client_secret });
-
-    res.status(501).json({
-      error:
-        "Not implemented. See server/routes/payments.ts for setup instructions.",
-    });
+    const result = await paymentService.getPaymentHistory(req.params.bookingId);
+    res.json({ success: true, data: result });
   } catch (error) {
-    console.error("Error creating payment intent:", error);
-    res.status(500).json({ error: "Internal server error" });
+    next(error);
   }
-};
+});
 
-/**
- * POST /api/confirm-payment
- * Confirm a payment after frontend processing
- */
-export const handleConfirmPayment: RequestHandler = async (req, res) => {
-  try {
-    // TODO: Implement payment confirmation
-    // This would verify the payment with Stripe and update the booking status
-    res.status(501).json({
-      error:
-        "Not implemented. See server/routes/payments.ts for setup instructions.",
-    });
-  } catch (error) {
-    console.error("Error confirming payment:", error);
-    res.status(500).json({ error: "Internal server error" });
-  }
-};
+// Stripe Webhook
+// NOTE: This route needs raw body for signature verification.
+router.post(
+  "/webhook",
+  async (req: Request, res: Response, next: NextFunction) => {
+    const sig = req.headers["stripe-signature"];
+    const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
 
-/**
- * POST /api/refund-payment
- * Refund a payment based on cancellation policy
- */
-export const handleRefundPayment: RequestHandler = async (req, res) => {
-  try {
-    // TODO: Implement refund logic
-    // 1. Check cancellation policy
-    // 2. Calculate refund amount
-    // 3. Create Stripe refund
-    // 4. Update booking status
-    res.status(501).json({
-      error:
-        "Not implemented. See server/routes/payments.ts for setup instructions.",
-    });
-  } catch (error) {
-    console.error("Error refunding payment:", error);
-    res.status(500).json({ error: "Internal server error" });
-  }
-};
+    if (!sig || !webhookSecret) {
+      console.error("Missing signature or webhook secret");
+      res.status(400).send("Webhook Error: Missing signature or secret");
+      return;
+    }
 
-/**
- * POST /api/schedule-payment
- * Schedule the remaining balance payment for 30 days before check-in
- */
-export const handleSchedulePayment: RequestHandler = async (req, res) => {
-  try {
-    // TODO: Implement scheduled payment
-    // This would create a scheduled payment that charges automatically
-    // 30 days before the guest's check-in date
-    res.status(501).json({
-      error:
-        "Not implemented. See server/routes/payments.ts for setup instructions.",
-    });
-  } catch (error) {
-    console.error("Error scheduling payment:", error);
-    res.status(500).json({ error: "Internal server error" });
-  }
-};
+    let event: Stripe.Event;
 
-/**
- * POST /api/webhook/stripe
- * Handle Stripe webhooks
- * Set up webhook URL in Stripe Dashboard: https://dashboard.stripe.com/webhooks
- */
-export const handleStripeWebhook: RequestHandler = async (req, res) => {
-  try {
-    // TODO: Implement webhook handler
-    // Listen to events like:
-    // - payment_intent.succeeded
-    // - payment_intent.payment_failed
-    // - charge.refunded
-    // - customer.subscription.created
-    res.status(501).json({
-      error:
-        "Not implemented. See server/routes/payments.ts for setup instructions.",
-    });
-  } catch (error) {
-    console.error("Error handling webhook:", error);
-    res.status(500).json({ error: "Internal server error" });
-  }
-};
+    try {
+      event = stripe.webhooks.constructEvent(req.body, sig, webhookSecret);
+    } catch (err: any) {
+      console.error(`Webhook Signature Verification Failed: ${err.message}`);
+      res.status(400).send(`Webhook Error: ${err.message}`);
+      return;
+    }
 
-/**
- * GET /api/payments/:bookingId
- * Get payment history for a booking
- */
-export const handleGetPaymentHistory: RequestHandler = async (req, res) => {
-  try {
-    // TODO: Implement payment history retrieval
-    // Query database for all payments related to a booking
-    res.status(501).json({
-      error:
-        "Not implemented. See server/routes/payments.ts for setup instructions.",
-    });
-  } catch (error) {
-    console.error("Error fetching payment history:", error);
-    res.status(500).json({ error: "Internal server error" });
-  }
-};
+    try {
+      await paymentService.handleStripeWebhook(event);
+      res.json({ received: true });
+    } catch (error) {
+      console.error("Error processing webhook:", error);
+      res.status(500).json({ error: "Webhook processing failed" });
+    }
+  },
+);
 
-export default {
-  handleCreatePaymentIntent,
-  handleConfirmPayment,
-  handleRefundPayment,
-  handleSchedulePayment,
-  handleStripeWebhook,
-  handleGetPaymentHistory,
-};
+export const paymentRouter = router;

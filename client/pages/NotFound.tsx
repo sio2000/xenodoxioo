@@ -2,9 +2,11 @@ import { useLocation } from "react-router-dom";
 import Layout from "@/components/Layout";
 import { Link } from "react-router-dom";
 import { useEffect } from "react";
+import { useLanguage } from "@/hooks/useLanguage";
 
 const NotFound = () => {
   const location = useLocation();
+  const { t } = useLanguage();
 
   useEffect(() => {
     console.error(
@@ -19,14 +21,13 @@ const NotFound = () => {
         <div className="text-center max-w-md">
           <h1 className="text-6xl font-bold text-primary mb-4">404</h1>
           <p className="text-2xl font-bold text-foreground mb-2">
-            Page Not Found
+            {t("common.pageNotFound")}
           </p>
           <p className="text-muted-foreground text-lg mb-8">
-            Sorry, we couldn't find the page you're looking for. It might be
-            under construction or the path may be incorrect.
+            {t("common.pageNotFoundDesc")}
           </p>
           <Link to="/" className="btn-primary">
-            Return to Home
+            {t("common.returnHome")}
           </Link>
         </div>
       </div>

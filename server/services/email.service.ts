@@ -125,9 +125,9 @@ export async function sendBookingConfirmationEmail(
       <li><strong>Nights:</strong> ${booking.nights}</li>
       <li><strong>Guests:</strong> ${booking.guests}</li>
     </ul>
-    <h2>Total Amount: $${booking.totalPrice.toFixed(2)}</h2>
-    <p><strong>Deposit (25%):</strong> $${(booking.totalPrice * 0.25).toFixed(2)} (Due immediately)</p>
-    <p><strong>Balance (75%):</strong> $${(booking.totalPrice * 0.75).toFixed(2)} (Due 30 days before arrival)</p>
+    <h2>Total Amount: €${booking.totalPrice.toFixed(2)}</h2>
+    <p><strong>Deposit (25%):</strong> €${(booking.totalPrice * 0.25).toFixed(2)} (Due immediately)</p>
+    <p><strong>Balance (75%):</strong> €${(booking.totalPrice * 0.75).toFixed(2)} (Due 30 days before arrival)</p>
     <a href="${process.env.FRONTEND_URL}/dashboard" style="background-color: #0677A1; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">View Booking</a>
     <p>Best regards,<br/>The LEONIDIONHOUSES Team</p>
   `;
@@ -166,7 +166,7 @@ export async function sendPaymentReceiptEmail(
     <ul>
       <li><strong>Booking Number:</strong> ${booking.bookingNumber}</li>
       <li><strong>Payment Type:</strong> ${paymentTypeText}</li>
-      <li><strong>Amount:</strong> $${payment.amount.toFixed(2)}</li>
+      <li><strong>Amount:</strong> €${payment.amount.toFixed(2)}</li>
       <li><strong>Date:</strong> ${new Date(payment.createdAt).toLocaleDateString()}</li>
       <li><strong>Transaction ID:</strong> ${payment.stripeChargeId || "N/A"}</li>
     </ul>
@@ -268,7 +268,7 @@ export async function sendCancellationConfirmationEmail(
       <li><strong>Booking Number:</strong> ${booking.bookingNumber}</li>
       <li><strong>Property:</strong> ${booking.unit.property.name}</li>
       <li><strong>Original Check-in:</strong> ${new Date(booking.checkInDate).toLocaleDateString()}</li>
-      <li><strong>Refund Amount:</strong> $${refundAmount.toFixed(2)}</li>
+      <li><strong>Refund Amount:</strong> €${refundAmount.toFixed(2)}</li>
     </ul>
     <p>The refund will be processed back to your original payment method within 5-7 business days.</p>
     <p>We hope to see you again in the future!</p>

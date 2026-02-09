@@ -11,18 +11,21 @@ import {
   Waves,
 } from "lucide-react";
 import { useState } from "react";
+import { useLanguage } from "@/hooks/useLanguage";
+import formatCurrency from "@/lib/currency";
 
 export default function Index() {
   const [checkIn, setCheckIn] = useState("");
   const [checkOut, setCheckOut] = useState("");
   const [guests, setGuests] = useState("2");
+  const { language, t } = useLanguage();
 
   // Featured properties data
   const featuredProperties = [
     {
       id: 1,
       name: "The Lykoskufi Villas",
-      description: "Luxury villas with breathtaking sea views",
+      descriptionKey: "home.featured.prop1",
       units: 3,
       image:
         "https://images.unsplash.com/photo-1564013799919-ab600027ffc6?w=600&h=400&fit=crop",
@@ -33,7 +36,7 @@ export default function Index() {
     {
       id: 2,
       name: "The Ogra House",
-      description: "Elegant seaside retreat for families",
+      descriptionKey: "home.featured.prop2",
       units: 1,
       image:
         "https://images.unsplash.com/photo-1568605114967-8130f3a36994?w=600&h=400&fit=crop",
@@ -44,7 +47,7 @@ export default function Index() {
     {
       id: 3,
       name: "The Bungalows",
-      description: "Modern, cozy bungalows nestled in nature",
+      descriptionKey: "home.featured.prop3",
       units: 2,
       image:
         "https://images.unsplash.com/photo-1566073771259-6a8506099945?w=600&h=400&fit=crop",
@@ -57,23 +60,23 @@ export default function Index() {
   const amenities = [
     {
       icon: Wifi,
-      label: "Fast WiFi",
-      description: "High-speed internet in all units",
+      label: t("amenities.fastWifi"),
+      description: t("amenities.fastWifiDesc"),
     },
     {
       icon: Utensils,
-      label: "Full Kitchen",
-      description: "Equipped for self-catering",
+      label: t("amenities.fullKitchen"),
+      description: t("amenities.fullKitchenDesc"),
     },
     {
       icon: Waves,
-      label: "Beach Access",
-      description: "Direct or nearby beach access",
+      label: t("amenities.beachAccess"),
+      description: t("amenities.beachAccessDesc"),
     },
     {
       icon: MapPin,
-      label: "Prime Location",
-      description: "Heart of Leonidion",
+      label: t("amenities.primeLocation"),
+      description: t("amenities.primeLocationDesc"),
     },
   ];
 
@@ -99,12 +102,12 @@ export default function Index() {
         <div className="relative container-max py-20 md:py-32">
           <div className="max-w-3xl">
             <h1 className="text-4xl md:text-6xl font-bold mb-6 leading-tight">
-              Discover Your Perfect{" "}
+              {t("home.hero.title")}
+              {" "}
               <span className="text-accent">Greek Escape</span>
             </h1>
             <p className="text-lg md:text-xl text-white/90 mb-8">
-              Luxury villa rentals in Leonidion. Book your dream vacation today
-              and experience authentic Greek hospitality.
+              {t("home.hero.subtitle")}
             </p>
           </div>
 
@@ -117,7 +120,7 @@ export default function Index() {
               {/* Check-in */}
               <div className="space-y-2">
                 <label className="block text-sm font-semibold text-foreground">
-                  Check In
+                  {t("home.search.checkIn")}
                 </label>
                 <div className="flex items-center gap-2 border border-border rounded-lg px-3 py-2">
                   <Calendar size={18} className="text-primary" />
@@ -133,7 +136,7 @@ export default function Index() {
               {/* Check-out */}
               <div className="space-y-2">
                 <label className="block text-sm font-semibold text-foreground">
-                  Check Out
+                  {t("home.search.checkOut")}
                 </label>
                 <div className="flex items-center gap-2 border border-border rounded-lg px-3 py-2">
                   <Calendar size={18} className="text-primary" />
@@ -149,7 +152,7 @@ export default function Index() {
               {/* Guests */}
               <div className="space-y-2">
                 <label className="block text-sm font-semibold text-foreground">
-                  Guests
+                  {t("home.search.guests")}
                 </label>
                 <div className="flex items-center gap-2 border border-border rounded-lg px-3 py-2">
                   <Users size={18} className="text-primary" />
@@ -160,7 +163,7 @@ export default function Index() {
                   >
                     {[1, 2, 3, 4, 5, 6, 7, 8].map((n) => (
                       <option key={n} value={n}>
-                        {n} {n === 1 ? "Guest" : "Guests"}
+                        {n} {n === 1 ? t("common.guest") : t("common.guests")}
                       </option>
                     ))}
                   </select>
@@ -174,7 +177,7 @@ export default function Index() {
                   className="w-full btn-primary justify-center gap-2"
                 >
                   <Search size={20} />
-                  <span className="hidden md:inline">Search</span>
+                  <span className="hidden md:inline">{t("home.search.button")}</span>
                 </button>
               </div>
             </div>
@@ -188,10 +191,10 @@ export default function Index() {
       <section className="container-max section-padding">
         <div className="mb-12">
           <h2 className="text-3xl md:text-4xl font-bold text-foreground mb-4">
-            Featured Properties
+            {t("home.featured.title")}
           </h2>
           <p className="text-muted-foreground text-lg">
-            Handpicked villas offering the best in luxury and comfort
+            {t("home.featured.subtitle")}
           </p>
         </div>
 
@@ -209,12 +212,12 @@ export default function Index() {
                   alt={property.name}
                   className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
                 />
-                <div className="absolute top-4 right-4 bg-white rounded-lg px-3 py-1 shadow-lg">
-                  <span className="text-primary font-bold">
-                    ${property.price}
-                  </span>
-                  <span className="text-muted-foreground text-sm">/night</span>
-                </div>
+                      <div className="absolute top-4 right-4 bg-white rounded-lg px-3 py-1 shadow-lg">
+                        <span className="text-primary font-bold">
+                          {formatCurrency(property.price, language)}
+                        </span>
+                        <span className="text-muted-foreground text-sm">/night</span>
+                      </div>
               </div>
 
               {/* Content */}
@@ -223,7 +226,7 @@ export default function Index() {
                   {property.name}
                 </h3>
                 <p className="text-muted-foreground text-sm mb-4">
-                  {property.description}
+                  {t(property.descriptionKey)}
                 </p>
 
                 {/* Rating */}
@@ -242,14 +245,11 @@ export default function Index() {
                   <span className="font-semibold text-foreground">
                     {property.rating}
                   </span>
-                  <span className="text-muted-foreground text-sm">
-                    ({property.reviews} reviews)
-                  </span>
                 </div>
 
                 {/* Units */}
                 <div className="text-sm text-muted-foreground">
-                  {property.units} unit{property.units > 1 ? "s" : ""} available
+                  {property.units} {t("common.unitsAvailable")}
                 </div>
               </div>
             </Link>
@@ -258,7 +258,7 @@ export default function Index() {
 
         <div className="mt-12 text-center">
           <Link to="/properties" className="btn-primary">
-            View All Properties
+            {t("home.featured.viewAll")}
           </Link>
         </div>
       </section>
@@ -267,7 +267,7 @@ export default function Index() {
       <section className="bg-primary/5 section-padding">
         <div className="container-max">
           <h2 className="text-3xl md:text-4xl font-bold text-foreground mb-12 text-center">
-            Why Book With LEONIDIONHOUSES
+            {t("home.why.title")}
           </h2>
 
           <div className="grid md:grid-cols-4 gap-8">
@@ -293,24 +293,23 @@ export default function Index() {
       <section className="bg-gradient-to-r from-primary/10 via-accent/5 to-primary/10 section-padding">
         <div className="container-max text-center">
           <h2 className="text-2xl md:text-3xl font-bold text-foreground mb-4">
-            Trusted by Thousands of Guests
-          </h2>
+          {t("home.trust.title")}
+        </h2>
           <p className="text-muted-foreground text-lg mb-8 max-w-2xl mx-auto">
-            Since 2015, we've been providing unforgettable vacation experiences
-            in Leonidion. Join our growing community of satisfied travelers.
+            {t("home.trust.description")}
           </p>
           <div className="grid md:grid-cols-3 gap-8">
             <div>
               <div className="text-4xl font-bold text-primary mb-2">5,000+</div>
-              <p className="text-muted-foreground">Happy Guests</p>
+              <p className="text-muted-foreground">{t("common.happyGuests")}</p>
             </div>
             <div>
               <div className="text-4xl font-bold text-primary mb-2">6</div>
-              <p className="text-muted-foreground">Luxury Units</p>
+              <p className="text-muted-foreground">{t("common.luxuryUnits")}</p>
             </div>
             <div>
               <div className="text-4xl font-bold text-primary mb-2">4.8★</div>
-              <p className="text-muted-foreground">Average Rating</p>
+              <p className="text-muted-foreground">{t("common.averageRating")}</p>
             </div>
           </div>
         </div>
@@ -320,17 +319,16 @@ export default function Index() {
       <section className="bg-primary text-white section-padding">
         <div className="container-max text-center">
           <h2 className="text-3xl md:text-4xl font-bold mb-4">
-            Ready to Plan Your Escape?
+            {t("home.cta.title")}
           </h2>
           <p className="text-lg text-white/90 mb-8 max-w-2xl mx-auto">
-            Explore our beautiful properties and book your perfect getaway in
-            Leonidion today.
+            {t("home.cta.subtitle")}
           </p>
           <Link
             to="/properties"
             className="inline-flex items-center justify-center rounded-lg bg-accent text-primary px-8 py-4 font-bold hover:bg-accent/90 transition-colors text-lg"
           >
-            Explore Properties
+            {t("home.featured.viewAll")}
           </Link>
         </div>
       </section>

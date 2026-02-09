@@ -1,6 +1,8 @@
 import Layout from "@/components/Layout";
 import { useSearchParams, Link } from "react-router-dom";
 import { useState } from "react";
+import { useLanguage } from "@/hooks/useLanguage";
+import formatCurrency from "@/lib/currency";
 import { CreditCard, Lock } from "lucide-react";
 
 export default function Checkout() {
@@ -22,6 +24,7 @@ export default function Checkout() {
   const depositAmount = Math.round(subtotal * 0.25);
   const tax = Math.round((subtotal + property.cleaningFee) * 0.15);
   const total = subtotal + property.cleaningFee + tax;
+  const { language, t } = useLanguage();
 
   const [formData, setFormData] = useState({
     firstName: "",
@@ -65,13 +68,13 @@ export default function Checkout() {
             to={`/properties/${propertyId}`}
             className="text-primary hover:text-primary/80 mb-4 inline-block"
           >
-            ← Back to property
+            ← {t("property.backToProperty")}
           </Link>
           <h1 className="text-3xl md:text-4xl font-bold text-foreground">
-            Complete Your Booking
+            {t("checkout.title")}
           </h1>
           <p className="text-muted-foreground text-lg mt-2">
-            Review your details and secure your reservation
+            {t("checkout.subtitle")}
           </p>
         </div>
 
@@ -82,13 +85,13 @@ export default function Checkout() {
               {/* Guest Information */}
               <div className="bg-card border border-border rounded-lg p-6">
                 <h2 className="text-xl font-bold text-foreground mb-6">
-                  Guest Information
+                  {t("checkout.guestInfo")}
                 </h2>
 
                 <div className="grid md:grid-cols-2 gap-4 mb-6">
                   <div>
                     <label className="block text-sm font-semibold text-foreground mb-2">
-                      First Name *
+                      {t("checkout.firstName")} *
                     </label>
                     <input
                       type="text"
@@ -97,12 +100,12 @@ export default function Checkout() {
                       onChange={handleInputChange}
                       required
                       className="w-full px-4 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary text-foreground"
-                      placeholder="John"
+                      placeholder={t("auth.firstNamePlaceholder")}
                     />
                   </div>
                   <div>
                     <label className="block text-sm font-semibold text-foreground mb-2">
-                      Last Name *
+                      {t("checkout.lastName")} *
                     </label>
                     <input
                       type="text"
@@ -111,7 +114,7 @@ export default function Checkout() {
                       onChange={handleInputChange}
                       required
                       className="w-full px-4 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary text-foreground"
-                      placeholder="Doe"
+                      placeholder={t("auth.lastNamePlaceholder")}
                     />
                   </div>
                 </div>
@@ -119,7 +122,7 @@ export default function Checkout() {
                 <div className="space-y-4">
                   <div>
                     <label className="block text-sm font-semibold text-foreground mb-2">
-                      Email *
+                      {t("checkout.email")} *
                     </label>
                     <input
                       type="email"
@@ -128,12 +131,12 @@ export default function Checkout() {
                       onChange={handleInputChange}
                       required
                       className="w-full px-4 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary text-foreground"
-                      placeholder="john@example.com"
+                      placeholder={t("auth.emailPlaceholder")}
                     />
                   </div>
                   <div>
                     <label className="block text-sm font-semibold text-foreground mb-2">
-                      Phone *
+                      {t("checkout.phone")} *
                     </label>
                     <input
                       type="tel"
@@ -142,7 +145,7 @@ export default function Checkout() {
                       onChange={handleInputChange}
                       required
                       className="w-full px-4 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary text-foreground"
-                      placeholder="+1 (555) 123-4567"
+                      placeholder={t("checkout.phonePlaceholder")}
                     />
                   </div>
                 </div>
@@ -151,13 +154,13 @@ export default function Checkout() {
               {/* Billing Address */}
               <div className="bg-card border border-border rounded-lg p-6">
                 <h2 className="text-xl font-bold text-foreground mb-6">
-                  Billing Address
+                  {t("checkout.billingAddress")}
                 </h2>
 
                 <div className="space-y-4">
                   <div>
                     <label className="block text-sm font-semibold text-foreground mb-2">
-                      Address *
+                      {t("checkout.address")} *
                     </label>
                     <input
                       type="text"
@@ -166,14 +169,14 @@ export default function Checkout() {
                       onChange={handleInputChange}
                       required
                       className="w-full px-4 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary text-foreground"
-                      placeholder="123 Main Street"
+                      placeholder={t("checkout.addressPlaceholder")}
                     />
                   </div>
 
                   <div className="grid md:grid-cols-2 gap-4">
                     <div>
                       <label className="block text-sm font-semibold text-foreground mb-2">
-                        City *
+                        {t("checkout.city")} *
                       </label>
                       <input
                         type="text"
@@ -182,12 +185,12 @@ export default function Checkout() {
                         onChange={handleInputChange}
                         required
                         className="w-full px-4 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary text-foreground"
-                        placeholder="New York"
+                        placeholder={t("checkout.cityPlaceholder")}
                       />
                     </div>
                     <div>
                       <label className="block text-sm font-semibold text-foreground mb-2">
-                        Zip Code *
+                        {t("checkout.zipCode")} *
                       </label>
                       <input
                         type="text"
@@ -196,7 +199,7 @@ export default function Checkout() {
                         onChange={handleInputChange}
                         required
                         className="w-full px-4 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary text-foreground"
-                        placeholder="10001"
+                        placeholder={t("checkout.zipPlaceholder")}
                       />
                     </div>
                   </div>
@@ -227,15 +230,12 @@ export default function Checkout() {
               <div className="bg-card border border-border rounded-lg p-6">
                 <h2 className="text-xl font-bold text-foreground mb-6 flex items-center gap-2">
                   <CreditCard size={24} />
-                  Payment Information
+                  {t("checkout.payment")}
                 </h2>
 
                 <div className="p-4 bg-primary/5 rounded-lg mb-4 flex items-center gap-2">
                   <Lock size={18} className="text-primary" />
-                  <p className="text-sm text-foreground">
-                    Your payment information is encrypted and secure. We use
-                    Stripe for secure processing.
-                  </p>
+                  <p className="text-sm text-foreground">{t("checkout.securePaymentText")}</p>
                 </div>
 
                 <div className="space-y-4">
@@ -245,7 +245,7 @@ export default function Checkout() {
                     </label>
                     <input
                       type="text"
-                      placeholder="4242 4242 4242 4242"
+                      placeholder={t("checkout.cardNumberPlaceholder")}
                       className="w-full px-4 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary text-foreground"
                     />
                   </div>
@@ -257,7 +257,7 @@ export default function Checkout() {
                       </label>
                       <input
                         type="text"
-                        placeholder="MM/YY"
+                        placeholder={t("checkout.expiryPlaceholder")}
                         className="w-full px-4 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary text-foreground"
                       />
                     </div>
@@ -267,7 +267,7 @@ export default function Checkout() {
                       </label>
                       <input
                         type="text"
-                        placeholder="123"
+                        placeholder={t("checkout.cvvPlaceholder")}
                         className="w-full px-4 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary text-foreground"
                       />
                     </div>
@@ -279,24 +279,12 @@ export default function Checkout() {
               <div className="space-y-4">
                 <label className="flex items-start gap-3 cursor-pointer">
                   <input type="checkbox" required className="mt-1 w-4 h-4" />
-                  <span className="text-sm text-foreground">
-                    I agree to the{" "}
-                    <a href="#" className="text-primary hover:underline">
-                      Cancellation Policy
-                    </a>{" "}
-                    and{" "}
-                    <a href="#" className="text-primary hover:underline">
-                      Terms of Service
-                    </a>
-                  </span>
+                  <span className="text-sm text-foreground">{t("checkout.agreeTerms")}</span>
                 </label>
 
                 <label className="flex items-start gap-3 cursor-pointer">
                   <input type="checkbox" className="mt-1 w-4 h-4" />
-                  <span className="text-sm text-foreground">
-                    Send me booking confirmation and important updates to my
-                    email
-                  </span>
+                  <span className="text-sm text-foreground">{t("checkout.sendUpdates")}</span>
                 </label>
               </div>
 
@@ -306,12 +294,11 @@ export default function Checkout() {
                 disabled={isProcessing}
                 className="btn-primary w-full justify-center text-lg py-3 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {isProcessing ? "Processing Payment..." : "Complete Booking"}
+                {isProcessing ? t("checkout.processingPayment") : t("checkout.completeBooking")}
               </button>
 
               <p className="text-xs text-muted-foreground text-center">
-                Only ${depositAmount} will be charged now. Remaining $
-                {total - depositAmount} will be charged 30 days before arrival.
+                Only {formatCurrency(depositAmount, language)} will be charged now. Remaining {formatCurrency(total - depositAmount, language)} will be charged 30 days before arrival.
               </p>
             </form>
           </div>
@@ -352,23 +339,23 @@ export default function Checkout() {
               <div className="space-y-3 mb-6 pb-6 border-b border-border text-sm">
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">
-                    {property.nights} nights × ${property.price}
+                    {property.nights} nights × {formatCurrency(property.price, language)}
                   </span>
                   <span className="font-semibold text-foreground">
-                    ${subtotal}
+                    {formatCurrency(subtotal, language)}
                   </span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Cleaning fee</span>
                   <span className="font-semibold text-foreground">
-                    ${property.cleaningFee}
+                    {formatCurrency(property.cleaningFee, language)}
                   </span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">
                     Taxes & fees (15%)
                   </span>
-                  <span className="font-semibold text-foreground">${tax}</span>
+                  <span className="font-semibold text-foreground">{formatCurrency(tax, language)}</span>
                 </div>
               </div>
 
@@ -377,11 +364,11 @@ export default function Checkout() {
                 <div className="flex justify-between items-baseline mb-2">
                   <span className="font-semibold text-foreground">Total</span>
                   <span className="text-3xl font-bold text-primary">
-                    ${total}
+                    {formatCurrency(total, language)}
                   </span>
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  Deposit due: ${depositAmount}
+                  Deposit due: {formatCurrency(depositAmount, language)}
                 </p>
               </div>
 
@@ -394,7 +381,7 @@ export default function Checkout() {
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Deposit (25%)</span>
                     <span className="font-semibold text-foreground">
-                      ${depositAmount}
+                      {formatCurrency(depositAmount, language)}
                     </span>
                   </div>
                   <div className="flex justify-between">
@@ -402,7 +389,7 @@ export default function Checkout() {
                       Balance (75%) - Due 30 days before
                     </span>
                     <span className="font-semibold text-foreground">
-                      ${total - depositAmount}
+                      {formatCurrency(total - depositAmount, language)}
                     </span>
                   </div>
                 </div>

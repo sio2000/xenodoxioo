@@ -8,31 +8,34 @@ import {
   BookOpen,
 } from "lucide-react";
 import { useState } from "react";
+import { useLanguage } from "@/hooks/useLanguage";
+import formatCurrency from "@/lib/currency";
 
 export default function Admin() {
   const [activeTab, setActiveTab] = useState("dashboard");
+  const { language, t } = useLanguage();
 
   const stats = [
     {
-      label: "Total Bookings",
+      label: t("admin.totalBookings"),
       value: "48",
       icon: BookOpen,
       color: "bg-blue-100 text-blue-700",
     },
     {
-      label: "Revenue (This Month)",
-      value: "$12,450",
+      label: t("admin.revenue"),
+      value: formatCurrency(12450, language),
       icon: DollarSign,
       color: "bg-green-100 text-green-700",
     },
     {
-      label: "Total Users",
+      label: t("admin.totalUsers"),
       value: "156",
       icon: Users,
       color: "bg-purple-100 text-purple-700",
     },
     {
-      label: "Occupancy Rate",
+      label: t("admin.occupancy"),
       value: "87%",
       icon: Calendar,
       color: "bg-orange-100 text-orange-700",
@@ -40,12 +43,12 @@ export default function Admin() {
   ];
 
   const adminMenuItems = [
-    { id: "dashboard", label: "Dashboard", icon: BarChart3 },
-    { id: "bookings", label: "Bookings", icon: BookOpen },
-    { id: "pricing", label: "Pricing & Discounts", icon: DollarSign },
-    { id: "properties", label: "Properties", icon: Calendar },
-    { id: "users", label: "Users", icon: Users },
-    { id: "settings", label: "Settings", icon: Settings },
+    { id: "dashboard", label: t("admin.dashboard"), icon: BarChart3 },
+    { id: "bookings", label: t("admin.bookings"), icon: BookOpen },
+    { id: "pricing", label: t("admin.pricing"), icon: DollarSign },
+    { id: "properties", label: t("admin.properties"), icon: Calendar },
+    { id: "users", label: t("admin.users"), icon: Users },
+    { id: "settings", label: t("admin.settings"), icon: Settings },
   ];
 
   return (
@@ -54,9 +57,9 @@ export default function Admin() {
         {/* Admin Header */}
         <div className="bg-primary text-white py-8 mb-8">
           <div className="container-max">
-            <h1 className="text-4xl font-bold">Admin Panel</h1>
+            <h1 className="text-4xl font-bold">{t("admin.title")}</h1>
             <p className="text-white/80 mt-2">
-              Manage your villa rental business
+              {t("admin.subtitle")}
             </p>
           </div>
         </div>

@@ -15,19 +15,21 @@ import {
   Heart,
 } from "lucide-react";
 import { useState } from "react";
+import { useLanguage } from "@/hooks/useLanguage";
+import formatCurrency from "@/lib/currency";
 
 export default function PropertyDetail() {
   const { id } = useParams<{ id: string }>();
   const [isFavorite, setIsFavorite] = useState(false);
   const [selectedImage, setSelectedImage] = useState(0);
+  const { language, t } = useLanguage();
 
   // Property data (in production, fetch from API)
   const property = {
     id: 1,
     name: "The Lykoskufi Villas - Villa A",
     property: "The Lykoskufi Villas",
-    description:
-      "Experience pure luxury in our stunning seaside villa. This magnificent property features modern amenities combined with traditional Greek architecture. Wake up to breathtaking sea views, relax by your private pool, and enjoy the authentic Mediterranean lifestyle.",
+    descriptionKey: "property.description.sample1",
     bedrooms: 3,
     bathrooms: 2,
     maxGuests: 6,
@@ -44,32 +46,20 @@ export default function PropertyDetail() {
       "https://images.unsplash.com/photo-1552321554-5fefe8c9ef14?w=1200&h=600&fit=crop",
     ],
     amenities: [
-      { icon: Wifi, label: "WiFi", description: "High-speed internet" },
-      {
-        icon: Wind,
-        label: "Air Conditioning",
-        description: "Full AC in all rooms",
-      },
-      { icon: Utensils, label: "Full Kitchen", description: "Fully equipped" },
-      { icon: Tv, label: "Smart TV", description: "Entertainment system" },
-      {
-        icon: Waves,
-        label: "Private Pool",
-        description: "Heated pool available",
-      },
-      {
-        icon: MapPin,
-        label: "Beach Access",
-        description: "5 min walk to beach",
-      },
+      { icon: Wifi, labelKey: "amenities.fastWifi", descKey: "amenities.fastWifiDesc" },
+      { icon: Wind, labelKey: "amenities.ac", descKey: "amenities.acDesc" },
+      { icon: Utensils, labelKey: "amenities.fullKitchen", descKey: "amenities.fullKitchenDesc" },
+      { icon: Tv, labelKey: "amenities.smartTV", descKey: "amenities.smartTVDesc" },
+      { icon: Waves, labelKey: "amenities.privatePool", descKey: "amenities.privatePoolDesc" },
+      { icon: MapPin, labelKey: "amenities.beachAccess", descKey: "amenities.beachAccessDesc" },
     ],
     highlights: [
-      "Stunning sea views from all bedrooms",
-      "Modern kitchen with top appliances",
-      "Spacious living areas with luxury furniture",
-      "Private terrace with BBQ area",
-      "Dedicated parking space",
-      "Professional cleaning service",
+      "property.highlights.seaViews",
+      "property.highlights.modernKitchen",
+      "property.highlights.spaciousLiving",
+      "property.highlights.privateTerrace",
+      "property.highlights.parking",
+      "property.highlights.cleaning",
     ],
   };
 
@@ -152,9 +142,6 @@ export default function PropertyDetail() {
                     ))}
                   </div>
                   <span className="font-semibold">{property.rating}</span>
-                  <span className="text-muted-foreground">
-                    ({property.reviews} reviews)
-                  </span>
                 </div>
                 <div className="flex items-center gap-1 text-muted-foreground">
                   <MapPin size={16} />
@@ -166,21 +153,21 @@ export default function PropertyDetail() {
             {/* Property Details */}
             <div className="grid grid-cols-3 gap-4 mb-8 p-6 bg-primary/5 rounded-lg">
               <div>
-                <p className="text-sm text-muted-foreground mb-1">Bedrooms</p>
+                <p className="text-sm text-muted-foreground mb-1">{t("common.bedrooms")}</p>
                 <p className="text-2xl font-bold text-foreground flex items-center gap-2">
                   <Bed size={24} className="text-primary" />
                   {property.bedrooms}
                 </p>
               </div>
               <div>
-                <p className="text-sm text-muted-foreground mb-1">Bathrooms</p>
+                <p className="text-sm text-muted-foreground mb-1">{t("common.bathrooms")}</p>
                 <p className="text-2xl font-bold text-foreground flex items-center gap-2">
                   <Bath size={24} className="text-primary" />
                   {property.bathrooms}
                 </p>
               </div>
               <div>
-                <p className="text-sm text-muted-foreground mb-1">Max Guests</p>
+                <p className="text-sm text-muted-foreground mb-1">{t("common.maxGuests")}</p>
                 <p className="text-2xl font-bold text-foreground flex items-center gap-2">
                   <Users size={24} className="text-primary" />
                   {property.maxGuests}
@@ -191,18 +178,18 @@ export default function PropertyDetail() {
             {/* Description */}
             <div className="mb-8">
               <h2 className="text-2xl font-bold text-foreground mb-4">
-                About this property
-              </h2>
+                  {t("property.aboutTitle")}
+                </h2>
               <p className="text-muted-foreground text-lg leading-relaxed">
-                {property.description}
+                {t(property.descriptionKey)}
               </p>
             </div>
 
             {/* Amenities */}
             <div className="mb-8">
               <h2 className="text-2xl font-bold text-foreground mb-6">
-                Amenities
-              </h2>
+                {t("property.amenities")}
+                </h2>
               <div className="grid md:grid-cols-2 gap-6">
                 {property.amenities.map((amenity, idx) => {
                   const Icon = amenity.icon;
@@ -213,10 +200,10 @@ export default function PropertyDetail() {
                       </div>
                       <div>
                         <h4 className="font-semibold text-foreground">
-                          {amenity.label}
+                          {t(amenity.labelKey)}
                         </h4>
                         <p className="text-muted-foreground text-sm">
-                          {amenity.description}
+                          {t(amenity.descKey)}
                         </p>
                       </div>
                     </div>
@@ -228,60 +215,16 @@ export default function PropertyDetail() {
             {/* Highlights */}
             <div className="mb-8">
               <h2 className="text-2xl font-bold text-foreground mb-4">
-                Why guests love this place
-              </h2>
+                  {t("property.whyLove")}
+                </h2>
               <ul className="space-y-3">
-                {property.highlights.map((highlight, idx) => (
+                {property.highlights.map((highlightKey, idx) => (
                   <li key={idx} className="flex items-start gap-3">
                     <div className="w-2 h-2 rounded-full bg-primary mt-2 flex-shrink-0" />
-                    <span className="text-foreground">{highlight}</span>
+                    <span className="text-foreground">{t(highlightKey)}</span>
                   </li>
                 ))}
               </ul>
-            </div>
-
-            {/* Reviews Section */}
-            <div>
-              <h2 className="text-2xl font-bold text-foreground mb-6">
-                Guest Reviews
-              </h2>
-              <div className="space-y-6">
-                {[
-                  {
-                    author: "Sarah M.",
-                    rating: 5,
-                    text: "Absolutely stunning villa! The views are incredible and the location is perfect. Highly recommend!",
-                    date: "2 weeks ago",
-                  },
-                  {
-                    author: "John D.",
-                    rating: 5,
-                    text: "Best vacation ever. Everything was clean, well-maintained, and exactly as described.",
-                    date: "1 month ago",
-                  },
-                ].map((review, idx) => (
-                  <div key={idx} className="pb-6 border-b border-border">
-                    <div className="flex items-start justify-between mb-2">
-                      <h4 className="font-semibold text-foreground">
-                        {review.author}
-                      </h4>
-                      <span className="text-muted-foreground text-sm">
-                        {review.date}
-                      </span>
-                    </div>
-                    <div className="flex gap-1 mb-3">
-                      {[...Array(review.rating)].map((_, i) => (
-                        <Star
-                          key={i}
-                          size={16}
-                          className="fill-accent text-accent"
-                        />
-                      ))}
-                    </div>
-                    <p className="text-foreground">{review.text}</p>
-                  </div>
-                ))}
-              </div>
             </div>
           </div>
 
@@ -292,13 +235,11 @@ export default function PropertyDetail() {
               <div className="mb-6">
                 <div className="flex items-baseline gap-2 mb-2">
                   <span className="text-3xl font-bold text-primary">
-                    ${property.price}
+                    {formatCurrency(property.price, language)}
                   </span>
                   <span className="text-muted-foreground">/night</span>
                 </div>
-                <p className="text-sm text-muted-foreground">
-                  Includes taxes and fees
-                </p>
+                <p className="text-sm text-muted-foreground">{t("checkout.taxes")}</p>
               </div>
 
               {/* Calendar */}
@@ -307,16 +248,16 @@ export default function PropertyDetail() {
               {/* Price Breakdown */}
               <div className="mt-6 p-4 bg-muted/50 rounded-lg space-y-2 text-sm mb-6">
                 <div className="flex justify-between text-foreground">
-                  <span>1 night × ${property.basePrice}</span>
-                  <span>${property.basePrice}</span>
+                  <span>1 {t("common.night")} × {formatCurrency(property.basePrice, language)}</span>
+                  <span>{formatCurrency(property.basePrice, language)}</span>
                 </div>
                 <div className="flex justify-between text-foreground">
-                  <span>Cleaning fee</span>
-                  <span>${property.cleaningFee}</span>
+                  <span>{t("checkout.cleaningFee")}</span>
+                  <span>{formatCurrency(property.cleaningFee, language)}</span>
                 </div>
                 <div className="border-t border-border pt-2 flex justify-between font-bold text-foreground">
-                  <span>Total</span>
-                  <span>${property.basePrice + property.cleaningFee}</span>
+                  <span>{t("property.totalPrice")}</span>
+                  <span>{formatCurrency(property.basePrice + property.cleaningFee, language)}</span>
                 </div>
               </div>
 
@@ -325,14 +266,14 @@ export default function PropertyDetail() {
                 onClick={handleBooking}
                 className="btn-primary w-full justify-center mb-3"
               >
-                Book Now
+                {t("nav.bookNow")}
               </button>
 
               {/* Trust Badges */}
               <div className="space-y-3 text-xs text-muted-foreground">
-                <p>✓ Free cancellation before 60 days</p>
-                <p>✓ Secure payment with Stripe</p>
-                <p>✓ Professional cleaning included</p>
+                <p>✓ {t("property.freeCancel")}</p>
+                <p>✓ {t("property.securePayment")}</p>
+                <p>✓ {t("property.cleaningIncluded")}</p>
               </div>
             </div>
 
@@ -345,12 +286,8 @@ export default function PropertyDetail() {
                 to="/properties"
                 className="block p-4 border border-border rounded-lg hover:border-primary transition-colors"
               >
-                <p className="font-semibold text-foreground mb-2">
-                  View More Villas
-                </p>
-                <p className="text-muted-foreground text-sm">
-                  Browse our entire collection
-                </p>
+                <p className="font-semibold text-foreground mb-2">{t("common.viewMore")}</p>
+                <p className="text-muted-foreground text-sm">{t("common.browseCollection")}</p>
               </Link>
             </div>
           </div>

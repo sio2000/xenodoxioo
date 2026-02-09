@@ -29,7 +29,7 @@ export const PAYMENT_CONFIG = {
   // Charge remaining 75% 30 days before check-in
   remainingDaysBeforeCharge: 30,
   // Currency
-  currency: "usd",
+  currency: "eur",
 } as const;
 
 /**

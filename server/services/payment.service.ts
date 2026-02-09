@@ -27,8 +27,8 @@ export async function createPaymentIntent(
     throw new AppError(403, "Unauthorized access to this booking");
   }
 
-  // Calculate amount based on payment type
-  let amount = booking.totalPrice;
+  // Calculate amount based on payment type (amount in cents)
+  let amount = Math.round(booking.totalPrice * 100);
   if (paymentType === "DEPOSIT") {
     amount = Math.round(booking.totalPrice * 0.25 * 100); // 25% deposit
   } else if (paymentType === "BALANCE") {
@@ -44,7 +44,7 @@ export async function createPaymentIntent(
   // Create Stripe payment intent
   const paymentIntent = await stripe.paymentIntents.create({
     amount, // in cents
-    currency: "usd",
+    currency: "eur",
     metadata: {
       bookingId,
       bookingNumber: booking.bookingNumber,
@@ -55,13 +55,13 @@ export async function createPaymentIntent(
     description: `Booking ${booking.bookingNumber} - ${booking.unit.property.name}`,
   });
 
-  // Store payment record
+  // Store payment record (amount stored in euros)
   const payment = await prisma.payment.create({
     data: {
       bookingId,
       userId,
-      amount: amount / 100, // convert back to dollars
-      currency: "USD",
+      amount: amount / 100, // amount in euros
+      currency: "EUR",
       paymentType: paymentType as any,
       stripePaymentIntentId: paymentIntent.id,
       status: "PROCESSING",
@@ -77,7 +77,7 @@ export async function createPaymentIntent(
     clientSecret: paymentIntent.client_secret,
     paymentIntentId: paymentIntent.id,
     amount: amount / 100,
-    currency: "USD",
+    currency: "EUR",
   };
 }
 
@@ -136,7 +136,7 @@ export async function confirmPayment(paymentIntentId: string) {
           bookingId: booking.id,
           userId: booking.userId,
           amount: Math.round(booking.totalPrice * 0.75 * 100) / 100,
-          currency: "USD",
+          currency: "EUR",
           paymentType: "BALANCE",
           status: "PENDING",
           scheduledFor,
@@ -261,16 +261,16 @@ export async function refundPayment(
 
   const refundAmount = Math.round(booking.totalPrice * refundPercentage * 100);
 
-  if (refundAmount > 0) {
-    // Create Stripe refund
-    const refund = await stripe.refunds.create({
-      charge: payment.stripeChargeId,
-      amount: refundAmount,
-      metadata: {
-        bookingId,
-        reason: reason || "Cancellation",
-      },
-    });
+    if (refundAmount > 0) {
+      // Create Stripe refund
+      const refund = await stripe.refunds.create({
+        charge: payment.stripeChargeId,
+        amount: refundAmount,
+        metadata: {
+          bookingId,
+          reason: reason || "Cancellation",
+        },
+      });
 
     // Update payment
     await prisma.payment.update({
