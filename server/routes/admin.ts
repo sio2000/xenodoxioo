@@ -36,7 +36,7 @@ const updateBookingStatusSchema = z.object({
 // Dashboard Stats
 router.get("/dashboard", async (req, res, next) => {
     try {
-        const stats = await adminService.getDashboardStats();
+        const stats = await adminService.getAdminStats();
         res.json({ success: true, data: stats });
     } catch (error) {
         next(error);
@@ -50,7 +50,7 @@ router.get("/bookings", async (req, res, next) => {
         const pageSize = req.query.pageSize ? parseInt(req.query.pageSize as string) : 20;
         const status = req.query.status as string;
 
-        const result = await adminService.getAllBookings(page, pageSize, status);
+        const result = await adminService.getAllBookings(page, pageSize, { status });
         res.json({ success: true, data: result });
     } catch (error) {
         next(error);
@@ -64,12 +64,11 @@ router.post(
     async (req, res, next) => {
         try {
             const { startDate, endDate, reason } = req.body;
-            const blockage = await adminService.createDateBlockage(
+            const blockage = await adminService.blockDates(
                 req.params.id,
                 new Date(startDate),
                 new Date(endDate),
-                reason,
-                req.user!.userId
+                reason
             );
             res.json({ success: true, data: blockage });
         } catch (error) {

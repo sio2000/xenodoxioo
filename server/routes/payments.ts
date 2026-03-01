@@ -7,9 +7,17 @@ import { authenticate } from "../middleware/auth";
 import * as paymentService from "../services/payment.service";
 
 const router = Router();
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || "", {
-  apiVersion: "2024-01-01",
-});
+
+// Initialize Stripe for webhook handling only
+const getStripe = () => {
+  const secretKey = process.env.STRIPE_SECRET_KEY;
+  if (!secretKey) {
+    throw new Error('STRIPE_SECRET_KEY not found');
+  }
+  return new Stripe(secretKey, {
+    apiVersion: "2024-01-01" as any,
+  });
+};
 
 // Schemas
 const createIntentSchema = z.object({
@@ -89,7 +97,7 @@ router.post(
     let event: Stripe.Event;
 
     try {
-      event = stripe.webhooks.constructEvent(req.body, sig, webhookSecret);
+      event = getStripe().webhooks.constructEvent(req.body, sig, webhookSecret);
     } catch (err: any) {
       console.error(`Webhook Signature Verification Failed: ${err.message}`);
       res.status(400).send(`Webhook Error: ${err.message}`);

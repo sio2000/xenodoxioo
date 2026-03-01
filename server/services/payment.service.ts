@@ -2,9 +2,15 @@ import prisma from "../lib/db";
 import { NotFoundError, AppError, ValidationError } from "../lib/errors";
 import Stripe from "stripe";
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || "", {
-  apiVersion: "2024-01-01",
-});
+const getStripe = () => {
+  const secretKey = process.env.STRIPE_SECRET_KEY;
+  if (!secretKey) {
+    throw new Error('STRIPE_SECRET_KEY not found');
+  }
+  return new Stripe(secretKey, {
+    apiVersion: "2024-01-01" as any,
+  });
+};
 
 /**
  * Create payment intent for booking
@@ -42,7 +48,7 @@ export async function createPaymentIntent(
   }
 
   // Create Stripe payment intent
-  const paymentIntent = await stripe.paymentIntents.create({
+  const paymentIntent = await getStripe().paymentIntents.create({
     amount, // in cents
     currency: "eur",
     metadata: {
@@ -86,7 +92,7 @@ export async function createPaymentIntent(
  */
 export async function confirmPayment(paymentIntentId: string) {
   // Verify with Stripe
-  const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
+  const paymentIntent = await getStripe().paymentIntents.retrieve(paymentIntentId);
 
   if (paymentIntent.status !== "succeeded") {
     throw new AppError(400, `Payment status is ${paymentIntent.status}`);
@@ -101,13 +107,14 @@ export async function confirmPayment(paymentIntentId: string) {
     throw new NotFoundError("Payment not found");
   }
 
-  const stripeCharge = paymentIntent.charges.data[0];
+  const stripeCharge = (paymentIntent as any).latest_charge;
+  const chargeId = stripeCharge?.id;
 
   const updatedPayment = await prisma.payment.update({
     where: { id: payment.id },
     data: {
       status: "SUCCEEDED",
-      stripeChargeId: stripeCharge.id,
+      stripeChargeId: chargeId,
     },
   });
 
@@ -263,7 +270,7 @@ export async function refundPayment(
 
     if (refundAmount > 0) {
       // Create Stripe refund
-      const refund = await stripe.refunds.create({
+      const refund = await getStripe().refunds.create({
         charge: payment.stripeChargeId,
         amount: refundAmount,
         metadata: {
@@ -327,7 +334,7 @@ export async function processScheduledPayments() {
   for (const payment of scheduledPayments) {
     try {
       // Create payment intent for scheduled payment
-      const paymentIntent = await stripe.paymentIntents.create({
+      const paymentIntent = await getStripe().paymentIntents.create({
         amount: Math.round(payment.amount * 100),
         currency: payment.currency.toLowerCase(),
         metadata: {
