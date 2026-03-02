@@ -40,6 +40,10 @@ COPY --from=builder /app/prisma ./prisma
 # Create uploads dir with correct permissions (app needs to write here)
 RUN mkdir -p /app/uploads && chown -R nextjs:nodejs /app/uploads
 
+# Prisma CLI needs write access to engines cache within node_modules when running
+# db push/seed at container start (non-root).
+RUN chown -R nextjs:nodejs /app/node_modules
+
 # Set the correct permissions
 USER nextjs
 
