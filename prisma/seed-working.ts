@@ -6,6 +6,13 @@ const prisma = new PrismaClient();
 async function main() {
   console.log('🌱 Start seeding...');
 
+  // Skip if DB already has data (production safety)
+  const existingProperties = await prisma.property.count();
+  if (existingProperties > 0) {
+    console.log('✅ Database already seeded, skipping.');
+    return;
+  }
+
   // Clean existing data
   await prisma.booking.deleteMany();
   await prisma.payment.deleteMany();

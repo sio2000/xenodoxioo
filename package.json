@@ -15,11 +15,14 @@
     "build": "npm run build:client && npm run build:server",
     "build:client": "prisma generate && vite build --config vite.config.client.ts",
     "build:server": "vite build --config vite.config.server.ts",
-    "start": "node dist/server/node-build.mjs",
+    "start": "prisma db push && prisma db seed && node dist/server/node-build.mjs",
     "test": "vitest --run",
     "format.fix": "prettier --write .",
     "typecheck": "tsc",
     "db:seed": "tsx prisma/seed-working.ts"
+  },
+  "prisma": {
+    "seed": "tsx prisma/seed-working.ts"
   },
   "dependencies": {
     "@types/bcryptjs": "^3.0.0",
