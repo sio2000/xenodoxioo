@@ -36,10 +36,16 @@ export default function AdminLogin() {
         navigate("/admin");
       } else {
         const data = await response.json();
-        setError(data.error || "Login failed");
+        const msg =
+          data.error === "Invalid credentials"
+            ? "Λάθος email ή κωδικός. Χρησιμοποιήστε admin@booking.com / admin123. Βεβαιωθείτε ότι έχετε τρέξει pnpm db:seed στο backend (Render)."
+            : data.error || "Login failed";
+        setError(msg);
       }
     } catch (err) {
-      setError("Network error. Please try again.");
+      setError(
+        "Δεν ήταν δυνατή η σύνδεση με το backend. Ελέγξτε ότι το VITE_API_URL ορίζει το Render URL και κάντε redeploy στο Netlify."
+      );
     } finally {
       setLoading(false);
     }
@@ -52,7 +58,11 @@ export default function AdminLogin() {
           <CardHeader>
             <CardTitle>Admin Login</CardTitle>
             <CardDescription>
-              Enter your credentials to access the admin panel
+              Enter your credentials to access the admin panel.
+              <br />
+              <span className="text-xs text-muted-foreground mt-2 block">
+                Demo: admin@booking.com / admin123
+              </span>
             </CardDescription>
           </CardHeader>
           <CardContent>

@@ -84,7 +84,9 @@ export default function Index() {
         setFeaturedProperties(items.slice(0, 6));
       } catch (error) {
         console.error("❌ [CLIENT] Error loading properties", error);
-        setPropertiesError("Unable to load properties right now.");
+        setPropertiesError(
+          "Δεν φόρτωσαν τα δωμάτια. Ελέγξτε VITE_API_URL (Render URL) στο Netlify και κάντε redeploy."
+        );
       } finally {
         setPropertiesLoading(false);
       }

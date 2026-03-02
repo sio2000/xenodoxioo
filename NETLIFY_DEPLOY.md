@@ -14,11 +14,11 @@
 4. Ρυθμίσεις:
    - **Name**: `leonidionhouses-api`
    - **Runtime**: Node
-   - **Build Command**: `pnpm install && pnpm prisma generate && pnpm run build:server`
+   - **Build Command**: `pnpm install && pnpm prisma generate && pnpm prisma db push && pnpm db:seed && pnpm run build:server`
    - **Start Command**: `pnpm start` (ή `node dist/server/node-build.mjs`)
    - **Plan**: Free
 5. **Environment**:
-   - `DATABASE_URL` = `file:./data/dev.db` (Render έχει persistent disk)
+   - `DATABASE_URL` = `file:./data/dev.db` (Render Free έχει persistent disk - επιλέξτε Add Disk)
    - Ή δημιουργήστε PostgreSQL DB στο Render και χρησιμοποιήστε: `postgresql://...`
    - Όλες οι άλλες μεταβλητές από το `.env.example`
 6. **Create Web Service**
