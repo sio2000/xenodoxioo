@@ -6,8 +6,6 @@
 [functions]
   external_node_modules = ["express"]
   node_bundler = "esbuild"
-  # Increase timeout for cold starts with Prisma
-  node_bundler_target = "es2022"
 
 # API: rewrite /api/* to serverless function (must come first)
 [[redirects]]
