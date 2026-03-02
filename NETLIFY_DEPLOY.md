@@ -48,6 +48,14 @@ app.use(cors({ origin: ['https://your-site.netlify.app', 'http://localhost:8080'
 
 Οι εικόνες αποθηκεύονται στο `/uploads` του backend. Όταν το backend τρέχει στο Render, οι εικόνες φορτώνονται αυτόματα από το API URL (`VITE_API_URL/uploads/...`). Βεβαιωθείτε ότι το `uploads/` folder είναι στο repo ή ότι οι φωτογραφίες ανεβαίνουν μέσω του admin panel μετά το deploy.
 
+## Βήμα 5: Admin & Δωμάτια
+
+Μετά το deploy:
+- **Προτεινόμενα δωμάτια**: Φαίνονται αν το seed τρέξει (περιλαμβάνεται στο Build Command)
+- **Admin login**: admin@booking.com / admin123 (δημιουργείται από το seed)
+
+Αν το Render "κοιμάται" (free tier), η πρώτη αίτηση μπορεί να καθυστερήσει ~30-60 sec.
+
 ## Αποτέλεσμα
 
 - **Frontend (Netlify)**: SPA με όλες τις σελίδες (/admin, /about, /contact, κλπ)

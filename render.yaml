@@ -1,0 +1,21 @@
+# Render Blueprint - Backend API για Netlify frontend
+# https://render.com/docs/blueprint-spec
+
+services:
+  - type: web
+    name: leonidionhouses-api
+    runtime: node
+    plan: free
+
+    buildCommand: pnpm install && pnpm prisma generate && pnpm prisma db push && pnpm db:seed && pnpm run build:server
+    startCommand: pnpm start
+
+    envVars:
+      - key: DATABASE_URL
+        sync: false
+      - key: NODE_ENV
+        value: production
+      - key: JWT_SECRET
+        generateValue: true
+      - key: JWT_REFRESH_SECRET
+        generateValue: true
