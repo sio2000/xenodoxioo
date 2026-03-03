@@ -731,12 +731,17 @@ async function handleAdminRoutes(path: string, method: string, supabase: any, ev
 
     // GET /api/admin/coupons
     if (path === '/api/admin/coupons' && method === 'GET') {
+      console.log(`🔍 [${requestId}] Fetching coupons from Supabase...`);
+      
       const { data: coupons, error } = await supabase
         .from('coupons')
         .select('*')
         .order('created_at', { ascending: false });
 
+      console.log(`✅ [${requestId}] Coupons query result:`, { coupons, error, count: coupons?.length || 0 });
+
       if (error) {
+        console.error(`❌ [${requestId}] Coupons query error:`, error);
         return {
           statusCode: 500,
           headers: { 'Content-Type': 'application/json' },

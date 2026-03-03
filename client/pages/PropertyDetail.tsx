@@ -55,38 +55,39 @@ type ApiPropertyDetail = {
 };
 
 // Map property/unit names to view video filenames (in public/viewvideos)
-// Returns encoded URL for spaces and special chars (Greek etc.)
+// Returns direct URL for public folder videos
 function getViewVideoPath(propertyName: string, unitName: string): string | null {
   const normalized = (s: string) =>
     s
       .toLowerCase()
       .trim()
       .replace(/\s+/g, " ");
+
   const p = normalized(propertyName);
   const u = normalized(unitName);
 
   let raw: string | null = null;
-  if (p.includes("ogra") || u.includes("ogra")) raw = "/api/viewvideos/Ogra House.mp4";
+  if (p.includes("ogra") || u.includes("ogra")) raw = "/viewvideos/Ogra House.mp4";
   else if (p.includes("small") || u.includes("small bungalow"))
-    raw = "/api/viewvideos/Small bungalow.mp4";
+    raw = "/viewvideos/Small bungalow.mp4";
   else if (
     p.includes("μεγάλο") ||
     p.includes("megalo") ||
-    p.includes("big bungalow") ||
+    p.includes("big") ||
     u.includes("big") ||
     u.includes("μεγάλο")
   )
-    raw = "/api/viewvideos/Μεγάλο bungalow.mp4";
+    raw = "/viewvideos/Μεγάλο bungalow.mp4";
   else if (p.includes("lykoskufi 5") || u.includes("lykoskufi 5"))
-    raw = "/api/viewvideos/Lykoskufi 5.mp4";
+    raw = "/viewvideos/Lykoskufi 5.mp4";
   else if (
     p.includes("lykoskufi 2") ||
     p.includes("lykoskufi2") ||
     u.includes("lykoskufi 2") ||
     u.includes("lykoskufi2")
   )
-    raw = "/api/viewvideos/Lykoskufi2.mp4";
-  else if (p.includes("lykoskufi")) raw = "/api/viewvideos/Lykoskufi2.mp4";
+    raw = "/viewvideos/Lykoskufi2.mp4";
+  else if (p.includes("lykoskufi")) raw = "/viewvideos/Lykoskufi2.mp4";
 
   return raw ? raw.replace(/[^/]+$/, (filename) => encodeURIComponent(filename)) : null;
 }
@@ -444,15 +445,17 @@ export default function PropertyDetail() {
                           >
                             <video
                               ref={videoRef}
-                              src={apiUrl(getViewVideoPath(data.name, currentUnit.name) || "")}
+                              src={getViewVideoPath(data.name, currentUnit.name) || ""}
                               controls
                               playsInline
-                              preload="auto"
-                              autoPlay
-                              muted
+                              preload="metadata"
+                              muted={false}
                               loop
                               onPlay={() => setVideoStarted(true)}
+                              onLoadedData={() => console.log("🎬 [VIDEO] Video loaded successfully")}
+                              onError={(e) => console.error("❌ [VIDEO] Video error:", e)}
                               className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-[1.02]"
+                              style={{ width: '100%', height: '100%', maxHeight: '100%' }}
                             />
                             {/* "Press play" hint — fades on hover or when video starts */}
                             <div
