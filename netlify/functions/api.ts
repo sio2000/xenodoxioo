@@ -169,7 +169,10 @@ export const handler = async (event: any, context: any) => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           success: true,
-          data: aggregatedProperties
+          data: aggregatedProperties.map(property => ({
+            ...property,
+            units: property.units || [] // Put units at property level for frontend
+          }))
         })
       };
     }
