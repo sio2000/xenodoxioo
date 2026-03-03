@@ -1,0 +1,28 @@
+{
+  "timestamp": "2026-03-03T03:56:17.889Z",
+  "phase": "PHASE 5: IMAGE MIGRATION PREPARATION",
+  "currentImagePaths": {
+    "localSource": "/uploads/",
+    "samplePaths": [
+      "/uploads/mainImage-1772418181980-300596449.jpg",
+      "/uploads/mainImage-1772418424055-383530146.jpg",
+      "/uploads/mainImage-1772418561929-485202986.avif",
+      "/uploads/images-1772418226500-525554115.jpg",
+      "/uploads/images-1772418452491-638849038.jpg"
+    ]
+  },
+  "targetImagePaths": {
+    "supabaseFormat": "https://[PROJECT_REF].supabase.co/storage/v1/object/public/[BUCKET]/[FILENAME]",
+    "bucketName": "property-images",
+    "publicAccess": true
+  },
+  "migrationSteps": [
+    "1. Create Supabase Storage bucket named \"property-images\"",
+    "2. Set bucket to public access",
+    "3. Upload all files from local /uploads/ directory",
+    "4. Generate public URLs for all uploaded images",
+    "5. Update database image paths with Supabase URLs",
+    "6. Verify all images load correctly"
+  ],
+  "sqlUpdateTemplate": "\n-- Update property main images\nUPDATE \"Property\" \nSET mainImage = REPLACE(mainImage, '/uploads/', 'https://[PROJECT_REF].supabase.co/storage/v1/object/public/property-images/')\nWHERE mainImage LIKE '/uploads/%';\n\n-- Update property gallery images (array field)\nUPDATE \"Property\" \nSET galleryImages = ARRAY(\n  SELECT REPLACE(unnest(galleryImages), '/uploads/', 'https://[PROJECT_REF].supabase.co/storage/v1/object/public/property-images/')\n  WHERE unnest(galleryImages) LIKE '/uploads/%'\n)\nWHERE galleryImages IS NOT NULL;\n\n-- Update unit images (array field)  \nUPDATE \"Unit\" \nSET images = ARRAY(\n  SELECT REPLACE(unnest(images), '/uploads/', 'https://[PROJECT_REF].supabase.co/storage/v1/object/public/property-images/')\n  WHERE unnest(images) LIKE '/uploads/%'\n)\nWHERE images IS NOT NULL;\n"
+}

@@ -1,0 +1,560 @@
+{
+  "timestamp": "2026-03-03T03:50:42.596Z",
+  "database": "SQLite",
+  "schema": {},
+  "data": {
+    "counts": {
+      "properties": 6,
+      "units": 6,
+      "bookings": 1,
+      "payments": 0,
+      "users": 3,
+      "coupons": 3,
+      "seasonalPricing": 0,
+      "amenities": 0,
+      "dateBlockages": 0
+    },
+    "property": [
+      {
+        "id": "cmm8k0twj0000w4o5jpn49rev",
+        "name": "Lykoskufi 1",
+        "description": "undefined",
+        "location": "Arcadia",
+        "city": "Leonidion",
+        "country": "Greece",
+        "slug": "lykoskufi-1",
+        "mainImage": "/uploads/mainImage-1772418181980-300596449.jpg",
+        "galleryImages": "[]",
+        "isActive": true,
+        "createdAt": "2026-03-02T02:23:01.987Z",
+        "updatedAt": "2026-03-02T02:27:59.776Z"
+      },
+      {
+        "id": "cmm8k60or0003w4o5fekr1hiv",
+        "name": "Lykoskufi 2",
+        "description": "undefined",
+        "location": "Arcadia",
+        "city": "Leonidion",
+        "country": "Greece",
+        "slug": "lykoskufi-2",
+        "mainImage": "/uploads/mainImage-1772418424055-383530146.jpg",
+        "galleryImages": "[]",
+        "isActive": true,
+        "createdAt": "2026-03-02T02:27:04.060Z",
+        "updatedAt": "2026-03-02T02:27:04.060Z"
+      },
+      {
+        "id": "cmm8k8z2l0006w4o5dtpkw46o",
+        "name": "Lykoskufi 5",
+        "description": "undefined",
+        "location": "Arcadia",
+        "city": "Leonidion",
+        "country": "Greece",
+        "slug": "lykoskufi-5",
+        "mainImage": "/uploads/mainImage-1772418561929-485202986.avif",
+        "galleryImages": "[]",
+        "isActive": true,
+        "createdAt": "2026-03-02T02:29:21.933Z",
+        "updatedAt": "2026-03-02T02:29:21.933Z"
+      },
+      {
+        "id": "cmm8kbe8n0009w4o5vbfgfok0",
+        "name": "Big Bungalow",
+        "description": "undefined",
+        "location": "Arcadia",
+        "city": "Leonidion",
+        "country": "Greece",
+        "slug": "big-bungalow",
+        "mainImage": "/uploads/mainImage-1772461082161-265535525.jpg",
+        "galleryImages": "[]",
+        "isActive": true,
+        "createdAt": "2026-03-02T02:31:14.904Z",
+        "updatedAt": "2026-03-02T14:18:02.170Z"
+      },
+      {
+        "id": "cmm8kcrmt000cw4o5yiplpnt6",
+        "name": "Small Bungalow",
+        "description": "undefined",
+        "location": "Arcadia",
+        "city": "Leonidion",
+        "country": "Greece",
+        "slug": "small-bungalow",
+        "mainImage": "/uploads/mainImage-1772462473660-980903232.jpg",
+        "galleryImages": "[]",
+        "isActive": true,
+        "createdAt": "2026-03-02T02:32:18.917Z",
+        "updatedAt": "2026-03-02T14:41:13.668Z"
+      },
+      {
+        "id": "cmm8kdzvb000fw4o5zimfjccx",
+        "name": "Ogra house",
+        "description": "undefined",
+        "location": "Arcadia",
+        "city": "Leonidion",
+        "country": "Greece",
+        "slug": "ogra-house",
+        "mainImage": "/uploads/mainImage-1772465392013-366762628.jpg",
+        "galleryImages": "[]",
+        "isActive": true,
+        "createdAt": "2026-03-02T02:33:16.247Z",
+        "updatedAt": "2026-03-02T15:29:52.020Z"
+      }
+    ],
+    "unit": [
+      {
+        "id": "cmm8k1s9x0002w4o5p63yrkf2",
+        "propertyId": "cmm8k0twj0000w4o5jpn49rev",
+        "name": "Lykoskufi 1",
+        "slug": "lykoskufi-1",
+        "description": "Το Lykoskufi 1 ευρισκεται σε αποσταση 40 μετρων απο την παραλια, η οποια ειναι προσβασιμη μεσω μονοπατιου με σκαλια σε 5 λεπτα. Τοσο απο το εσωτερικο, οσο και απο τη σκεπαστη βεραντα, η θεα στη θαλασσα ειναι ανεμποδιστη.\r\nΑποτελειται απο ενα καθιστικο,λουτρο, πληρως εξοπλισμενη κουζινα και ενα υπνοδωματιο με ενα διπλο κρεβατι με 2 ξεχωριστα στρωματα για μεγαλυτερη ανεση. Μπορει να φιλοξενησει 2 ατομα.",
+        "maxGuests": 2,
+        "bedrooms": 2,
+        "bathrooms": 3,
+        "beds": 1,
+        "basePrice": 100,
+        "cleaningFee": 30,
+        "images": "[\"/uploads/images-1772418226500-525554115.jpg\",\"/uploads/images-1772418226500-878560324.jpg\",\"/uploads/images-1772418226501-548511614.jpg\",\"/uploads/images-1772418226501-752098521.png\",\"/uploads/images-1772418226501-595319251.jpg\",\"/uploads/images-1772418226515-541063168.jpg\",\"/uploads/images-1772418226519-891695137.jpg\"]",
+        "minStayDays": 1,
+        "isActive": true,
+        "createdAt": "2026-03-02T02:23:46.533Z",
+        "updatedAt": "2026-03-02T02:23:46.533Z"
+      },
+      {
+        "id": "cmm8k6mmy0005w4o5gqzxg0yk",
+        "propertyId": "cmm8k60or0003w4o5fekr1hiv",
+        "name": "Lykoskufi 2",
+        "slug": "lykoskufi-2",
+        "description": "Το Lykoskufi 2 ευρισκεται σε αποσταση 45 μετρων απο την παραλια, η οποια ειναι προσβασιμη σε 5 λεπτα μεσω ενος μονοπατιου με σκαλια. Τοσο απο το εσωτερικο, οσο και απο τη σκεπαστη βεραντα, η θεα στη θαλασσα ειναι ανεμποδιστη.\r\nΑποτελειται απο δυο επιπεδα, - στο ισογειο ειναι το καθιστικο, η κουζινα, ενα λουτρο με ντους και ενα υπνοδωματιο με ενα διπλο κρεβατι με 2 ξεχωριστα στρωματα, στον οροφο ενα υπνοδωματιο επισης με διπλο κρεβατι με 2 μονα στρωματα, ενα ανοικτο παταρι με ενα μονό κρεβατι και ενα λουτρο με μπανιερα. Μπορει να φιλοξενησει μεχρι 5 ατομα.",
+        "maxGuests": 5,
+        "bedrooms": 5,
+        "bathrooms": 3,
+        "beds": 1,
+        "basePrice": 140,
+        "cleaningFee": 20,
+        "images": "[\"/uploads/images-1772418452491-638849038.jpg\",\"/uploads/images-1772418452491-547559297.jpg\",\"/uploads/images-1772418452491-409047756.jpg\",\"/uploads/images-1772418452491-997492684.avif\",\"/uploads/images-1772418452496-141216362.avif\"]",
+        "minStayDays": 1,
+        "isActive": true,
+        "createdAt": "2026-03-02T02:27:32.506Z",
+        "updatedAt": "2026-03-02T02:27:32.506Z"
+      },
+      {
+        "id": "cmm8ka0zh0008w4o5br56k8pm",
+        "propertyId": "cmm8k8z2l0006w4o5dtpkw46o",
+        "name": "Lykoskufi 5",
+        "slug": "lykoskufi-5",
+        "description": "Το Lykoskufi 5 αποτελει τη ναυαρχιδα των καταλυματων μας.  Ειναι κτισμενο δε δεσποζουσα θεση σε αποσταση 30 μετρων απο την παραλια, η οποια ειναι προσβασιμη απο ενα μονοπατι με σκαλια σε 3 λεπτα. Απο το εσωτερικο και απο ολους τους εξωτερικους χωρους η θεα στη θαλασσα ειναι πανοραμικη. \r\nΑποτελειται απο καθιστικο, κουζινα, 5 υπνοδωματια, 4 λουτρα, ενα WC επισκεπτων και ανεξαρτητο χωρο πλυντηριου - στεγνωτηριου.\r\nΤο σπιτι ειναι κατασκευασμενο με επιλεγμενα υλικα, αριστα διακοσμημενο με ποιοτικα επιπλα και πληρως εξοπλισμενο, με κεντρικη θερμανση και κλιματισμο με αντλια θερμοτητος. Για αποκλειστικη χρηση του σπιτιου υπαρχει μια πισινα, μια ηλεκτρικη ψησταρια και ενα κορυφαιας ποιοτητας πιανο με ουρα. Μπορει να φιλοξενησει μεχρι 10 ατομα.",
+        "maxGuests": 10,
+        "bedrooms": 10,
+        "bathrooms": 3,
+        "beds": 1,
+        "basePrice": 150,
+        "cleaningFee": 50,
+        "images": "[\"/uploads/images-1772418611049-404542356.jpg\",\"/uploads/images-1772418611049-617692771.jpg\",\"/uploads/images-1772418611049-326489170.jpg\",\"/uploads/images-1772418611049-534415516.jpg\",\"/uploads/images-1772418611049-959885619.jpg\",\"/uploads/images-1772418611049-335875172.jpg\"]",
+        "minStayDays": 1,
+        "isActive": true,
+        "createdAt": "2026-03-02T02:30:11.069Z",
+        "updatedAt": "2026-03-02T02:30:11.069Z"
+      },
+      {
+        "id": "cmm8kbw1z000bw4o5qa59i60y",
+        "propertyId": "cmm8kbe8n0009w4o5vbfgfok0",
+        "name": "Big Bungalow",
+        "slug": "big-bungalow",
+        "description": "Το Big Bungalow ευρισκεται σε αποσταση 35 μετρων απο τη θαλασσα και η παραλια ειναι προσβασιμη μεσω μονοπατιου με σκαλια σε 3 λεπτα. Αποτελειται απο ενα χωρο καθιστικου με δυο κρεβατια και ενα μικρο υπνοδωματιο ενα  κρεβατι πλατους 1.30μ, και μπορει να φιλοξενησει μεχρι 4 ατομα\r\nΑπο τις τρεις πλευρες το κτισμα περιβαλλεται απο το εδαφος, ενω η ανατολικη πλευρα του ειναι ανοικτη προς τη θαλασσα. Η πλευρα αυτη  ειναι εξοπλισμενη εν μερει με υαλοπινακες και εν μερει με αντικουνουπικο πλεγμα και κουρτινες συσκοτισης. Με αυτη τη βιοκλιματικη σχεδιαση επιτυγχανεται ενα μειωμενο ενεργειακο αποτυπωμα, το σπιτι διαθετει μονον εναν ανεμιστηρα στο καθιστικο και ενα κλιματιστικο στο υπνοδωματιο. \r\nΚατα τα αλλα, υπαρχουν ολα τα απαραιτητα για μιαν ανετη διαμονη, με πληρες λουτρο, κουζινα και πλυντηριο ρουχων.\r\nΤοσο απο το εσωτερικο, οσο και απο τη βεραντα, η θεα στη θαλασσα ειναι απροσκοπτη.\r\nΤο Bungalow ειναι ιδανικο για παραθεριστες που αγαπουν το απεριττο και την επαφη με τη φυση.",
+        "maxGuests": 4,
+        "bedrooms": 3,
+        "bathrooms": 2,
+        "beds": 1,
+        "basePrice": 220,
+        "cleaningFee": 50,
+        "images": "[\"/uploads/images-1772461068395-785466717.jpg\",\"/uploads/images-1772461068396-880616286.jpg\",\"/uploads/images-1772461068411-859493489.jpg\",\"/uploads/images-1772461068415-201835401.jpg\",\"/uploads/images-1772461068421-911266449.jpg\",\"/uploads/images-1772461068431-317709392.jpg\",\"/uploads/images-1772461068435-498877261.jpg\",\"/uploads/images-1772461068441-779309143.jpg\",\"/uploads/images-1772461068445-917228380.jpg\"]",
+        "minStayDays": 1,
+        "isActive": true,
+        "createdAt": "2026-03-02T02:31:37.991Z",
+        "updatedAt": "2026-03-02T14:17:48.466Z"
+      },
+      {
+        "id": "cmm8kdbpb000ew4o5nadge3v8",
+        "propertyId": "cmm8kcrmt000cw4o5yiplpnt6",
+        "name": "Small Bungalow",
+        "slug": "small-bungalow",
+        "description": "Το Small Bungalow ευρισκεται σε αποσταση 35 μετρων απο τη θαλασσα και η παραλια ειναι προσβασιμη μεσω μονοπατιου με σκαλια σε 4 λεπτα. Αποτελειται απο ενα χωρο με ενα διπλο και ενα μονο κρεβατι, και μπορει να φιλοξενησει μεχρι 3 ατομα. \r\nΑπο τις τρεις πλευρες το κτισμα περιβαλλεται απο το εδαφος, ενω η ανατολικη πλευρα του ειναι ανοικτη προς τη θαλασσα. Η πλευρα αυτη ειναι εξοπλισμενη εν μερει με υαλοπινακες και εν μερει με αντικουνουπικο πλεγμα και κουρτινες συσκοτισης. Με αυτη τη βιοκλιματικη σχεδιαση επιτυγχανεται ενα μειωμενο ενεργειακο αποτυπωμα, το σπιτι διαθετει μονον εναν ανεμιστηρα. \r\nΚατα τα αλλα, υπαρχουν ολα τα απαραιτητα για μιαν ανετη διαμονη με πληρες λουτρο, κουζινα και πλυντηριο ρουχων.\r\nΤοσο απο το εσωτερικο, οσο και απο τη βεραντα, η θεα στη θαλασσα ειναι απροσκοπτη.\r\nΤο Bungalow ειναι ιδανικο για παραθεριστες που ζητουν την απλοτητα και τη στενη επαφη με τη φυση.",
+        "maxGuests": 3,
+        "bedrooms": 3,
+        "bathrooms": 1,
+        "beds": 1,
+        "basePrice": 250,
+        "cleaningFee": 50,
+        "images": "[\"/uploads/images-1772462458614-209961488.jpg\",\"/uploads/images-1772462458615-511300977.jpg\",\"/uploads/images-1772462458615-337618217.jpg\",\"/uploads/images-1772462458622-165454149.jpg\",\"/uploads/images-1772462458624-127098961.jpg\",\"/uploads/images-1772462458637-300148281.jpg\",\"/uploads/images-1772462458641-18805791.jpg\"]",
+        "minStayDays": 1,
+        "isActive": true,
+        "createdAt": "2026-03-02T02:32:44.927Z",
+        "updatedAt": "2026-03-02T14:40:58.675Z"
+      },
+      {
+        "id": "cmm8kehwy000hw4o5wh3bhuk6",
+        "propertyId": "cmm8kdzvb000fw4o5zimfjccx",
+        "name": "Ogra house",
+        "slug": "ogra-house",
+        "description": "Tο Ogra house καταλαμβανει το ισογειο μιας μεγαλης κατοικιας και  αποτελειται απο ενα τεραστιο καθιστικο, κουζινα, 4 υπνοδωματια και 3 λουτρα. Μπορει να φιλοξενησει μεχρι 10 ατομα. Ιδανικο για μεγαλες οικογενειες και παρεες φιλων.\r\nΤοσο απο το εσωτερικο, οσο και απο την μεγαλη αυλη, η θεα προς τη θαλασσα ειναι απροσκοπτη. \r\nΗ αποκλειστικη παραλια ειναι προσβασιμη σε 6 λεπτα με τα ποδια μεσω ενος μονοπατιου με σκαλοπατια. Το σπιτι ειναι πολυ ανετο και  αριστα εξοπλισμενο, με κεντρικη θερμανση και κλιματισμο.\r\n",
+        "maxGuests": 4,
+        "bedrooms": 4,
+        "bathrooms": 3,
+        "beds": 1,
+        "basePrice": 100,
+        "cleaningFee": 50,
+        "images": "[\"/uploads/images-1772465372372-787674598.jpg\",\"/uploads/images-1772465372372-328026422.jpg\",\"/uploads/images-1772465372381-489834416.jpg\",\"/uploads/images-1772465372385-62135235.jpg\",\"/uploads/images-1772465372385-852837641.jpg\",\"/uploads/images-1772465372385-538900061.jpg\",\"/uploads/images-1772465372396-616219497.jpg\",\"/uploads/images-1772465372410-230352185.jpg\",\"/uploads/images-1772465372417-368464586.jpg\",\"/uploads/images-1772465372417-348741560.jpg\",\"/uploads/images-1772465372419-699241484.jpg\",\"/uploads/images-1772465372419-765381832.jpg\",\"/uploads/images-1772465372430-216157708.jpg\",\"/uploads/images-1772465372434-989179854.jpg\",\"/uploads/images-1772465372434-350727031.jpg\",\"/uploads/images-1772465372434-570583846.jpg\",\"/uploads/images-1772465372434-524984873.jpg\",\"/uploads/images-1772465372434-822468254.jpg\",\"/uploads/images-1772465372435-995203932.jpg\",\"/uploads/images-1772465372435-271846582.jpg\",\"/uploads/images-1772465372448-580251597.jpg\",\"/uploads/images-1772465372456-948619502.jpg\",\"/uploads/images-1772465372464-906717486.jpg\",\"/uploads/images-1772465372464-318039214.jpg\",\"/uploads/images-1772465372481-547316934.jpg\",\"/uploads/images-1772465372481-797436126.jpg\",\"/uploads/images-1772465372494-481262592.jpg\"]",
+        "minStayDays": 1,
+        "isActive": true,
+        "createdAt": "2026-03-02T02:33:39.634Z",
+        "updatedAt": "2026-03-02T15:29:32.510Z"
+      }
+    ],
+    "booking": [
+      {
+        "id": "cmm9bknwn0002ek10xg446qpj",
+        "bookingNumber": "BK-1772464456966-MCML7T",
+        "unitId": "cmm8kbw1z000bw4o5qa59i60y",
+        "userId": null,
+        "checkInDate": "2026-03-17T07:00:00.000Z",
+        "checkOutDate": "2026-03-18T07:00:00.000Z",
+        "nights": 1,
+        "basePrice": 220,
+        "totalNights": 1,
+        "subtotal": 220,
+        "cleaningFee": 50,
+        "taxes": 40.5,
+        "discountAmount": 0,
+        "depositAmount": 0,
+        "balanceAmount": 0,
+        "totalPrice": 310.5,
+        "guests": 2,
+        "guestName": "Theocharis Panagiotis Siozos",
+        "guestEmail": "xsiwzos@gmail.com",
+        "guestPhone": "6900000000",
+        "totalPaid": 0,
+        "paymentStatus": "PENDING",
+        "depositPaid": false,
+        "balancePaid": false,
+        "balanceChargeDate": null,
+        "status": "PENDING",
+        "stripeCustomerId": null,
+        "cancellationReason": null,
+        "cancelledAt": null,
+        "createdAt": "2026-03-02T15:14:16.967Z",
+        "updatedAt": "2026-03-02T15:14:16.967Z"
+      }
+    ],
+    "payment": [],
+    "user": [
+      {
+        "id": "cmm8fqdxe0000iwlcxavrc7la",
+        "email": "admin@booking.com",
+        "firstName": "Admin",
+        "lastName": "User",
+        "password": "$2b$10$JsEWzGwFYUe4CKDMJ78K4.WMKL1IFg5HdgBIZUhEyrpjcsJ1wPyjS",
+        "role": "ADMIN",
+        "status": "ACTIVE",
+        "isEmailVerified": false,
+        "emailVerificationToken": null,
+        "passwordResetToken": null,
+        "passwordResetExpires": null,
+        "lastLoginAt": null,
+        "createdAt": "2026-03-02T00:22:56.258Z",
+        "updatedAt": "2026-03-02T00:22:56.258Z"
+      },
+      {
+        "id": "cmm8fqdz90001iwlcm8vpul5w",
+        "email": "customer@booking.com",
+        "firstName": "John",
+        "lastName": "Doe",
+        "password": "$2b$10$tc5zqGggDkKkFcBvxmHne.YV2MCMqvqt.VW.QQxI02BtttzYNzhWu",
+        "role": "CUSTOMER",
+        "status": "ACTIVE",
+        "isEmailVerified": false,
+        "emailVerificationToken": null,
+        "passwordResetToken": null,
+        "passwordResetExpires": null,
+        "lastLoginAt": null,
+        "createdAt": "2026-03-02T00:22:56.326Z",
+        "updatedAt": "2026-03-02T00:22:56.326Z"
+      },
+      {
+        "id": "cmm8gzwsm0003nbsbfzmnf023",
+        "email": "wibavid922@hutudns.com",
+        "firstName": "natal",
+        "lastName": "nadel",
+        "password": "$2b$10$kpiGd35sArZCVJPcS6Zr6O3d4oeNnLKsZ2q98rEhu7MnTGXYCb22i",
+        "role": "CUSTOMER",
+        "status": "ACTIVE",
+        "isEmailVerified": false,
+        "emailVerificationToken": null,
+        "passwordResetToken": null,
+        "passwordResetExpires": null,
+        "lastLoginAt": null,
+        "createdAt": "2026-03-02T00:58:20.231Z",
+        "updatedAt": "2026-03-02T00:58:20.231Z"
+      }
+    ],
+    "coupon": [
+      {
+        "id": "cmm8imxhr0000i34wf1472i3x",
+        "code": "SUMMER",
+        "description": null,
+        "discountType": "FIXED",
+        "discountValue": 10,
+        "validFrom": "2026-03-02T08:00:00.000Z",
+        "validUntil": "2027-03-03T07:59:59.000Z",
+        "minBookingAmount": null,
+        "maxUses": null,
+        "usedCount": 0,
+        "isActive": true,
+        "createdAt": "2026-03-02T01:44:13.839Z",
+        "updatedAt": "2026-03-02T01:44:13.839Z"
+      },
+      {
+        "id": "cmm9cstrp0000uoiikaxnykhx",
+        "code": "DADA",
+        "description": null,
+        "discountType": "FIXED",
+        "discountValue": 100,
+        "validFrom": "2026-03-02T08:00:00.000Z",
+        "validUntil": "2027-04-24T06:59:59.000Z",
+        "minBookingAmount": null,
+        "maxUses": null,
+        "usedCount": 0,
+        "isActive": true,
+        "createdAt": "2026-03-02T15:48:37.429Z",
+        "updatedAt": "2026-03-02T15:48:37.429Z"
+      },
+      {
+        "id": "cmma1vbfa0000nayw27xm4719",
+        "code": "SA",
+        "description": null,
+        "discountType": "PERCENTAGE",
+        "discountValue": 10,
+        "validFrom": "2026-03-03T08:00:00.000Z",
+        "validUntil": "2027-03-04T07:59:59.000Z",
+        "minBookingAmount": null,
+        "maxUses": null,
+        "usedCount": 0,
+        "isActive": true,
+        "createdAt": "2026-03-03T03:30:24.023Z",
+        "updatedAt": "2026-03-03T03:30:24.023Z"
+      }
+    ],
+    "amenity": []
+  },
+  "samples": {
+    "properties": [
+      {
+        "id": "cmm8k0twj0000w4o5jpn49rev",
+        "name": "Lykoskufi 1",
+        "description": "undefined",
+        "location": "Arcadia",
+        "city": "Leonidion",
+        "country": "Greece",
+        "slug": "lykoskufi-1",
+        "mainImage": "/uploads/mainImage-1772418181980-300596449.jpg",
+        "galleryImages": "[]",
+        "isActive": true,
+        "createdAt": "2026-03-02T02:23:01.987Z",
+        "updatedAt": "2026-03-02T02:27:59.776Z",
+        "units": [
+          {
+            "id": "cmm8k1s9x0002w4o5p63yrkf2",
+            "propertyId": "cmm8k0twj0000w4o5jpn49rev",
+            "name": "Lykoskufi 1",
+            "slug": "lykoskufi-1",
+            "description": "Το Lykoskufi 1 ευρισκεται σε αποσταση 40 μετρων απο την παραλια, η οποια ειναι προσβασιμη μεσω μονοπατιου με σκαλια σε 5 λεπτα. Τοσο απο το εσωτερικο, οσο και απο τη σκεπαστη βεραντα, η θεα στη θαλασσα ειναι ανεμποδιστη.\r\nΑποτελειται απο ενα καθιστικο,λουτρο, πληρως εξοπλισμενη κουζινα και ενα υπνοδωματιο με ενα διπλο κρεβατι με 2 ξεχωριστα στρωματα για μεγαλυτερη ανεση. Μπορει να φιλοξενησει 2 ατομα.",
+            "maxGuests": 2,
+            "bedrooms": 2,
+            "bathrooms": 3,
+            "beds": 1,
+            "basePrice": 100,
+            "cleaningFee": 30,
+            "images": "[\"/uploads/images-1772418226500-525554115.jpg\",\"/uploads/images-1772418226500-878560324.jpg\",\"/uploads/images-1772418226501-548511614.jpg\",\"/uploads/images-1772418226501-752098521.png\",\"/uploads/images-1772418226501-595319251.jpg\",\"/uploads/images-1772418226515-541063168.jpg\",\"/uploads/images-1772418226519-891695137.jpg\"]",
+            "minStayDays": 1,
+            "isActive": true,
+            "createdAt": "2026-03-02T02:23:46.533Z",
+            "updatedAt": "2026-03-02T02:23:46.533Z"
+          }
+        ],
+        "amenities": [],
+        "seasonalPricing": [],
+        "dateBlockages": []
+      },
+      {
+        "id": "cmm8k60or0003w4o5fekr1hiv",
+        "name": "Lykoskufi 2",
+        "description": "undefined",
+        "location": "Arcadia",
+        "city": "Leonidion",
+        "country": "Greece",
+        "slug": "lykoskufi-2",
+        "mainImage": "/uploads/mainImage-1772418424055-383530146.jpg",
+        "galleryImages": "[]",
+        "isActive": true,
+        "createdAt": "2026-03-02T02:27:04.060Z",
+        "updatedAt": "2026-03-02T02:27:04.060Z",
+        "units": [
+          {
+            "id": "cmm8k6mmy0005w4o5gqzxg0yk",
+            "propertyId": "cmm8k60or0003w4o5fekr1hiv",
+            "name": "Lykoskufi 2",
+            "slug": "lykoskufi-2",
+            "description": "Το Lykoskufi 2 ευρισκεται σε αποσταση 45 μετρων απο την παραλια, η οποια ειναι προσβασιμη σε 5 λεπτα μεσω ενος μονοπατιου με σκαλια. Τοσο απο το εσωτερικο, οσο και απο τη σκεπαστη βεραντα, η θεα στη θαλασσα ειναι ανεμποδιστη.\r\nΑποτελειται απο δυο επιπεδα, - στο ισογειο ειναι το καθιστικο, η κουζινα, ενα λουτρο με ντους και ενα υπνοδωματιο με ενα διπλο κρεβατι με 2 ξεχωριστα στρωματα, στον οροφο ενα υπνοδωματιο επισης με διπλο κρεβατι με 2 μονα στρωματα, ενα ανοικτο παταρι με ενα μονό κρεβατι και ενα λουτρο με μπανιερα. Μπορει να φιλοξενησει μεχρι 5 ατομα.",
+            "maxGuests": 5,
+            "bedrooms": 5,
+            "bathrooms": 3,
+            "beds": 1,
+            "basePrice": 140,
+            "cleaningFee": 20,
+            "images": "[\"/uploads/images-1772418452491-638849038.jpg\",\"/uploads/images-1772418452491-547559297.jpg\",\"/uploads/images-1772418452491-409047756.jpg\",\"/uploads/images-1772418452491-997492684.avif\",\"/uploads/images-1772418452496-141216362.avif\"]",
+            "minStayDays": 1,
+            "isActive": true,
+            "createdAt": "2026-03-02T02:27:32.506Z",
+            "updatedAt": "2026-03-02T02:27:32.506Z"
+          }
+        ],
+        "amenities": [],
+        "seasonalPricing": [],
+        "dateBlockages": []
+      },
+      {
+        "id": "cmm8k8z2l0006w4o5dtpkw46o",
+        "name": "Lykoskufi 5",
+        "description": "undefined",
+        "location": "Arcadia",
+        "city": "Leonidion",
+        "country": "Greece",
+        "slug": "lykoskufi-5",
+        "mainImage": "/uploads/mainImage-1772418561929-485202986.avif",
+        "galleryImages": "[]",
+        "isActive": true,
+        "createdAt": "2026-03-02T02:29:21.933Z",
+        "updatedAt": "2026-03-02T02:29:21.933Z",
+        "units": [
+          {
+            "id": "cmm8ka0zh0008w4o5br56k8pm",
+            "propertyId": "cmm8k8z2l0006w4o5dtpkw46o",
+            "name": "Lykoskufi 5",
+            "slug": "lykoskufi-5",
+            "description": "Το Lykoskufi 5 αποτελει τη ναυαρχιδα των καταλυματων μας.  Ειναι κτισμενο δε δεσποζουσα θεση σε αποσταση 30 μετρων απο την παραλια, η οποια ειναι προσβασιμη απο ενα μονοπατι με σκαλια σε 3 λεπτα. Απο το εσωτερικο και απο ολους τους εξωτερικους χωρους η θεα στη θαλασσα ειναι πανοραμικη. \r\nΑποτελειται απο καθιστικο, κουζινα, 5 υπνοδωματια, 4 λουτρα, ενα WC επισκεπτων και ανεξαρτητο χωρο πλυντηριου - στεγνωτηριου.\r\nΤο σπιτι ειναι κατασκευασμενο με επιλεγμενα υλικα, αριστα διακοσμημενο με ποιοτικα επιπλα και πληρως εξοπλισμενο, με κεντρικη θερμανση και κλιματισμο με αντλια θερμοτητος. Για αποκλειστικη χρηση του σπιτιου υπαρχει μια πισινα, μια ηλεκτρικη ψησταρια και ενα κορυφαιας ποιοτητας πιανο με ουρα. Μπορει να φιλοξενησει μεχρι 10 ατομα.",
+            "maxGuests": 10,
+            "bedrooms": 10,
+            "bathrooms": 3,
+            "beds": 1,
+            "basePrice": 150,
+            "cleaningFee": 50,
+            "images": "[\"/uploads/images-1772418611049-404542356.jpg\",\"/uploads/images-1772418611049-617692771.jpg\",\"/uploads/images-1772418611049-326489170.jpg\",\"/uploads/images-1772418611049-534415516.jpg\",\"/uploads/images-1772418611049-959885619.jpg\",\"/uploads/images-1772418611049-335875172.jpg\"]",
+            "minStayDays": 1,
+            "isActive": true,
+            "createdAt": "2026-03-02T02:30:11.069Z",
+            "updatedAt": "2026-03-02T02:30:11.069Z"
+          }
+        ],
+        "amenities": [],
+        "seasonalPricing": [],
+        "dateBlockages": []
+      }
+    ],
+    "pricing": {
+      "unitId": "cmm8k1s9x0002w4o5p63yrkf2",
+      "unitName": "Lykoskufi 1",
+      "basePrice": 100,
+      "cleaningFee": 30,
+      "propertyName": "Lykoskufi 1",
+      "calculation": {
+        "nights": 7,
+        "basePrice": 100,
+        "subtotal": 700,
+        "cleaningFee": 30,
+        "taxes": 70,
+        "totalPrice": 800
+      }
+    },
+    "coupon": {
+      "code": "SUMMER",
+      "discountType": "FIXED",
+      "discountValue": 10,
+      "validFrom": "2026-03-02T08:00:00.000Z",
+      "validUntil": "2027-03-03T07:59:59.000Z",
+      "minBookingAmount": null,
+      "usedCount": 0,
+      "maxUses": null,
+      "isActive": true,
+      "validation": {
+        "isValid": true,
+        "reason": "Active and valid"
+      }
+    },
+    "slugs": {
+      "properties": [
+        {
+          "id": "cmm8k0twj0000w4o5jpn49rev",
+          "name": "Lykoskufi 1",
+          "slug": "lykoskufi-1"
+        },
+        {
+          "id": "cmm8k60or0003w4o5fekr1hiv",
+          "name": "Lykoskufi 2",
+          "slug": "lykoskufi-2"
+        },
+        {
+          "id": "cmm8k8z2l0006w4o5dtpkw46o",
+          "name": "Lykoskufi 5",
+          "slug": "lykoskufi-5"
+        },
+        {
+          "id": "cmm8kbe8n0009w4o5vbfgfok0",
+          "name": "Big Bungalow",
+          "slug": "big-bungalow"
+        },
+        {
+          "id": "cmm8kcrmt000cw4o5yiplpnt6",
+          "name": "Small Bungalow",
+          "slug": "small-bungalow"
+        },
+        {
+          "id": "cmm8kdzvb000fw4o5zimfjccx",
+          "name": "Ogra house",
+          "slug": "ogra-house"
+        }
+      ],
+      "units": [
+        {
+          "id": "cmm8k1s9x0002w4o5p63yrkf2",
+          "name": "Lykoskufi 1",
+          "slug": "lykoskufi-1"
+        },
+        {
+          "id": "cmm8k6mmy0005w4o5gqzxg0yk",
+          "name": "Lykoskufi 2",
+          "slug": "lykoskufi-2"
+        },
+        {
+          "id": "cmm8ka0zh0008w4o5br56k8pm",
+          "name": "Lykoskufi 5",
+          "slug": "lykoskufi-5"
+        },
+        {
+          "id": "cmm8kbw1z000bw4o5qa59i60y",
+          "name": "Big Bungalow",
+          "slug": "big-bungalow"
+        },
+        {
+          "id": "cmm8kdbpb000ew4o5nadge3v8",
+          "name": "Small Bungalow",
+          "slug": "small-bungalow"
+        },
+        {
+          "id": "cmm8kehwy000hw4o5wh3bhuk6",
+          "name": "Ogra house",
+          "slug": "ogra-house"
+        }
+      ]
+    }
+  },
+  "verification": {}
+}

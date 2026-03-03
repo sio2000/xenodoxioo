@@ -1,0 +1,66 @@
+{
+  "timestamp": "2026-03-03T04:10:59.240Z",
+  "issue": "Cannot connect to Supabase database from local environment",
+  "errorCode": "P1001",
+  "possibleCauses": [
+    "Network firewall blocking database connections",
+    "ISP blocking database ports",
+    "Local network restrictions",
+    "Supabase database paused or suspended",
+    "Incorrect database URL format"
+  ],
+  "solutions": [
+    {
+      "title": "Use Supabase Dashboard SQL Editor",
+      "description": "Run verification queries directly in Supabase dashboard",
+      "steps": [
+        "Go to your Supabase project dashboard",
+        "Navigate to SQL Editor",
+        "Copy and paste contents of supabase-dashboard-verification.sql",
+        "Execute the script",
+        "Review all verification results"
+      ]
+    },
+    {
+      "title": "Check Supabase Project Status",
+      "description": "Ensure your Supabase project is active",
+      "steps": [
+        "Go to Supabase dashboard",
+        "Check project status (should be \"Active\")",
+        "Verify database is not paused",
+        "Check billing status if applicable"
+      ]
+    },
+    {
+      "title": "Verify Database URL",
+      "description": "Confirm connection string is correct",
+      "steps": [
+        "Go to Settings → Database in Supabase",
+        "Copy the \"Connection string\" (URI format)",
+        "Compare with your DATABASE_URL",
+        "Ensure password matches exactly"
+      ]
+    },
+    {
+      "title": "Network Diagnostics",
+      "description": "Test network connectivity",
+      "steps": [
+        "Try accessing https://supabase.com in browser",
+        "Check if you can reach your project dashboard",
+        "Test with different network (mobile hotspot)",
+        "Check if corporate firewall is blocking connections"
+      ]
+    }
+  ],
+  "alternativeApproaches": [
+    "Deploy to Netlify for production testing",
+    "Use Supabase dashboard for all verification",
+    "Proceed with deployment if dashboard verification passes"
+  ],
+  "nextSteps": [
+    "1. Run supabase-dashboard-verification.sql in Supabase dashboard",
+    "2. Review all verification results",
+    "3. If all checks pass, proceed to Phase 7",
+    "4. If issues found, fix them before deployment"
+  ]
+}

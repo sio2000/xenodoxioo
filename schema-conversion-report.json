@@ -1,0 +1,42 @@
+{
+  "timestamp": "2026-03-03T03:52:12.436Z",
+  "conversion": {
+    "provider": {
+      "from": "sqlite",
+      "to": "postgresql",
+      "status": "✅ COMPLETED"
+    },
+    "arrayFields": {
+      "galleryImages": {
+        "from": "String @default(\"[]\")",
+        "to": "String[]",
+        "status": "✅ COMPLETED"
+      },
+      "images": {
+        "from": "String @default(\"[]\")",
+        "to": "String[]",
+        "status": "✅ COMPLETED"
+      }
+    }
+  },
+  "preserved": {
+    "relations": "✅ All relations preserved",
+    "fieldTypes": "✅ All Float/DateTime types preserved",
+    "constraints": "✅ All UNIQUE constraints preserved",
+    "defaults": "✅ All @default values preserved"
+  },
+  "baseline": {
+    "originalCounts": {
+      "properties": 6,
+      "units": 6,
+      "bookings": 1,
+      "payments": 0,
+      "users": 3,
+      "coupons": 3,
+      "seasonalPricing": 0,
+      "amenities": 0,
+      "dateBlockages": 0
+    },
+    "originalProvider": "sqlite"
+  }
+}

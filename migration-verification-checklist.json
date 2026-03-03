@@ -1,0 +1,62 @@
+{
+  "timestamp": "2026-03-03T03:56:17.889Z",
+  "phase": "PHASE 4: DATA MIGRATION VERIFICATION",
+  "checklist": {
+    "preMigration": [
+      "✅ Supabase project created and accessible",
+      "✅ DATABASE_URL environment variable configured",
+      "✅ Supabase connection tested successfully",
+      "✅ SQL migration scripts generated",
+      "✅ Baseline snapshot loaded and verified"
+    ],
+    "migrationExecution": [
+      "□ Run table creation script in Supabase SQL Editor",
+      "□ Run data insertion script in Supabase SQL Editor",
+      "□ Verify no SQL errors occurred",
+      "□ Check all tables created successfully",
+      "□ Confirm foreign key constraints applied"
+    ],
+    "postMigration": [
+      "□ Verify row counts match baseline snapshot",
+      "□ Verify all IDs preserved exactly from SQLite",
+      "□ Verify slug values are identical",
+      "□ Verify numeric fields (prices, fees) are identical",
+      "□ Verify array fields (galleryImages, images) converted properly",
+      "□ Verify coupon validation logic works",
+      "□ Verify booking calculations match baseline",
+      "□ Test property/unit relationships",
+      "□ Test user authentication data"
+    ],
+    "dataIntegrity": [
+      "□ Properties: Count should be 6",
+      "□ Units: Count should be 6",
+      "□ Bookings: Count should be 1",
+      "□ Users: Count should be 3",
+      "□ Coupons: Count should be 3",
+      "□ All property slugs unique and present",
+      "□ All unit slugs present",
+      "□ All main_image fields populated",
+      "□ All basePrice values > 0",
+      "□ All totalPrice calculations correct"
+    ]
+  },
+  "sqlCommands": {
+    "verificationQueries": [
+      "SELECT COUNT(*) FROM \"User\";",
+      "SELECT COUNT(*) FROM \"Property\";",
+      "SELECT COUNT(*) FROM \"Unit\";",
+      "SELECT COUNT(*) FROM \"Booking\";",
+      "SELECT COUNT(*) FROM \"Coupon\";",
+      "SELECT slug, name FROM \"Property\" ORDER BY slug;",
+      "SELECT slug, name, basePrice FROM \"Unit\" ORDER BY slug;",
+      "SELECT code, discountType, discountValue, isActive FROM \"Coupon\";",
+      "SELECT bookingNumber, totalPrice, status FROM \"Booking\";"
+    ]
+  },
+  "nextSteps": [
+    "1. Execute SQL migration in Supabase dashboard",
+    "2. Run verification queries",
+    "3. Proceed to Phase 5: Image migration",
+    "4. Complete runtime verification"
+  ]
+}

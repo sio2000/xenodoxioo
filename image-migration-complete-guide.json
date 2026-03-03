@@ -1,0 +1,107 @@
+{
+  "timestamp": "2026-03-03T03:59:16.709Z",
+  "phase": "PHASE 5: IMAGE MIGRATION",
+  "status": "DATA MIGRATION COMPLETED - READY FOR IMAGE MIGRATION",
+  "currentImagePaths": {
+    "localSource": "/uploads/",
+    "localDirectory": "uploads/",
+    "sampleFiles": [
+      "mainImage-1772418181980-300596449.jpg",
+      "mainImage-1772418424055-383530146.jpg",
+      "mainImage-1772418561929-485202986.avif",
+      "images-1772418226500-525554115.jpg",
+      "images-1772418452491-638849038.jpg",
+      "images-1772418611049-404542356.jpg"
+    ]
+  },
+  "supabaseConfiguration": {
+    "bucketName": "property-images",
+    "publicAccess": true,
+    "urlFormat": "https://[PROJECT_REF].supabase.co/storage/v1/object/public/property-images/[FILENAME]"
+  },
+  "migrationSteps": [
+    {
+      "step": 1,
+      "title": "Create Supabase Storage Bucket",
+      "instructions": [
+        "Go to Supabase dashboard → Storage",
+        "Click \"New bucket\"",
+        "Name: \"property-images\"",
+        "Public bucket: ✓ (enabled)",
+        "File size limit: 50MB",
+        "Allowed MIME types: image/*"
+      ]
+    },
+    {
+      "step": 2,
+      "title": "Upload Local Images",
+      "instructions": [
+        "Navigate to Supabase Storage → property-images bucket",
+        "Click \"Upload\"",
+        "Select all files from local /uploads/ directory",
+        "Upload all images (should be ~100+ files)",
+        "Verify all files uploaded successfully"
+      ]
+    },
+    {
+      "step": 3,
+      "title": "Get Project Reference",
+      "instructions": [
+        "Go to Supabase dashboard → Settings → API",
+        "Copy the \"Project URL\" (e.g., https://abc123.supabase.co)",
+        "Extract project reference: \"abc123\"",
+        "Your image URL format will be: https://abc123.supabase.co/storage/v1/object/public/property-images/[filename]"
+      ]
+    },
+    {
+      "step": 4,
+      "title": "Update Database Image URLs",
+      "instructions": [
+        "Run the SQL update script provided below",
+        "Replace [PROJECT_REF] with your actual project reference",
+        "Verify all image URLs are updated",
+        "Test image loading in application"
+      ]
+    }
+  ],
+  "sqlUpdateScript": "\n-- =====================================================\n-- IMAGE URL MIGRATION - UPDATE TO SUPABASE STORAGE URLS\n-- =====================================================\n\n-- STEP 1: Update Property main images\nUPDATE \"Property\" \nSET \"mainImage\" = REPLACE(\"mainImage\", '/uploads/', 'https://[PROJECT_REF].supabase.co/storage/v1/object/public/property-images/')\nWHERE \"mainImage\" LIKE '/uploads/%';\n\n-- STEP 2: Update Property gallery images (array field)\nUPDATE \"Property\" \nSET \"galleryImages\" = ARRAY(\n  SELECT REPLACE(unnest(\"galleryImages\"), '/uploads/', 'https://[PROJECT_REF].supabase.co/storage/v1/object/public/property-images/')\n  WHERE unnest(\"galleryImages\") LIKE '/uploads/%'\n)\nWHERE \"galleryImages\" IS NOT NULL AND array_length(\"galleryImages\", 1) > 0;\n\n-- STEP 3: Update Unit images (array field)\nUPDATE \"Unit\" \nSET \"images\" = ARRAY(\n  SELECT REPLACE(unnest(\"images\"), '/uploads/', 'https://[PROJECT_REF].supabase.co/storage/v1/object/public/property-images/')\n  WHERE unnest(\"images\") LIKE '/uploads/%'\n)\nWHERE \"images\" IS NOT NULL AND array_length(\"images\", 1) > 0;\n\n-- =====================================================\n-- VERIFICATION QUERIES\n-- =====================================================\n\n-- Check updated Property main images\nSELECT \"id\", \"name\", \"mainImage\" \nFROM \"Property\" \nWHERE \"mainImage\" LIKE 'https://%.supabase.co/storage/v1/object/public/%'\nLIMIT 5;\n\n-- Check updated Property gallery images\nSELECT \"id\", \"name\", \"galleryImages\"\nFROM \"Property\" \nWHERE \"galleryImages\" IS NOT NULL AND array_length(\"galleryImages\", 1) > 0\nLIMIT 3;\n\n-- Check updated Unit images\nSELECT \"id\", \"name\", \"images\"\nFROM \"Unit\" \nWHERE \"images\" IS NOT NULL AND array_length(\"images\", 1) > 0\nLIMIT 3;\n\n-- Count images still using local paths (should be 0)\nSELECT COUNT(*) as remaining_local_images \nFROM \"Property\" \nWHERE \"mainImage\" LIKE '/uploads/%';\n",
+  "verificationChecklist": [
+    "□ Supabase Storage bucket \"property-images\" created",
+    "□ Bucket set to public access",
+    "□ All local /uploads/ files uploaded to Supabase",
+    "□ Project reference extracted from Supabase URL",
+    "□ SQL update script executed with correct PROJECT_REF",
+    "□ All Property mainImage URLs updated to Supabase",
+    "□ All Property galleryImages arrays updated",
+    "□ All Unit images arrays updated",
+    "□ No remaining /uploads/ paths in database",
+    "□ Images load correctly in frontend application",
+    "□ Images load correctly in admin panel"
+  ],
+  "beforeAfterExample": {
+    "before": {
+      "mainImage": "/uploads/mainImage-1772418181980-300596449.jpg",
+      "galleryImages": "[\"/uploads/images-1772418226500-525554115.jpg\"]",
+      "unitImages": "[\"/uploads/images-1772418452491-638849038.jpg\"]"
+    },
+    "after": {
+      "mainImage": "https://abc123.supabase.co/storage/v1/object/public/property-images/mainImage-1772418181980-300596449.jpg",
+      "galleryImages": "[\"https://abc123.supabase.co/storage/v1/object/public/property-images/images-1772418226500-525554115.jpg\"]",
+      "unitImages": "[\"https://abc123.supabase.co/storage/v1/object/public/property-images/images-1772418452491-638849038.jpg\"]"
+    }
+  },
+  "troubleshooting": [
+    {
+      "issue": "Images not loading",
+      "solution": "Check bucket is set to public access and verify URL format"
+    },
+    {
+      "issue": "404 errors on images",
+      "solution": "Verify filenames match exactly between local and Supabase Storage"
+    },
+    {
+      "issue": "SQL update not working",
+      "solution": "Replace [PROJECT_REF] with your actual project reference from Supabase URL"
+    }
+  ]
+}
