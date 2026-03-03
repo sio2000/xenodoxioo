@@ -43,7 +43,7 @@ export default function UserManagement() {
       const response = await fetch(apiUrl(`/api/admin/users?${params}`));
       if (response.ok) {
         const data = await response.json();
-        setUsers(data.users || []);
+        setUsers(data.data || data.users || []);
         setTotalPages(data.totalPages || 1);
       }
     } catch (error) {
@@ -177,7 +177,7 @@ export default function UserManagement() {
                   <td className="px-4 py-3 text-sm text-foreground">
                     <div className="flex items-center gap-1">
                       <BookOpen size={14} className="text-muted-foreground" />
-                      {user._count.bookings} bookings
+                      {user._count?.bookings || 0} bookings
                     </div>
                   </td>
                   <td className="px-4 py-3 text-sm text-foreground">
@@ -302,7 +302,7 @@ function UserDetailsModal({ user, onClose, onStatusUpdate }: any) {
               </div>
               <div>
                 <span className="text-muted-foreground">Total Bookings:</span>
-                <p className="text-foreground">{user._count.bookings}</p>
+                <p className="text-foreground">{user._count?.bookings || 0}</p>
               </div>
               <div>
                 <span className="text-muted-foreground">Current Status:</span>

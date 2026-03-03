@@ -43,16 +43,14 @@ type ApiUnit = {
 };
 
 type ApiPropertyDetail = {
-  property: {
-    id: string;
-    name: string;
-    description: string;
-    location: string;
-    city: string;
-    country: string;
-    mainImage: string;
-    galleryImages: string[];
-  };
+  id: string;
+  name: string;
+  description: string;
+  location: string;
+  city: string;
+  country: string;
+  main_image: string;
+  gallery_images: string[];
   units: ApiUnit[];
 };
 
@@ -116,17 +114,24 @@ export default function PropertyDetail() {
       if (!id) return;
       try {
         console.log("🔍 [CLIENT] Fetching property detail...", id);
-        const response = await fetch(apiUrl(`/api/properties/${id}`));
+        const response = await fetch(apiUrl(`/api/properties/id/${id}`));
         if (!response.ok) {
           throw new Error(`Failed to load property: ${response.status}`);
         }
         const json = await response.json();
         const payload = json.data as ApiPropertyDetail;
         // Normalise images arrays
-        payload.property.galleryImages =
-          Array.isArray(payload.property.galleryImages) ?
-            payload.property.galleryImages :
-            [];
+        if (payload.gallery_images && Array.isArray(payload.gallery_images)) {
+          // Already an array, keep as is
+        } else if (payload.gallery_images && typeof payload.gallery_images === 'string') {
+          try {
+            payload.gallery_images = JSON.parse(payload.gallery_images);
+          } catch {
+            payload.gallery_images = [];
+          }
+        } else {
+          payload.gallery_images = [];
+        }
         payload.units = (payload.units ?? []).map((u: any) => {
           let images: string[] = [];
           if (Array.isArray(u.images)) {
@@ -166,12 +171,12 @@ export default function PropertyDetail() {
   const rawImages =
     currentUnit?.images?.length
       ? currentUnit.images
-      : data?.property.galleryImages ?? [];
+      : data?.gallery_images ?? [];
   const images =
     rawImages.length > 0
       ? rawImages
-      : data?.property.mainImage
-        ? [data.property.mainImage]
+      : data?.main_image
+        ? [data.main_image]
         : [];
 
   // Scroll selected thumbnail into view when changing image
@@ -187,7 +192,7 @@ export default function PropertyDetail() {
     if (!canBook) return;
     const params = new URLSearchParams({
       unit: currentUnit!.id,
-      property: data!.property.id,
+      property: data!.id,
       checkIn: selectedDates!.checkIn.toISOString(),
       checkOut: selectedDates!.checkOut.toISOString(),
     });
@@ -213,7 +218,7 @@ export default function PropertyDetail() {
                 {images.length > 0 && (
                   <img
                     src={imageUrl(images[selectedImage])}
-                    alt={currentUnit?.name ?? data.property.name}
+                    alt={currentUnit?.name ?? data.name}
                     loading="eager"
                     decoding="async"
                     className="w-full h-full object-cover"
@@ -359,7 +364,7 @@ export default function PropertyDetail() {
               </div>
               <div className="flex items-center gap-2 text-muted-foreground ml-auto">
                 <MapPin size={18} className="shrink-0" />
-                <span>{data.property.location || `${data.property.city}, ${data.property.country}`}</span>
+                <span>{data.location || `${data.city}, ${data.country}`}</span>
               </div>
             </div>
           </div>
@@ -384,7 +389,7 @@ export default function PropertyDetail() {
                 {/* Header & Experience Description */}
                 <div className="mb-10">
                   <p className="text-sm text-muted-foreground uppercase tracking-wide mb-1">
-                    {data.property.name}
+                    {data.name}
                   </p>
                   <h1 className="text-3xl md:text-4xl font-bold text-foreground mb-6">
                     {currentUnit.name}
@@ -393,7 +398,7 @@ export default function PropertyDetail() {
                   {/* Description — lead paragraph + body */}
                   <div className="space-y-5">
                     <p className="text-lg md:text-xl text-foreground leading-relaxed font-medium">
-                      {data.property.description}
+                      {data.description}
                     </p>
                     {currentUnit.description && (
                       <p className="text-muted-foreground leading-relaxed">
@@ -404,7 +409,7 @@ export default function PropertyDetail() {
                 </div>
 
                 {/* View from room — unforgettable section */}
-                {getViewVideoPath(data.property.name, currentUnit.name) && (
+                {getViewVideoPath(data.name, currentUnit.name) && (
                   <section className="mb-8" aria-labelledby="view-from-room-heading">
                     <div className="relative rounded-3xl overflow-hidden bg-gradient-to-br from-primary/8 via-accent/5 to-primary/10 border border-primary/10 shadow-xl shadow-primary/5">
                       {/* Soft glow & divider */}
@@ -437,7 +442,7 @@ export default function PropertyDetail() {
                           >
                             <video
                               ref={videoRef}
-                              src={apiUrl(getViewVideoPath(data.property.name, currentUnit.name) || "")}
+                              src={apiUrl(getViewVideoPath(data.name, currentUnit.name) || "")}
                               controls
                               playsInline
                               preload="auto"
@@ -628,7 +633,7 @@ export default function PropertyDetail() {
                     />
                   </div>
                   <a
-                    href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(data.property.location || `${data.property.city}, ${data.property.country}`)}`}
+                    href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(data.location || `${data.city}, ${data.country}`)}`}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="inline-flex items-center gap-2 text-primary font-medium hover:underline"

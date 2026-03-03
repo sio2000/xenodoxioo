@@ -8,6 +8,11 @@ const localeMap: Record<Language, string> = {
 };
 
 export function formatCurrency(amount: number, lang: Language = "en") {
+  if (typeof amount !== 'number' || isNaN(amount)) {
+    console.error("❌ [CURRENCY] Invalid amount:", amount);
+    return "NaN €";
+  }
+  
   const locale = localeMap[lang] || "en-IE";
   try {
     return new Intl.NumberFormat(locale, {
@@ -16,6 +21,7 @@ export function formatCurrency(amount: number, lang: Language = "en") {
       minimumFractionDigits: 2,
     }).format(amount);
   } catch (e) {
+    console.error("❌ [CURRENCY] Format error:", e);
     return `€${amount.toFixed(2)}`;
   }
 }

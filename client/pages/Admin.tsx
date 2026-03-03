@@ -47,14 +47,20 @@ function PricingAndDiscounts() {
 
   const fetchPricing = async () => {
     try {
+      console.log("🔍 [PRICING] Fetching pricing data...");
       const res = await fetch(apiUrl("/api/admin/pricing"));
+      console.log("🔍 [PRICING] Response status:", res.status, res.ok);
+      
       if (res.ok) {
         const data = await res.json();
+        console.log("✅ [PRICING] Pricing data:", data);
         setSeasonalPricing(data.seasonalPricing || []);
         setCoupons(data.coupons || []);
+      } else {
+        console.error("❌ [PRICING] Failed to fetch pricing:", res.status);
       }
     } catch (e) {
-      console.error("Failed to fetch pricing:", e);
+      console.error("❌ [PRICING] Network error:", e);
     } finally {
       setLoading(false);
     }
@@ -174,51 +180,7 @@ function PricingAndDiscounts() {
         <p className="text-muted-foreground">{t("common.loading")}</p>
       ) : (
         <div className="space-y-8">
-          <div className="bg-card border border-border rounded-lg p-6">
-            <h3 className="text-lg font-semibold text-foreground mb-4 flex items-center gap-2">
-              <CalendarRange size={20} />
-              {t("admin.seasonalPricing")}
-            </h3>
-            {seasonalPricing.length === 0 ? (
-              <p className="text-muted-foreground">
-                {t("admin.noSeasonalPricing")}
-              </p>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-border">
-                      <th className="text-left py-2 font-medium text-foreground">{t("admin.property")}</th>
-                      <th className="text-left py-2 font-medium text-foreground">{t("admin.name")}</th>
-                      <th className="text-left py-2 font-medium text-foreground">{t("admin.start")}</th>
-                      <th className="text-left py-2 font-medium text-foreground">{t("admin.end")}</th>
-                      <th className="text-left py-2 font-medium text-foreground">{t("admin.pricePerNight")}</th>
-                      <th className="text-left py-2 font-medium text-foreground">{t("admin.minStay")}</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {seasonalPricing.map((s) => (
-                      <tr key={s.id} className="border-b border-border/50">
-                        <td className="py-2 text-foreground">{s.property?.name ?? "—"}</td>
-                        <td className="py-2 text-foreground">{s.name}</td>
-                        <td className="py-2 text-muted-foreground">
-                          {new Date(s.startDate).toLocaleDateString()}
-                        </td>
-                        <td className="py-2 text-muted-foreground">
-                          {new Date(s.endDate).toLocaleDateString()}
-                        </td>
-                        <td className="py-2 font-medium text-foreground">
-                          {formatCurrency(s.pricePerNight, language)}
-                        </td>
-                        <td className="py-2 text-muted-foreground">{s.minStayDays} {t("common.nights")}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
-
+          
           <div className="bg-card border border-border rounded-lg p-6">
             <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
               <h3 className="text-lg font-semibold text-foreground flex items-center gap-2">
@@ -433,10 +395,12 @@ export default function Admin() {
     totalBookings: 0,
     confirmedBookings: 0,
     pendingBookings: 0,
+    cancelledBookings: 0,
     totalRevenue: 0,
     totalUsers: 0,
     propertiesCount: 0,
     occupancyByProperty: [],
+    activeUsers: 0,
   });
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
@@ -466,9 +430,9 @@ export default function Admin() {
       const response = await fetch(apiUrl("/api/admin/stats"));
       
       if (response.ok) {
-        const data = await response.json();
-        console.log("✅ [ADMIN CLIENT] Stats received:", data);
-        setStats(data);
+        const response_data = await response.json();
+        console.log("✅ [ADMIN CLIENT] Stats received:", response_data);
+        setStats(response_data.data || response_data);
       } else {
         console.error("❌ [ADMIN CLIENT] Failed to fetch stats:", response.status);
       }
@@ -506,25 +470,25 @@ export default function Admin() {
   const statsCards = [
     {
       label: t("admin.totalBookings"),
-      value: stats.totalBookings.toString(),
+      value: (stats?.totalBookings || 0).toString(),
       icon: BookOpen,
       color: "bg-blue-100 text-blue-700",
     },
     {
       label: t("admin.revenue"),
-      value: formatCurrency(stats.totalRevenue, language),
+      value: formatCurrency(stats?.totalRevenue || 0, language),
       icon: DollarSign,
       color: "bg-green-100 text-green-700",
     },
     {
       label: t("admin.totalUsers"),
-      value: stats.totalUsers.toString(),
+      value: (stats?.totalUsers || 0).toString(),
       icon: Users,
       color: "bg-purple-100 text-purple-700",
     },
     {
       label: t("admin.properties"),
-      value: stats.propertiesCount.toString(),
+      value: (stats?.propertiesCount || 0).toString(),
       icon: Settings,
       color: "bg-orange-100 text-orange-700",
     },
@@ -634,7 +598,7 @@ export default function Admin() {
                   <div className="space-y-4">
                     {loading ? (
                       <p className="text-muted-foreground">{t("admin.loadingOccupancy")}</p>
-                    ) : stats.occupancyByProperty.length > 0 ? (
+                    ) : (stats?.occupancyByProperty?.length || 0) > 0 ? (
                       stats.occupancyByProperty.map((property) => (
                         <div key={property.id}>
                           <div className="flex justify-between text-sm mb-2">

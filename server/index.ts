@@ -12,7 +12,7 @@ import { bookingRouter } from "./routes/bookings";
 import { propertiesRouter } from "./routes/properties";
 import { unitsRouter } from "./routes/units";
 import viewVideosRouter from "./routes/viewvideos";
-import PaymentScheduler from "./services/scheduler";
+// import { startScheduler } from "./services/scheduler";
 
 export function createServer() {
   const app = express();
@@ -22,6 +22,9 @@ export function createServer() {
   if (!fs.existsSync(uploadsDir)) {
     fs.mkdirSync(uploadsDir, { recursive: true });
   }
+
+  // Serve static files from uploads directory
+  app.use("/uploads", express.static(uploadsDir));
 
   // Configure multer for file uploads
   const storage = multer.diskStorage({
@@ -78,7 +81,7 @@ export function createServer() {
 
   // Start payment scheduler
   if (process.env.NODE_ENV !== "test") {
-    PaymentScheduler.start();
+    // startScheduler(); // TODO: Implement with Supabase
   }
 
   return app;

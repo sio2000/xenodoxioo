@@ -4,7 +4,7 @@ import { z } from "zod";
 import { validate } from "../middleware/validation";
 import { authenticate, optionalAuthenticate } from "../middleware/auth";
 import * as bookingService from "../services/booking.service";
-import prisma from "../lib/db";
+import { supabase } from "../lib/db";
 
 const router = Router();
 
@@ -128,9 +128,11 @@ router.post(
                 });
             }
 
-            const unit = await prisma.unit.findUnique({
-                where: { id: unitId },
-            });
+            const { data: unit } = await supabase
+                .from('units')
+                .select('*')
+                .eq('id', unitId)
+                .single();
 
             if (!unit) {
                 return res
@@ -138,30 +140,22 @@ router.post(
                     .json({ success: false, error: "Unit not found" });
             }
 
-            if (guests > unit.maxGuests) {
+            if (guests > unit.max_guests) {
                 return res.status(400).json({
                     success: false,
-                    error: `Maximum guests for this unit is ${unit.maxGuests}`,
+                    error: `Maximum guests for this unit is ${unit.max_guests}`,
                 });
             }
 
             // Check for overlapping bookings (simple availability)
-            const conflicting = await prisma.booking.findMany({
-                where: {
-                    unitId,
-                    status: {
-                        in: ["CONFIRMED", "DEPOSIT_PAID", "CHECKED_IN"],
-                    },
-                    OR: [
-                        {
-                            checkInDate: { lt: checkOut },
-                            checkOutDate: { gt: checkIn },
-                        },
-                    ],
-                },
-            });
+            const { data: conflicting } = await supabase
+                .from('bookings')
+                .select('*')
+                .eq('unit_id', unitId)
+                .in('status', ["CONFIRMED", "DEPOSIT_PAID", "CHECKED_IN"])
+                .or(`check_in_date.lt.${checkOut.toISOString()},check_out_date.gt.${checkIn.toISOString()}`);
 
-            if (conflicting.length > 0) {
+            if (conflicting && conflicting.length > 0) {
                 return res.status(409).json({
                     success: false,
                     error: "Unit is not available for selected dates",
@@ -180,9 +174,9 @@ router.post(
                 });
             }
 
-            const basePrice = unit.basePrice;
+            const basePrice = unit.base_price;
             const subtotal = basePrice * nights;
-            const cleaningFee = unit.cleaningFee || 0;
+            const cleaningFee = unit.cleaning_fee || 0;
             const taxableAmount = subtotal + cleaningFee;
             const taxes =
                 Math.round(taxableAmount * 0.15 * 100) / 100;
@@ -197,9 +191,9 @@ router.post(
                     unit: {
                         id: unit.id,
                         name: unit.name,
-                        maxGuests: unit.maxGuests,
-                        basePrice: unit.basePrice,
-                        cleaningFee: unit.cleaningFee,
+                        maxGuests: unit.max_guests,
+                        basePrice: unit.base_price,
+                        cleaningFee: unit.cleaning_fee,
                     },
                     pricing: {
                         nights,

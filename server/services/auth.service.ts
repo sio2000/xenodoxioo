@@ -1,11 +1,11 @@
-import prisma from "../lib/db";
+import { supabase } from "../lib/db";
 import {
   AuthError,
   ConflictError,
   NotFoundError,
   ValidationError,
 } from "../lib/errors";
-import jwt from "jsonwebtoken";
+import jwt, { SignOptions } from "jsonwebtoken";
 import bcrypt from "bcryptjs";
 import crypto from "crypto";
 
@@ -46,7 +46,7 @@ export function generateToken(
   payload: JwtPayload,
   expiresIn: string = JWT_EXPIRY,
 ): string {
-  return jwt.sign(payload, JWT_SECRET, { expiresIn });
+  return jwt.sign(payload, JWT_SECRET, { expiresIn } as any);
 }
 
 /**
@@ -55,7 +55,7 @@ export function generateToken(
 export function generateRefreshToken(payload: JwtPayload): string {
   return jwt.sign(payload, JWT_REFRESH_SECRET, {
     expiresIn: JWT_REFRESH_EXPIRY,
-  });
+  } as any);
 }
 
 /**
@@ -99,9 +99,11 @@ export async function registerUser(
   }
 
   // Check if user exists
-  const existingUser = await prisma.user.findUnique({
-    where: { email: email.toLowerCase() },
-  });
+  const { data: existingUser } = await supabase
+    .from('users')
+    .select('id')
+    .eq('email', email.toLowerCase())
+    .single();
 
   if (existingUser) {
     throw new ConflictError("User with this email already exists");
@@ -111,20 +113,31 @@ export async function registerUser(
   const hashedPassword = await hashPassword(password);
 
   // Create user
-  const user = await prisma.user.create({
-    data: {
+  const { data: user, error } = await supabase
+    .from('users')
+    .insert({
       email: email.toLowerCase(),
-      firstName,
-      lastName,
+      first_name: firstName,
+      last_name: lastName,
       password: hashedPassword,
-    },
-  });
+    })
+    .select()
+    .single();
+
+  if (error) {
+    console.error('Database error during user creation:', error);
+    throw new Error(`Failed to create user: ${error.message}`);
+  }
+
+  if (!user) {
+    throw new Error("Failed to create user: No data returned");
+  }
 
   return {
     id: user.id,
     email: user.email,
-    firstName: user.firstName,
-    lastName: user.lastName,
+    firstName: user.first_name,
+    lastName: user.last_name,
     role: user.role,
   };
 }
@@ -137,9 +150,11 @@ export async function loginUser(email: string, password: string) {
     throw new ValidationError("Email and password are required");
   }
 
-  const user = await prisma.user.findUnique({
-    where: { email: email.toLowerCase() },
-  });
+  const { data: user } = await supabase
+    .from('users')
+    .select('*')
+    .eq('email', email.toLowerCase())
+    .single();
 
   if (!user) {
     throw new AuthError("Invalid email or password");
@@ -161,21 +176,21 @@ export async function loginUser(email: string, password: string) {
 
   // Store session
   const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
-  await prisma.session.create({
-    data: {
-      userId: user.id,
+  await supabase
+    .from('sessions')
+    .insert({
+      user_id: user.id,
       token: accessToken,
-      refreshToken,
-      expiresAt,
-    },
-  });
+      refresh_token: refreshToken,
+      expires_at: expiresAt.toISOString(),
+    });
 
   return {
     user: {
       id: user.id,
       email: user.email,
-      firstName: user.firstName,
-      lastName: user.lastName,
+      firstName: user.first_name,
+      lastName: user.last_name,
       role: user.role,
     },
     accessToken,
@@ -189,17 +204,21 @@ export async function loginUser(email: string, password: string) {
 export async function refreshAccessToken(refreshToken: string) {
   const payload = verifyRefreshToken(refreshToken);
 
-  const session = await prisma.session.findUnique({
-    where: { refreshToken },
-  });
+  const { data: session } = await supabase
+    .from('sessions')
+    .select('*')
+    .eq('refresh_token', refreshToken)
+    .single();
 
-  if (!session || session.isRevoked) {
+  if (!session) {
     throw new AuthError("Invalid refresh token");
   }
 
-  const user = await prisma.user.findUnique({
-    where: { id: payload.userId },
-  });
+  const { data: user } = await supabase
+    .from('users')
+    .select('*')
+    .eq('id', payload.userId)
+    .single();
 
   if (!user) {
     throw new NotFoundError("User not found");
@@ -220,9 +239,11 @@ export async function refreshAccessToken(refreshToken: string) {
  * Request password reset
  */
 export async function requestPasswordReset(email: string) {
-  const user = await prisma.user.findUnique({
-    where: { email: email.toLowerCase() },
-  });
+  const { data: user } = await supabase
+    .from('users')
+    .select('*')
+    .eq('email', email.toLowerCase())
+    .single();
 
   if (!user) {
     // Don't reveal if user exists
@@ -233,13 +254,13 @@ export async function requestPasswordReset(email: string) {
   const resetToken = crypto.randomBytes(32).toString("hex");
   const expiresAt = new Date(Date.now() + 1 * 60 * 60 * 1000); // 1 hour
 
-  await prisma.passwordReset.create({
-    data: {
-      userId: user.id,
+  await supabase
+    .from('password_resets')
+    .insert({
+      user_id: user.id,
       token: resetToken,
-      expiresAt,
-    },
-  });
+      expires_at: expiresAt.toISOString(),
+    });
 
   // TODO: Send email with reset link
   // const resetLink = `${process.env.FRONTEND_URL}/reset-password?token=${resetToken}`;
@@ -256,29 +277,31 @@ export async function resetPassword(token: string, newPassword: string) {
     throw new ValidationError("Password must be at least 8 characters long");
   }
 
-  const resetRecord = await prisma.passwordReset.findUnique({
-    where: { token },
-  });
+  const { data: resetRecord } = await supabase
+    .from('password_resets')
+    .select('*')
+    .eq('token', token)
+    .single();
 
-  if (!resetRecord || resetRecord.isUsed) {
+  if (!resetRecord) {
     throw new AuthError("Invalid or expired reset token");
   }
 
-  if (new Date() > resetRecord.expiresAt) {
+  if (new Date() > new Date(resetRecord.expires_at)) {
     throw new AuthError("Reset token has expired");
   }
 
   const hashedPassword = await hashPassword(newPassword);
 
   await Promise.all([
-    prisma.user.update({
-      where: { id: resetRecord.userId },
-      data: { password: hashedPassword },
-    }),
-    prisma.passwordReset.update({
-      where: { id: resetRecord.id },
-      data: { isUsed: true },
-    }),
+    supabase
+      .from('users')
+      .update({ password: hashedPassword })
+      .eq('id', resetRecord.user_id),
+    supabase
+      .from('password_resets')
+      .update({ used: true })
+      .eq('id', resetRecord.id),
   ]);
 
   return { success: true };
@@ -288,10 +311,10 @@ export async function resetPassword(token: string, newPassword: string) {
  * Logout user
  */
 export async function logoutUser(token: string) {
-  await prisma.session.update({
-    where: { token },
-    data: { isRevoked: true },
-  });
+  await supabase
+    .from('sessions')
+    .update({ revoked: true })
+    .eq('token', token);
 
   return { success: true };
 }
@@ -300,29 +323,33 @@ export async function logoutUser(token: string) {
  * Get user by ID
  */
 export async function getUserById(userId: string) {
-  const user = await prisma.user.findUnique({
-    where: { id: userId },
-    select: {
-      id: true,
-      email: true,
-      firstName: true,
-      lastName: true,
-      phone: true,
-      address: true,
-      city: true,
-      zipCode: true,
-      country: true,
-      isEmailVerified: true,
-      role: true,
-      createdAt: true,
-    },
-  });
+  const { data: user } = await supabase
+    .from('users')
+    .select(`
+      id,
+      email,
+      first_name,
+      last_name,
+      role,
+      is_email_verified,
+      created_at
+    `)
+    .eq('id', userId)
+    .single();
 
   if (!user) {
     throw new NotFoundError("User not found");
   }
 
-  return user;
+  return {
+    id: user.id,
+    email: user.email,
+    firstName: user.first_name,
+    lastName: user.last_name,
+    role: user.role,
+    isEmailVerified: user.is_email_verified,
+    createdAt: user.created_at,
+  };
 }
 
 /**
@@ -340,27 +367,39 @@ export async function updateUserProfile(
     country?: string;
   },
 ) {
-  const user = await prisma.user.update({
-    where: { id: userId },
-    data: {
-      ...data,
-    },
-    select: {
-      id: true,
-      email: true,
-      firstName: true,
-      lastName: true,
-      phone: true,
-      address: true,
-      city: true,
-      zipCode: true,
-      country: true,
-      isEmailVerified: true,
-      createdAt: true,
-    },
-  });
+  const updateData: any = {};
+  if (data.firstName) updateData.first_name = data.firstName;
+  if (data.lastName) updateData.last_name = data.lastName;
+  // Add other fields as needed
 
-  return user;
+  const { data: user } = await supabase
+    .from('users')
+    .update(updateData)
+    .eq('id', userId)
+    .select(`
+      id,
+      email,
+      first_name,
+      last_name,
+      role,
+      is_email_verified,
+      created_at
+    `)
+    .single();
+
+  if (!user) {
+    throw new NotFoundError("User not found");
+  }
+
+  return {
+    id: user.id,
+    email: user.email,
+    firstName: user.first_name,
+    lastName: user.last_name,
+    role: user.role,
+    isEmailVerified: user.is_email_verified,
+    createdAt: user.created_at,
+  };
 }
 
 /**
@@ -375,9 +414,11 @@ export async function changePassword(
     throw new ValidationError("Password must be at least 8 characters long");
   }
 
-  const user = await prisma.user.findUnique({
-    where: { id: userId },
-  });
+  const { data: user } = await supabase
+    .from('users')
+    .select('password')
+    .eq('id', userId)
+    .single();
 
   if (!user) {
     throw new NotFoundError("User not found");
@@ -390,10 +431,10 @@ export async function changePassword(
 
   const hashedPassword = await hashPassword(newPassword);
 
-  await prisma.user.update({
-    where: { id: userId },
-    data: { password: hashedPassword },
-  });
+  await supabase
+    .from('users')
+    .update({ password: hashedPassword })
+    .eq('id', userId);
 
   return { success: true };
 }

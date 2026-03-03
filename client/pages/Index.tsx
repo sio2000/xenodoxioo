@@ -9,6 +9,11 @@ import {
   Wifi,
   Utensils,
   Waves,
+  Star,
+  Compass,
+  Camera,
+  Heart,
+  Clock,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useLanguage } from "@/hooks/useLanguage";
@@ -283,6 +288,131 @@ export default function Index() {
             })}
           </div>
         </div>
+      </section>
+
+      {/* Experiences Section */}
+      <section className="py-20 bg-gradient-to-b from-background to-primary/5">
+        <div className="container-max">
+          <div className="text-center mb-16">
+            <h2 className="text-3xl md:text-4xl font-bold text-foreground mb-4">
+              {t("home.experiences.title")}
+            </h2>
+            <p className="text-muted-foreground text-lg max-w-2xl mx-auto">
+              {t("home.experiences.subtitle")}
+            </p>
+          </div>
+
+          <div className="grid md:grid-cols-3 gap-8">
+            <div className="group relative overflow-hidden rounded-2xl bg-white shadow-lg hover:shadow-2xl transition-all duration-300">
+              <div className="aspect-video overflow-hidden">
+                <img 
+                  src="/beach.png" 
+                  alt="Περιπέτειες παραλίας και θάλασσας"
+                  className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
+                  onError={(e) => {
+                    e.currentTarget.src = "/village.png";
+                  }}
+                />
+              </div>
+              <div className="p-6">
+                <div className="flex items-center gap-2 mb-3">
+                  <Star className="w-5 h-5 text-accent fill-current" />
+                  <span className="text-sm font-semibold text-accent">{t("home.experiences.popular")}</span>
+                </div>
+                <h3 className="text-xl font-bold text-foreground mb-2">
+                  {t("home.experiences.beach.title")}
+                </h3>
+                <p className="text-muted-foreground text-sm mb-4">
+                  {t("home.experiences.beach.description")}
+                </p>
+                <div className="flex justify-between items-center">
+                  <div className="flex items-center gap-1">
+                    <Clock size={16} />
+                    <span>{t("home.experiences.beach.duration")}</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <Users size={16} />
+                    <span>{t("home.experiences.beach.group")}</span>
+                  </div>
+                  <Compass size={24} className="text-primary" />
+                </div>
+              </div>
+            </div>
+
+            <div className="group relative overflow-hidden rounded-2xl bg-white shadow-lg hover:shadow-2xl transition-all duration-300">
+              <div className="aspect-video overflow-hidden">
+                <img 
+                  src="/village.png" 
+                  alt="Περιηγήσεις πολιτιστικής κληρονομιάς"
+                  className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
+                  onError={(e) => {
+                    e.currentTarget.src = "/food.png";
+                  }}
+                />
+              </div>
+              <div className="p-6">
+                <div className="flex items-center gap-2 mb-3">
+                  <Heart className="w-5 h-5 text-accent fill-current" />
+                  <span className="text-sm font-semibold text-accent">{t("home.experiences.recommended")}</span>
+                </div>
+                <h3 className="text-xl font-bold text-foreground mb-2">
+                  {t("home.experiences.culture.title")}
+                </h3>
+                <p className="text-muted-foreground text-sm mb-4">
+                  {t("home.experiences.culture.description")}
+                </p>
+                <div className="flex justify-between items-center">
+                  <div className="flex items-center gap-1">
+                    <Clock size={16} />
+                    <span>{t("home.experiences.culture.duration")}</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <Users size={16} />
+                    <span>{t("home.experiences.culture.group")}</span>
+                  </div>
+                  <Camera size={24} className="text-primary" />
+                </div>
+              </div>
+            </div>
+
+            <div className="group relative overflow-hidden rounded-2xl bg-white shadow-lg hover:shadow-2xl transition-all duration-300">
+              <div className="aspect-video overflow-hidden">
+                <img 
+                  src="/food.png" 
+                  alt="Γαστρονομικά ταξίδια"
+                  className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
+                  onError={(e) => {
+                    e.currentTarget.src = "/beach.png";
+                  }}
+                />
+              </div>
+              <div className="p-6">
+                <div className="flex items-center gap-2 mb-3">
+                  <Star className="w-5 h-5 text-accent fill-current" />
+                  <span className="text-sm font-semibold text-accent">{t("home.experiences.exclusive")}</span>
+                </div>
+                <h3 className="text-xl font-bold text-foreground mb-2">
+                  {t("home.experiences.dining.title")}
+                </h3>
+                <p className="text-muted-foreground text-sm mb-4">
+                  {t("home.experiences.dining.description")}
+                </p>
+                <div className="flex justify-between items-center">
+                  <div className="flex items-center gap-1">
+                    <Clock size={16} />
+                    <span>{t("home.experiences.dining.duration")}</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <Users size={16} />
+                    <span>{t("home.experiences.dining.group")}</span>
+                  </div>
+                  <Utensils size={24} className="text-primary" />
+                </div>
+              </div>
+            </div>
+          </div>
+
+                  </div>
       </section>
 
       {/* Trust Section */}

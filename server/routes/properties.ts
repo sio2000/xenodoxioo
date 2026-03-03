@@ -1,122 +1,269 @@
 import { Router } from "express";
-import prisma from "../lib/db";
+import { supabase } from "../lib/db";
 
 const router = Router();
 
 // List all active properties with basic aggregated info
 router.get("/", async (_req, res, next) => {
   try {
-    const properties = await prisma.property.findMany({
-      where: { isActive: true },
-      orderBy: { createdAt: "desc" },
-    });
+    const { data: properties } = await supabase
+      .from('properties')
+      .select('*')
+      .eq('is_active', true)
+      .order('created_at', { ascending: false });
 
-    if (properties.length === 0) {
+    if (!properties || properties.length === 0) {
       return res.json({ success: true, data: [] });
     }
 
     const propertyIds = properties.map((p) => p.id);
 
-    // Aggregate units per property to get count and starting price
-    const unitAggregates = await prisma.unit.groupBy({
-      by: ["propertyId"],
-      where: {
-        propertyId: { in: propertyIds },
-        isActive: true,
-      },
-      _count: { _all: true },
-      _min: { basePrice: true },
-    });
+    // Get units for each property
+    const { data: units } = await supabase
+      .from('units')
+      .select('*')
+      .eq('is_active', true)
+      .in('property_id', propertyIds);
 
-    const unitsByProperty = new Map(
-      unitAggregates.map((u) => [u.propertyId, u]),
-    );
+    // Aggregate units per property
+    const aggregatedProperties = properties.map((property) => {
+      const propertyUnits = units?.filter((u) => u.property_id === property.id) || [];
+      const minPrice = propertyUnits.length > 0 
+        ? Math.min(...propertyUnits.map((u) => u.base_price))
+        : 0;
 
-    const data = properties.map((prop) => {
-      const unitAgg = unitsByProperty.get(prop.id);
-      let galleryImages: string[] = [];
-      try {
-        galleryImages = prop.galleryImages
-          ? (JSON.parse(prop.galleryImages) as string[])
-          : [];
-      } catch {
-        galleryImages = [];
-      }
+      // Parse unit images
+      const parsedUnits = propertyUnits.map(unit => {
+        let parsedImages = [];
+        if (unit.images) {
+          try {
+            if (typeof unit.images === 'string') {
+              parsedImages = JSON.parse(unit.images);
+            } else if (Array.isArray(unit.images)) {
+              parsedImages = unit.images;
+            }
+          } catch (error) {
+            console.log("⚠️ [PROPERTIES] Failed to parse images for unit:", unit.id, error);
+            parsedImages = [];
+          }
+        }
+
+        return {
+          ...unit,
+          images: parsedImages,
+          propertyId: unit.property_id,
+          maxGuests: unit.max_guests,
+          bedrooms: unit.bedrooms,
+          bathrooms: unit.bathrooms,
+          basePrice: unit.base_price,
+          cleaningFee: unit.cleaning_fee,
+          minStayDays: unit.min_stay_days,
+          isActive: unit.is_active
+        };
+      });
 
       return {
-        id: prop.id,
-        name: prop.name,
-        description: prop.description,
-        location: prop.location,
-        city: prop.city,
-        country: prop.country,
-        mainImage: prop.mainImage,
-        galleryImages,
-        isActive: prop.isActive,
-        unitsCount: unitAgg?._count?._all ?? 0,
-        startingFrom: unitAgg?._min?.basePrice ?? null,
+        id: property.id,
+        name: property.name,
+        slug: property.slug,
+        location: property.location,
+        city: property.city,
+        country: property.country,
+        description: property.description,
+        mainImage: property.main_image,
+        galleryImages: property.gallery_images,
+        isActive: property.is_active,
+        createdAt: property.created_at,
+        updatedAt: property.updated_at,
+        units: parsedUnits, // Include parsed units with proper image arrays
+        unitsCount: propertyUnits.length,
+        startingFrom: minPrice, // Add startingFrom field for homepage
+        _count: {
+          units: propertyUnits.length,
+        },
+        _min: {
+          basePrice: minPrice,
+        },
       };
     });
 
-    res.json({ success: true, data });
+    res.json({ success: true, data: aggregatedProperties });
   } catch (error) {
     next(error);
   }
 });
 
-// Get single property with its active units
-router.get("/:id", async (req, res, next) => {
+// Get single property by slug with its units
+router.get("/:slug", async (req, res, next) => {
   try {
-    const property = await prisma.property.findUnique({
-      where: { id: req.params.id },
-    });
+    const { slug } = req.params;
+
+    const { data: property } = await supabase
+      .from('properties')
+      .select('*')
+      .eq('slug', slug)
+      .eq('is_active', true)
+      .single();
 
     if (!property) {
-      return res.status(404).json({ success: false, error: "Property not found" });
+      return res.status(404).json({
+        success: false,
+        message: "Property not found",
+      });
     }
 
-    const units = await prisma.unit.findMany({
-      where: {
-        propertyId: property.id,
-        isActive: true,
-      },
-      orderBy: { createdAt: "asc" },
-    });
+    const { data: units } = await supabase
+      .from('units')
+      .select('*')
+      .eq('property_id', property.id)
+      .eq('is_active', true)
+      .order('base_price', { ascending: true });
 
-    let galleryImages: string[] = [];
-    try {
-      galleryImages = property.galleryImages
-        ? (JSON.parse(property.galleryImages) as string[])
-        : [];
-    } catch {
-      galleryImages = [];
-    }
+    const { data: amenities } = await supabase
+      .from('amenities')
+      .select('*')
+      .eq('property_id', property.id);
 
-    const unitsWithImages = units.map((u) => {
-      let images: string[] = [];
-      try {
-        images = u.images ? (JSON.parse(u.images) as string[]) : [];
-      } catch {
-        images = [];
+    // Transform units to match frontend expectations
+    const transformedUnits = (units || []).map(unit => {
+      // Parse images JSON string to array
+      let parsedImages = [];
+      if (unit.images) {
+        try {
+          if (typeof unit.images === 'string') {
+            parsedImages = JSON.parse(unit.images);
+          } else if (Array.isArray(unit.images)) {
+            parsedImages = unit.images;
+          }
+        } catch (error) {
+          console.log("⚠️ [PROPERTIES] Failed to parse images for unit:", unit.id, error);
+          parsedImages = [];
+        }
       }
-      const { images: _img, ...rest } = u;
-      return { ...rest, images };
+
+      return {
+        ...unit,
+        images: parsedImages,
+        propertyId: unit.property_id,
+        maxGuests: unit.max_guests,
+        bedrooms: unit.bedrooms,
+        bathrooms: unit.bathrooms,
+        basePrice: unit.base_price || 0, // Ensure basePrice is never undefined/null
+        cleaningFee: unit.cleaning_fee || 0,
+        minStayDays: unit.min_stay_days || 1,
+        isActive: unit.is_active
+      };
     });
 
-    res.json({
-      success: true,
-      data: {
-        property: {
-          ...property,
-          galleryImages,
-        },
-        units: unitsWithImages,
-      },
-    });
+    const result = {
+      ...property,
+      units: transformedUnits,
+      amenities: amenities || [],
+    };
+
+    res.json({ success: true, data: result });
   } catch (error) {
     next(error);
   }
 });
 
-export const propertiesRouter = router;
+// Get single property by ID
+router.get("/id/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    const { data: property, error } = await supabase
+      .from('properties')
+      .select('*')
+      .eq('id', id)
+      .eq('is_active', true)
+      .single();
+    
+    if (error || !property) {
+      return res.status(404).json({ success: false, message: "Property not found" });
+    }
+    
+    // Get units for this property
+    const { data: units } = await supabase
+      .from('units')
+      .select('*')
+      .eq('property_id', id)
+      .eq('is_active', true)
+      .order('base_price', { ascending: true });
+    
+    // Get amenities for this property
+    const { data: amenities } = await supabase
+      .from('amenities')
+      .select('*')
+      .eq('property_id', id);
+    
+    // Get reviews for this property
+    const { data: reviews } = await supabase
+      .from('reviews')
+      .select(`
+        *,
+        user:users(first_name, last_name)
+      `)
+      .eq('booking_id', 'in (SELECT id FROM bookings WHERE unit_id IN (SELECT id FROM units WHERE property_id = ' + id + '))');
+    
+    // Transform data for frontend
+    const transformedProperty = {
+      ...property,
+      // Handle gallery_images - it's already an array in your database
+      gallery_images: property.gallery_images || [],
+      // Transform units to match frontend expectations
+      units: (units || []).map(unit => {
+        // Parse images JSON string to array
+        let parsedImages = [];
+        if (unit.images) {
+          try {
+            if (typeof unit.images === 'string') {
+              parsedImages = JSON.parse(unit.images);
+            } else if (Array.isArray(unit.images)) {
+              parsedImages = unit.images;
+            }
+          } catch (error) {
+            console.log("⚠️ [PROPERTIES] Failed to parse images for unit:", unit.id, error);
+            parsedImages = [];
+          }
+        }
 
+        return {
+          ...unit,
+          images: parsedImages,
+          propertyId: property.id,
+          maxGuests: unit.max_guests,
+          bedrooms: unit.bedrooms,
+          bathrooms: unit.bathrooms,
+          basePrice: unit.base_price || 0, // Ensure basePrice is never undefined/null
+          cleaningFee: unit.cleaning_fee || 0,
+          minStayDays: unit.min_stay_days || 1,
+          isActive: unit.is_active
+        };
+      }),
+      amenities: amenities || [],
+      reviews: (reviews || []).map(review => ({
+        ...review,
+        userName: review.user ? `${review.user.first_name} ${review.user.last_name}` : 'Anonymous'
+      }))
+    };
+    
+    console.log("✅ [PROPERTIES] Property detail fetched:", {
+      id: property.id,
+      name: property.name,
+      unitsCount: units?.length || 0,
+      amenitiesCount: amenities?.length || 0
+    });
+    
+    res.json({ 
+      success: true, 
+      data: transformedProperty
+    });
+  } catch (error) {
+    console.error("❌ [PROPERTIES] Error fetching property detail:", error);
+    res.status(500).json({ success: false, message: "Failed to fetch property" });
+  }
+});
+
+export default router;
+export const propertiesRouter = router;

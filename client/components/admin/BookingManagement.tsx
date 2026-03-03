@@ -20,7 +20,10 @@ interface Booking {
     email: string;
     firstName: string;
     lastName: string;
-  };
+  } | null;
+  guestName?: string;
+  guestEmail?: string;
+  guestPhone?: string;
   checkInDate: string;
   checkOutDate: string;
   nights: number;
@@ -185,10 +188,10 @@ export default function BookingManagement() {
                   <td className="px-4 py-3 text-sm text-foreground">
                     <div>
                       <div className="font-medium">
-                        {booking.user ? `${booking.user.firstName} ${booking.user.lastName}` : 'Guest User'}
+                        {booking.user ? `${booking.user.firstName} ${booking.user.lastName}` : booking.guestName || 'Guest User'}
                       </div>
                       <div className="text-muted-foreground text-xs">
-                        {booking.user ? booking.user.email : 'No email'}
+                        {booking.user ? booking.user.email : booking.guestEmail || 'No email'}
                       </div>
                     </div>
                   </td>
@@ -322,12 +325,16 @@ function BookingDetailsModal({ booking, onClose, onStatusUpdate }: any) {
               <div>
                 <span className="text-muted-foreground">Name:</span>
                 <p className="text-foreground">
-                  {booking.user.firstName} {booking.user.lastName}
+                  {booking.user ? `${booking.user.firstName} ${booking.user.lastName}` : booking.guestName || 'Guest'}
                 </p>
               </div>
               <div>
                 <span className="text-muted-foreground">Email:</span>
-                <p className="text-foreground">{booking.user.email}</p>
+                <p className="text-foreground">{booking.user ? booking.user.email : booking.guestEmail || 'No email'}</p>
+              </div>
+              <div>
+                <span className="text-muted-foreground">Phone:</span>
+                <p className="text-foreground">{booking.guestPhone || 'Not provided'}</p>
               </div>
               <div>
                 <span className="text-muted-foreground">Guests:</span>

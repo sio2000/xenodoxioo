@@ -1,110 +1,117 @@
 import { Router } from "express";
-import prisma from "../lib/db";
+import { supabase } from "../lib/db";
 
 const router = Router();
 
 // List all active units with their parent property
 router.get("/", async (_req, res, next) => {
   try {
-    const units = await prisma.unit.findMany({
-      where: { isActive: true },
-      orderBy: { createdAt: "asc" },
-    });
+    const { data: units } = await supabase
+      .from('units')
+      .select(`
+        *,
+        property:properties(*)
+      `)
+      .eq('is_active', true)
+      .order('created_at', { ascending: true });
 
-    if (units.length === 0) {
+    if (!units) {
       return res.json({ success: true, data: [] });
     }
 
-    const propertyIds = Array.from(
-      new Set(units.map((u) => u.propertyId)),
-    );
-
-    const properties = await prisma.property.findMany({
-      where: { id: { in: propertyIds } },
-    });
-
-    const propertyById = new Map(properties.map((p) => [p.id, p]));
-
-    const data = units.map((unit) => {
-      let images: string[] = [];
-      try {
-        images = unit.images ? (JSON.parse(unit.images) as string[]) : [];
-      } catch {
-        images = [];
+    // Transform the data to match the expected interface
+    const transformedUnits = units?.map(unit => {
+      // Parse images JSON string to array
+      let parsedImages = [];
+      if (unit.images) {
+        try {
+          if (typeof unit.images === 'string') {
+            parsedImages = JSON.parse(unit.images);
+          } else if (Array.isArray(unit.images)) {
+            parsedImages = unit.images;
+          }
+        } catch (error) {
+          console.log("⚠️ [UNITS] Failed to parse images for unit:", unit.id, error);
+          parsedImages = [];
+        }
       }
 
-      const property = propertyById.get(unit.propertyId);
-
       return {
-        id: unit.id,
-        propertyId: unit.propertyId,
-        name: unit.name,
-        slug: unit.slug,
-        description: unit.description,
-        maxGuests: unit.maxGuests,
+        ...unit,
+        propertyId: unit.property_id,
+        maxGuests: unit.max_guests,
         bedrooms: unit.bedrooms,
         bathrooms: unit.bathrooms,
-        beds: unit.beds,
-        basePrice: unit.basePrice,
-        cleaningFee: unit.cleaningFee,
-        images,
-        minStayDays: unit.minStayDays,
-        isActive: unit.isActive,
-        property: property
-          ? {
-              id: property.id,
-              name: property.name,
-              city: property.city,
-              country: property.country,
-              location: property.location,
-              mainImage: property.mainImage,
-            }
-          : null,
+        basePrice: unit.base_price || 0, // Ensure basePrice is never undefined/null
+        cleaningFee: unit.cleaning_fee || 0,
+        images: parsedImages, // Use parsed array instead of JSON string
+        minStayDays: unit.min_stay_days || 1,
+        isActive: unit.is_active
       };
-    });
+    }) || [];
 
-    res.json({ success: true, data });
+    res.json({ success: true, data: transformedUnits });
   } catch (error) {
     next(error);
   }
 });
 
-// Get single unit with its property
-router.get("/:id", async (req, res, next) => {
+// Get single unit by slug
+router.get("/:slug", async (req, res, next) => {
   try {
-    const unit = await prisma.unit.findUnique({
-      where: { id: req.params.id },
-    });
+    const { slug } = req.params;
+
+    const { data: unit } = await supabase
+      .from('units')
+      .select(`
+        *,
+        property:properties(*)
+      `)
+      .eq('slug', slug)
+      .eq('is_active', true)
+      .single();
 
     if (!unit) {
-      return res.status(404).json({ success: false, error: "Unit not found" });
+      return res.status(404).json({
+        success: false,
+        message: "Unit not found",
+      });
     }
 
-    const property = await prisma.property.findUnique({
-      where: { id: unit.propertyId },
-    });
-
-    let images: string[] = [];
-    try {
-      images = unit.images ? (JSON.parse(unit.images) as string[]) : [];
-    } catch {
-      images = [];
+    // Parse images JSON string to array
+    let parsedImages = [];
+    if (unit.images) {
+      try {
+        if (typeof unit.images === 'string') {
+          parsedImages = JSON.parse(unit.images);
+        } else if (Array.isArray(unit.images)) {
+          parsedImages = unit.images;
+        }
+      } catch (error) {
+        console.log("⚠️ [UNITS] Failed to parse images for unit:", unit.id, error);
+        parsedImages = [];
+      }
     }
 
-    res.json({
-      success: true,
-      data: {
-        unit: {
-          ...unit,
-          images,
-        },
-        property,
-      },
-    });
+    // Transform the data to match the expected interface
+    const transformedUnit = {
+      ...unit,
+      propertyId: unit.property_id,
+      maxGuests: unit.max_guests,
+      bedrooms: unit.bedrooms,
+      bathrooms: unit.bathrooms,
+      basePrice: unit.base_price || 0, // Ensure basePrice is never undefined/null
+      cleaningFee: unit.cleaning_fee || 0,
+      images: parsedImages,
+      minStayDays: unit.min_stay_days || 1,
+      isActive: unit.is_active
+    };
+
+    res.json({ success: true, data: transformedUnit });
   } catch (error) {
     next(error);
   }
 });
 
+export default router;
 export const unitsRouter = router;
-

@@ -61,12 +61,12 @@ export default function Footer() {
             <h4 className="font-semibold text-foreground mb-4">{t("footer.company")}</h4>
             <ul className="space-y-2">
               <li>
-                <a
-                  href="#about"
+                <Link
+                  to="/about"
                   className="text-muted-foreground hover:text-primary transition-colors text-sm"
                 >
                   {t("footer.about")}
-                </a>
+                </Link>
               </li>
               <li>
                 <a
@@ -77,12 +77,12 @@ export default function Footer() {
                 </a>
               </li>
               <li>
-                <a
-                  href="#"
+                <Link
+                  to="/faq"
                   className="text-muted-foreground hover:text-primary transition-colors text-sm"
                 >
                   {t("footer.faqs")}
-                </a>
+                </Link>
               </li>
             </ul>
           </div>

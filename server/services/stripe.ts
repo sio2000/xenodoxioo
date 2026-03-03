@@ -1,5 +1,5 @@
 import Stripe from 'stripe';
-import prisma from '../lib/db';
+import { supabase } from '../lib/db';
 
 // Only initialize Stripe if we have the required environment variables
 const stripeSecretKey = process.env.STRIPE_SECRET_KEY;

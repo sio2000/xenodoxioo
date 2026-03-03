@@ -61,18 +61,18 @@ export default function About() {
         {/* Hero — full-bleed image, refined overlay */}
         <section className="relative h-[65vh] min-h-[420px] overflow-hidden">
           <img
-            src={propertyImages.hero}
+            src="/644024829_926388910567259_6978044638543006750_n.jpg"
             alt="Leonidion villas"
             className="absolute inset-0 w-full h-full object-cover"
           />
           <div className="absolute inset-0 bg-black/40" />
-          <div className="absolute inset-0 flex items-end">
-            <div className="container-max w-full pb-16 md:pb-20">
+          <div className="absolute inset-0 flex items-center justify-center">
+            <div className="container-max w-full">
               <motion.div
                 initial={{ opacity: 0, y: 24 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.7, delay: 0.2 }}
-                className="max-w-2xl"
+                className="max-w-2xl mx-auto text-center"
               >
                 <h1 className="luxury-heading text-4xl md:text-5xl lg:text-6xl text-white tracking-tight">
                   LEONIDIONHOUSES
@@ -97,8 +97,8 @@ export default function About() {
               {[
                 { label: t("about.trust.years"), value: t("about.trust.yearsVal") },
                 { label: t("about.trust.properties"), value: t("about.trust.propertiesVal") },
-                { label: t("about.trust.guests"), value: "—" },
-                { label: t("about.trust.reviews"), value: "—" },
+                { label: "Ευχαριστημένοι Επισκέπτες", value: "5000+" },
+                { label: "Θετικές Κριτικές", value: "100+" },
               ].map((item, i) => (
                 <motion.div key={i} variants={fadeIn} className="text-center">
                   <p className="text-2xl md:text-3xl luxury-heading text-foreground">{item.value}</p>
@@ -139,7 +139,7 @@ export default function About() {
               >
                 <div className="aspect-[4/5] rounded-lg overflow-hidden shadow-luxury-md">
                   <img
-                    src={propertyImages.interior}
+                    src="/645696801_1911893926199490_2525005987881341297_n.jpg"
                     alt="Villa interior"
                     className="w-full h-full object-cover"
                   />

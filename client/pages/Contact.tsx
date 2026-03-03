@@ -17,23 +17,30 @@ export default function Contact() {
   return (
     <Layout>
       <div className="min-h-screen bg-[#fafaf9]">
-        {/* Hero — understated, concierge tone */}
-        <section className="relative py-20 md:py-28 overflow-hidden">
-          <div className="absolute inset-0 bg-gradient-to-b from-muted/30 to-transparent" />
-          <div className="container-max relative">
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6 }}
-              className="max-w-2xl"
-            >
-              <h1 className="luxury-heading text-4xl md:text-5xl lg:text-6xl text-foreground tracking-tight">
-                {language === "el" ? "Επικοινωνία" : "Contact"}
-              </h1>
-              <p className="mt-4 text-lg md:text-xl text-muted-foreground leading-relaxed">
-                {t("contact.hero.subtitle")}
-              </p>
-            </motion.div>
+        {/* Hero — full-bleed image with centered content */}
+        <section className="relative h-[65vh] min-h-[420px] overflow-hidden">
+          <img
+            src="/642374359_2137655057550831_3099572580475220602_n.jpg"
+            alt="Contact Leonidion Houses"
+            className="absolute inset-0 w-full h-full object-cover"
+          />
+          <div className="absolute inset-0 bg-black/40" />
+          <div className="absolute inset-0 flex items-center justify-center">
+            <div className="container-max w-full">
+              <motion.div
+                initial={{ opacity: 0, y: 24 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.7, delay: 0.2 }}
+                className="max-w-2xl mx-auto text-center"
+              >
+                <h1 className="luxury-heading text-4xl md:text-5xl lg:text-6xl text-white tracking-tight">
+                  Επικοινωνία
+                </h1>
+                <p className="mt-4 text-lg md:text-xl text-white/90 font-light leading-relaxed">
+                  Είμαστε εδώ για να σας βοηθήσουμε. Επικοινωνήστε μαζί μας για κρατήσεις, ερωτήσεις ή υποστήριξη concierge.
+                </p>
+              </motion.div>
+            </div>
           </div>
         </section>
 
@@ -201,6 +208,46 @@ export default function Contact() {
                 </motion.div>
               </div>
             </div>
+          </div>
+        </section>
+
+        {/* Action Section */}
+        <section className="relative py-16 md:py-24 overflow-hidden">
+          <img
+            src="https://images.unsplash.com/photo-1582719508461-905c673771fd?w=1920&q=85"
+            alt="Leonidion sea view"
+            className="absolute inset-0 w-full h-full object-cover"
+          />
+          <div className="absolute inset-0 bg-black/50" />
+          <div className="relative container-max">
+            <motion.div
+              initial={{ opacity: 0, y: 24 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.6 }}
+              className="text-center max-w-3xl mx-auto"
+            >
+              <h2 className="luxury-heading text-3xl md:text-4xl text-white">
+                Έτοιμοι για την εμπειρία σας;
+              </h2>
+              <p className="mt-4 text-lg text-white/90 leading-relaxed">
+                Επικοινωνήστε μαζί μας σήμερα για να σχεδιάσουμε την ιδανική διαμονή σας στη Λεωνίδιο. Η ομάδα μας είναι εδώ για να κάνει το όνειρό σας πραγματικότητα.
+              </p>
+              <div className="mt-10 flex flex-col sm:flex-row gap-4 justify-center">
+                <a
+                  href="/properties"
+                  className="luxury-btn-primary"
+                >
+                  Δείτε τις Ιδιοκτησίες
+                </a>
+                <a
+                  href="tel:+302754051234"
+                  className="inline-flex items-center justify-center border border-white/20 px-8 py-3.5 font-medium text-white rounded-md hover:bg-white/10 transition-colors"
+                >
+                  Καλέστε Τώρα
+                </a>
+              </div>
+            </motion.div>
           </div>
         </section>
       </div>

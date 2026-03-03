@@ -1,14 +1,8 @@
-import prisma from "../lib/db";
-import sgMail from "@sendgrid/mail";
+import { supabase } from "../lib/db";
 
-const API_KEY = process.env.SENDGRID_API_KEY;
 const FROM_EMAIL =
-  process.env.SENDGRID_FROM_EMAIL || "noreply@leonidionhouses.com";
-const FROM_NAME = process.env.SENDGRID_FROM_NAME || "LEONIDIONHOUSES";
-
-if (API_KEY) {
-  sgMail.setApiKey(API_KEY);
-}
+  process.env.FROM_EMAIL || "noreply@leonidionhouses.com";
+const FROM_NAME = process.env.FROM_NAME || "LEONIDIONHOUSES";
 
 interface EmailOptions {
   to: string;
@@ -36,38 +30,30 @@ async function sendEmail(options: EmailOptions) {
     const { to, subject, html, type, userId, bookingId } = options;
 
     // Log email in database
-    const emailLog = await prisma.emailLog.create({
-      data: {
+    const { data: emailLog } = await supabase
+      .from('email_logs')
+      .insert({
         to,
         subject,
-        type: type as any,
-        userId,
-        bookingId,
+        type,
+        user_id: userId,
+        booking_id: bookingId,
         status: "PENDING",
-      },
-    });
+      })
+      .select()
+      .single();
 
-    // Send email via SendGrid
-    if (API_KEY) {
-      await sgMail.send({
-        to,
-        from: { email: FROM_EMAIL, name: FROM_NAME },
-        subject,
-        html,
-        trackingSettings: {
-          openTracking: { enable: true },
-          clickTracking: { enable: true },
-        },
-      });
+    // For now, just log the email (no external email service)
+    console.log("Email would be sent to:", to);
+    console.log("Subject:", subject);
+    console.log("Type:", type);
 
-      // Mark as sent
-      await prisma.emailLog.update({
-        where: { id: emailLog.id },
-        data: { status: "SENT", sentAt: new Date() },
-      });
-    } else {
-      console.log("SendGrid not configured. Email would be sent to:", to);
-      console.log("Subject:", subject);
+    // Mark as sent
+    if (emailLog) {
+      await supabase
+        .from('email_logs')
+        .update({ status: "SENT", sent_at: new Date().toISOString() })
+        .eq('id', emailLog.id);
     }
 
     return emailLog;
@@ -118,16 +104,16 @@ export async function sendBookingConfirmationEmail(
     <h2>Booking Details</h2>
     <ul>
       <li><strong>Booking Number:</strong> ${booking.bookingNumber}</li>
-      <li><strong>Room:</strong> ${booking.unit.property.name}</li>
-      <li><strong>Unit:</strong> ${booking.unit.name}</li>
+      <li><strong>Room:</strong> ${booking.unit?.property?.name || 'N/A'}</li>
+      <li><strong>Unit:</strong> ${booking.unit?.name || 'N/A'}</li>
       <li><strong>Check-in:</strong> ${new Date(booking.checkInDate).toLocaleDateString()}</li>
       <li><strong>Check-out:</strong> ${new Date(booking.checkOutDate).toLocaleDateString()}</li>
       <li><strong>Nights:</strong> ${booking.nights}</li>
       <li><strong>Guests:</strong> ${booking.guests}</li>
     </ul>
-    <h2>Total Amount: €${booking.totalPrice.toFixed(2)}</h2>
-    <p><strong>Deposit (25%):</strong> €${(booking.totalPrice * 0.25).toFixed(2)} (Due immediately)</p>
-    <p><strong>Balance (75%):</strong> €${(booking.totalPrice * 0.75).toFixed(2)} (Due 30 days before arrival)</p>
+    <h2>Total Amount: €${booking.totalPrice?.toFixed(2) || '0.00'}</h2>
+    <p><strong>Deposit (25%):</strong> €${((booking.totalPrice || 0) * 0.25).toFixed(2)} (Due immediately)</p>
+    <p><strong>Balance (75%):</strong> €${((booking.totalPrice || 0) * 0.75).toFixed(2)} (Due 30 days before arrival)</p>
     <a href="${process.env.FRONTEND_URL}/dashboard" style="background-color: #0677A1; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">View Booking</a>
     <p>Best regards,<br/>The LEONIDIONHOUSES Team</p>
   `;
@@ -166,8 +152,8 @@ export async function sendPaymentReceiptEmail(
     <ul>
       <li><strong>Booking Number:</strong> ${booking.bookingNumber}</li>
       <li><strong>Payment Type:</strong> ${paymentTypeText}</li>
-      <li><strong>Amount:</strong> €${payment.amount.toFixed(2)}</li>
-      <li><strong>Date:</strong> ${new Date(payment.createdAt).toLocaleDateString()}</li>
+      <li><strong>Amount:</strong> €${payment.amount?.toFixed(2) || '0.00'}</li>
+      <li><strong>Date:</strong> ${new Date(payment.createdAt || Date.now()).toLocaleDateString()}</li>
       <li><strong>Transaction ID:</strong> ${payment.stripeChargeId || "N/A"}</li>
     </ul>
     <p>Thank you for your payment!</p>
@@ -226,11 +212,11 @@ export async function sendArrivalReminderEmail(
   const html = `
     <h1>Arrival Reminder</h1>
     <p>Dear ${booking.guestName},</p>
-    <p>This is a friendly reminder that your check-in is tomorrow at the ${booking.unit.property.name}!</p>
+    <p>This is a friendly reminder that your check-in is tomorrow at the ${booking.unit?.property?.name || 'N/A'}!</p>
     <h2>Check-in Details</h2>
     <ul>
-      <li><strong>Room:</strong> ${booking.unit.property.name}</li>
-      <li><strong>Address:</strong> ${booking.unit.property.location}, ${booking.unit.property.city}</li>
+      <li><strong>Room:</strong> ${booking.unit?.property?.name || 'N/A'}</li>
+      <li><strong>Address:</strong> ${booking.unit?.property?.location || 'N/A'}, ${booking.unit?.property?.city || 'N/A'}</li>
       <li><strong>Check-in Date:</strong> ${checkInDate}</li>
       <li><strong>Check-in Time:</strong> 3:00 PM (or by arrangement)</li>
     </ul>
@@ -266,7 +252,7 @@ export async function sendCancellationConfirmationEmail(
     <h2>Cancellation Details</h2>
     <ul>
       <li><strong>Booking Number:</strong> ${booking.bookingNumber}</li>
-      <li><strong>Room:</strong> ${booking.unit.property.name}</li>
+      <li><strong>Room:</strong> ${booking.unit?.property?.name || 'N/A'}</li>
       <li><strong>Original Check-in:</strong> ${new Date(booking.checkInDate).toLocaleDateString()}</li>
       <li><strong>Refund Amount:</strong> €${refundAmount.toFixed(2)}</li>
     </ul>
@@ -298,7 +284,7 @@ export async function sendReviewRequestEmail(
   const html = `
     <h1>Share Your Experience</h1>
     <p>Dear ${booking.guestName},</p>
-    <p>Thank you for staying at ${booking.unit.property.name}! We'd love to hear about your experience.</p>
+    <p>Thank you for staying at ${booking.unit?.property?.name || 'N/A'}! We'd love to hear about your experience.</p>
     <p>Your review helps other guests make informed decisions and helps us improve our properties.</p>
     <a href="${reviewLink}" style="background-color: #0677A1; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Write a Review</a>
     <p>Best regards,<br/>The LEONIDIONHOUSES Team</p>
@@ -306,7 +292,7 @@ export async function sendReviewRequestEmail(
 
   return sendEmail({
     to: email,
-    subject: `Review Request - ${booking.unit.property.name}`,
+    subject: `Review Request - ${booking.unit?.property?.name || 'N/A'}`,
     html,
     type: "REVIEW_REQUEST",
     userId,

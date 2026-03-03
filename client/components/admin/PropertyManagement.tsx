@@ -11,15 +11,16 @@ interface Property {
   location: string;
   city: string;
   country: string;
-  mainImage: string;
-  galleryImages: string;
-  isActive: boolean;
+  main_image: string;
+  gallery_images: string;
+  is_active: boolean;
   units: {
     id: string;
     name: string;
     maxGuests: number;
     bedrooms: number;
     bathrooms: number;
+    beds: number;
     basePrice: number;
   }[];
 }
@@ -56,19 +57,32 @@ export default function PropertyManagement() {
 
   const fetchData = async () => {
     try {
+      console.log("🔍 [PROPERTIES] Fetching data...");
       const [propertiesRes, unitsRes] = await Promise.all([
         fetch(apiUrl("/api/admin/properties")),
         fetch(apiUrl("/api/admin/units"))
       ]);
 
+      console.log("🔍 [PROPERTIES] Properties response:", propertiesRes.status, propertiesRes.ok);
+      console.log("🔍 [PROPERTIES] Units response:", unitsRes.status, unitsRes.ok);
+
       if (propertiesRes.ok && unitsRes.ok) {
         const propertiesData = await propertiesRes.json();
         const unitsData = await unitsRes.json();
+        
+        console.log("✅ [PROPERTIES] Properties data:", propertiesData);
+        console.log("✅ [PROPERTIES] Units data:", unitsData);
+        
         setProperties(propertiesData);
         setUnits(unitsData);
+      } else {
+        console.error("❌ [PROPERTIES] Failed to fetch:", {
+          properties: propertiesRes.status,
+          units: unitsRes.status
+        });
       }
     } catch (error) {
-      console.error("Failed to fetch data:", error);
+      console.error("❌ [PROPERTIES] Network error:", error);
     } finally {
       setLoading(false);
     }
@@ -76,19 +90,46 @@ export default function PropertyManagement() {
 
   const handleCreateProperty = async (formData: any) => {
     try {
-      const submitData = new FormData();
-      submitData.append("name", formData.name);
-      submitData.append("description", formData.description);
-      submitData.append("location", formData.location || "");
-      submitData.append("city", formData.city);
-      submitData.append("country", formData.country);
+      let mainImageUrl = "https://picsum.photos/400/300?random=" + Date.now();
+      
+      // Upload main image if provided
       if (formData.mainImage instanceof File) {
-        submitData.append("mainImage", formData.mainImage);
+        const imageFormData = new FormData();
+        imageFormData.append('file', formData.mainImage);
+        
+        const uploadResponse = await fetch(apiUrl("/api/admin/upload-image"), {
+          method: "POST",
+          body: imageFormData,
+        });
+        
+        if (uploadResponse.ok) {
+          const uploadResult = await uploadResponse.json();
+          if (uploadResult.success) {
+            mainImageUrl = uploadResult.imageUrl;
+            console.log("✅ Image uploaded:", mainImageUrl);
+          }
+        } else {
+          console.error("❌ Image upload failed");
+        }
       }
+      
+      const submitData = {
+        name: formData.name,
+        description: formData.description || "",
+        location: formData.location || "",
+        city: formData.city,
+        country: formData.country,
+        main_image: mainImageUrl,
+        gallery_images: [],
+        is_active: true
+      };
 
       const response = await fetch(apiUrl("/api/admin/properties"), {
         method: "POST",
-        body: submitData,
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(submitData),
       });
 
       if (response.ok) {
@@ -97,14 +138,24 @@ export default function PropertyManagement() {
       } else {
         const error = await response.json();
         console.error("Failed to create property:", error);
+        alert(`Error: ${error.message || "Failed to create property"}`);
       }
     } catch (error) {
-      console.error("Failed to create property:", error);
+      console.error("Failed to fetch data:", error);
     }
   };
 
   const handleCreateUnit = async (formData: any) => {
     try {
+      console.log("🔍 [CLIENT] Creating unit with data:", formData);
+      
+      // Check if formData is valid
+      if (!formData || !formData.propertyId || !formData.name) {
+        console.error("❌ [CLIENT] Missing required unit data");
+        alert("Please select a property and enter unit name");
+        return;
+      }
+      
       const fd = new FormData();
       fd.append("propertyId", formData.propertyId || selectedProperty);
       fd.append("name", formData.name);
@@ -117,6 +168,8 @@ export default function PropertyManagement() {
       fd.append("minStayDays", String(formData.minStayDays));
       (formData.imageFiles || []).forEach((f: File) => fd.append("images", f));
 
+      console.log("🔍 [CLIENT] Sending FormData with entries:", Array.from(fd.entries()));
+
       const response = await fetch(apiUrl("/api/admin/units"), {
         method: "POST",
         body: fd,
@@ -128,9 +181,11 @@ export default function PropertyManagement() {
       } else {
         const err = await response.json();
         console.error("Failed to create unit:", err);
+        alert(`Error: ${err.message || "Failed to create unit"}`);
       }
     } catch (error) {
       console.error("Failed to create unit:", error);
+      alert("Failed to create unit");
     }
   };
 
@@ -259,20 +314,38 @@ export default function PropertyManagement() {
 
       {/* Properties List */}
       <div className="space-y-6">
-        {properties.map((property) => (
+        {properties.map((property) => {
+          const imageUrlSrc = imageUrl(property.main_image);
+          console.log(`🖼️ [IMAGE] Property: ${property.name}, Image URL: ${imageUrlSrc}`);
+          
+          return (
           <div key={property.id} className="bg-card border border-border rounded-lg p-6">
             <div className="flex justify-between items-start mb-4">
               <div className="flex gap-4">
                 <img
-                  src={imageUrl(property.mainImage)}
+                  src={imageUrlSrc}
                   alt={property.name}
-                  className="w-24 h-24 object-cover rounded-lg"
+                  className="w-24 h-24 object-cover rounded-lg border border-border"
+                  style={{
+                    backgroundColor: '#f3f4f6',
+                    backgroundImage: `url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300"><rect fill="%23f3f4f6" width="400" height="300"/><text x="50%" y="50%" text-anchor="middle" dy=".3em" fill="%239ca3af" font-family="sans-serif" font-size="14">Loading...</text></svg>')`,
+                    backgroundSize: 'cover',
+                    backgroundPosition: 'center'
+                  }}
+                  onError={(e: any) => {
+                    console.error(`❌ [IMAGE] Failed to load: ${imageUrlSrc}`);
+                    e.currentTarget.src = `https://picsum.photos/400/300?random=${property.id}&blur=2`;
+                  }}
+                  onLoad={(e: any) => {
+                    console.log(`✅ [IMAGE] Loaded: ${property.name}`);
+                    e.currentTarget.style.backgroundImage = 'none';
+                  }}
                 />
                 <div>
                   <h3 className="text-lg font-bold text-foreground">{property.name}</h3>
                   <p className="text-muted-foreground">{property.location}</p>
                   <p className="text-sm text-muted-foreground mt-1">
-                    {property.units.length} units
+                    {property.units?.length || 0} units
                   </p>
                 </div>
               </div>
@@ -329,7 +402,8 @@ export default function PropertyManagement() {
                 ))}
             </div>
           </div>
-        ))}
+        );
+      })}
       </div>
 
       {/* Property Form Modal */}
@@ -497,6 +571,7 @@ function UnitForm({ unit, propertyId, properties, onSubmit, onClose, onPropertyC
     minStayDays: unit?.minStayDays ?? 1,
     imageFiles: [] as File[],
     existingImages: existingImgs,
+    propertyId: propertyId ?? "",
   });
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -519,7 +594,7 @@ function UnitForm({ unit, propertyId, properties, onSubmit, onClose, onPropertyC
               value={propertyId}
               onChange={(e) => {
                 onPropertyChange(e.target.value);
-                setFormData({ ...formData });
+                setFormData({ ...formData, propertyId: e.target.value });
               }}
               className="w-full p-2 border border-border rounded-md bg-background text-foreground"
               required
@@ -650,11 +725,19 @@ function UnitForm({ unit, propertyId, properties, onSubmit, onClose, onPropertyC
               }}
               className="w-full p-2 border border-border rounded-md bg-background text-foreground"
             />
-            {formData.existingImages.length > 0 && (
+            {(formData.existingImages?.length || 0) > 0 && (
               <div className="mt-2 flex flex-wrap gap-2">
                 {formData.existingImages.map((url: string, i: number) => (
                   <div key={i} className="relative">
-                    <img src={url} alt="" className="w-20 h-20 object-cover rounded border" />
+                    <img 
+                      src={imageUrl(url)} 
+                      alt="" 
+                      className="w-20 h-20 object-cover rounded border" 
+                      onError={(e: any) => {
+                        console.error(`❌ [UNIT IMAGE] Failed to load: ${url}`);
+                        e.currentTarget.src = `https://picsum.photos/80/80?random=${i}&blur=2`;
+                      }}
+                    />
                     <button
                       type="button"
                       onClick={() =>
@@ -671,7 +754,7 @@ function UnitForm({ unit, propertyId, properties, onSubmit, onClose, onPropertyC
                 ))}
               </div>
             )}
-            {formData.imageFiles.length > 0 && (
+            {(formData.imageFiles?.length || 0) > 0 && (
               <div className="mt-2 flex flex-wrap gap-2">
                 {formData.imageFiles.map((f, i) => (
                   <img

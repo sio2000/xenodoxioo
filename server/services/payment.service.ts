@@ -1,4 +1,4 @@
-import prisma from "../lib/db";
+import { supabase } from "../lib/db";
 import { NotFoundError, AppError, ValidationError } from "../lib/errors";
 import Stripe from "stripe";
 
@@ -20,27 +20,35 @@ export async function createPaymentIntent(
   userId: string,
   paymentType: "DEPOSIT" | "BALANCE" | "FULL" = "DEPOSIT",
 ) {
-  const booking = await prisma.booking.findUnique({
-    where: { id: bookingId },
-    include: { user: true, unit: { include: { property: true } } },
-  });
+  const { data: booking } = await supabase
+    .from('bookings')
+    .select(`
+      *,
+      user:users(*),
+      unit:units(
+        *,
+        property:properties(*)
+      )
+    `)
+    .eq('id', bookingId)
+    .single();
 
   if (!booking) {
     throw new NotFoundError("Booking not found");
   }
 
-  if (booking.userId !== userId) {
+  if (booking.user_id !== userId) {
     throw new AppError(403, "Unauthorized access to this booking");
   }
 
   // Calculate amount based on payment type (amount in cents)
-  let amount = Math.round(booking.totalPrice * 100);
+  let amount = Math.round((booking.total_price || 0) * 100);
   if (paymentType === "DEPOSIT") {
-    amount = Math.round(booking.totalPrice * 0.25 * 100); // 25% deposit
+    amount = Math.round((booking.total_price || 0) * 0.25 * 100); // 25% deposit
   } else if (paymentType === "BALANCE") {
-    amount = Math.round(booking.totalPrice * 0.75 * 100); // 75% balance
+    amount = Math.round((booking.total_price || 0) * 0.75 * 100); // 75% balance
   } else {
-    amount = Math.round(booking.totalPrice * 100);
+    amount = Math.round((booking.total_price || 0) * 100);
   }
 
   if (amount < 50) {
@@ -48,318 +56,319 @@ export async function createPaymentIntent(
   }
 
   // Create Stripe payment intent
-  const paymentIntent = await getStripe().paymentIntents.create({
-    amount, // in cents
+  const stripe = getStripe();
+  const paymentIntent = await stripe.paymentIntents.create({
+    amount,
     currency: "eur",
     metadata: {
       bookingId,
-      bookingNumber: booking.bookingNumber,
       userId,
       paymentType,
     },
-    receipt_email: booking.guestEmail,
-    description: `Booking ${booking.bookingNumber} - ${booking.unit.property.name}`,
-  });
-
-  // Store payment record (amount stored in euros)
-  const payment = await prisma.payment.create({
-    data: {
-      bookingId,
-      userId,
-      amount: amount / 100, // amount in euros
-      currency: "EUR",
-      paymentType: paymentType as any,
-      stripePaymentIntentId: paymentIntent.id,
-      status: "PROCESSING",
-      description: `${paymentType} payment for booking ${booking.bookingNumber}`,
-      metadata: JSON.stringify({
-        propertyId: booking.unit.propertyId,
-        unitId: booking.unitId,
-      }),
+    automatic_payment_methods: {
+      enabled: true,
     },
   });
 
+  // Create payment record
+  const { data: payment } = await supabase
+    .from('payments')
+    .insert({
+      booking_id: bookingId,
+      user_id: userId,
+      amount: amount / 100,
+      currency: "EUR",
+      payment_type: paymentType,
+      stripe_payment_intent_id: paymentIntent.id,
+      status: "PENDING",
+    })
+    .select()
+    .single();
+
   return {
     clientSecret: paymentIntent.client_secret,
-    paymentIntentId: paymentIntent.id,
-    amount: amount / 100,
-    currency: "EUR",
+    paymentId: payment?.id,
   };
 }
 
 /**
- * Confirm payment after Stripe processes it
+ * Process successful payment
  */
-export async function confirmPayment(paymentIntentId: string) {
-  // Verify with Stripe
-  const paymentIntent = await getStripe().paymentIntents.retrieve(paymentIntentId);
+export async function processSuccessfulPayment(
+  paymentIntentId: string,
+  chargeId?: string,
+) {
+  const stripe = getStripe();
+  const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
 
-  if (paymentIntent.status !== "succeeded") {
-    throw new AppError(400, `Payment status is ${paymentIntent.status}`);
+  const { data: payment } = await supabase
+    .from('payments')
+    .select('*')
+    .eq('stripe_payment_intent_id', paymentIntentId)
+    .single();
+
+  if (!payment) {
+    throw new NotFoundError("Payment record not found");
   }
 
   // Update payment record
-  const payment = await prisma.payment.findUnique({
-    where: { stripePaymentIntentId: paymentIntentId },
-  });
+  const updateData: any = {
+    status: "COMPLETED",
+    processed_at: new Date().toISOString(),
+  };
+
+  if (chargeId) {
+    updateData.stripe_charge_id = chargeId;
+  }
+
+  // Get Stripe customer ID if available
+  if (paymentIntent.customer) {
+    updateData.stripe_customer_id = paymentIntent.customer as string;
+  }
+
+  await supabase
+    .from('payments')
+    .update(updateData)
+    .eq('id', payment.id);
+
+  // Update booking payment status
+  await updateBookingPaymentStatus(payment.booking_id, payment.payment_type);
+
+  return payment;
+}
+
+/**
+ * Update booking payment status
+ */
+async function updateBookingPaymentStatus(
+  bookingId: string,
+  paymentType: string,
+) {
+  const { data: booking } = await supabase
+    .from('bookings')
+    .select('*')
+    .eq('id', bookingId)
+    .single();
+
+  if (!booking) return;
+
+  const { data: payments } = await supabase
+    .from('payments')
+    .select('*')
+    .eq('booking_id', bookingId)
+    .eq('status', 'COMPLETED');
+
+  const totalPaid = payments?.reduce((sum, p) => sum + (p.amount || 0), 0) || 0;
+
+  const updateData: any = {
+    total_paid: totalPaid,
+  };
+
+  // Update specific payment flags
+  if (paymentType === "DEPOSIT") {
+    updateData.deposit_paid = true;
+  } else if (paymentType === "BALANCE") {
+    updateData.balance_paid = true;
+  } else if (paymentType === "FULL") {
+    updateData.deposit_paid = true;
+    updateData.balance_paid = true;
+  }
+
+  // Update overall payment status
+  if (totalPaid >= (booking.total_price || 0)) {
+    updateData.payment_status = "PAID";
+    updateData.status = "CONFIRMED";
+  } else if (totalPaid > 0) {
+    updateData.payment_status = "PARTIAL";
+  }
+
+  await supabase
+    .from('bookings')
+    .update(updateData)
+    .eq('id', bookingId);
+}
+
+/**
+ * Get payment by ID
+ */
+export async function getPaymentById(paymentId: string) {
+  const { data: payment } = await supabase
+    .from('payments')
+    .select(`
+      *,
+      booking:bookings(
+        *,
+        unit:units(
+          *,
+          property:properties(*)
+        )
+      )
+    `)
+    .eq('id', paymentId)
+    .single();
 
   if (!payment) {
     throw new NotFoundError("Payment not found");
   }
 
-  const stripeCharge = (paymentIntent as any).latest_charge;
-  const chargeId = stripeCharge?.id;
+  return payment;
+}
 
-  const updatedPayment = await prisma.payment.update({
-    where: { id: payment.id },
-    data: {
-      status: "SUCCEEDED",
-      stripeChargeId: chargeId,
+/**
+ * Get user payments
+ */
+export async function getUserPayments(userId: string) {
+  const { data: payments } = await supabase
+    .from('payments')
+    .select(`
+      *,
+      booking:bookings(
+        *,
+        unit:units(
+          *,
+          property:properties(*)
+        )
+      )
+    `)
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false });
+
+  return payments || [];
+}
+
+/**
+ * Refund payment
+ */
+export async function refundPayment(paymentId: string, reason?: string) {
+  const { data: payment } = await supabase
+    .from('payments')
+    .select('*')
+    .eq('id', paymentId)
+    .single();
+
+  if (!payment) {
+    throw new NotFoundError("Payment not found");
+  }
+
+  if (payment.status !== "COMPLETED") {
+    throw new ValidationError("Payment cannot be refunded");
+  }
+
+  if (!payment.stripe_charge_id) {
+    throw new ValidationError("No charge ID found for refund");
+  }
+
+  const stripe = getStripe();
+  const refund = await stripe.refunds.create({
+    charge: payment.stripe_charge_id,
+    reason: "requested_by_customer",
+    metadata: {
+      paymentId,
+      reason: reason || "Customer requested refund",
     },
   });
 
-  // Update booking status
-  const booking = await prisma.booking.findUnique({
-    where: { id: payment.bookingId },
-  });
-
-  if (!booking) {
-    throw new NotFoundError("Booking not found");
-  }
-
-  let newStatus = "DEPOSIT_PAID";
-  if (payment.paymentType === "BALANCE" || payment.paymentType === "FULL") {
-    newStatus = "CONFIRMED";
-
-    // Schedule balance payment if deposit was paid
-    if (payment.paymentType === "DEPOSIT") {
-      const daysBeforeCheckIn = 30;
-      const scheduledFor = new Date(booking.checkInDate);
-      scheduledFor.setDate(scheduledFor.getDate() - daysBeforeCheckIn);
-
-      // Create scheduled payment record for balance
-      await prisma.payment.create({
-        data: {
-          bookingId: booking.id,
-          userId: booking.userId,
-          amount: Math.round(booking.totalPrice * 0.75 * 100) / 100,
-          currency: "EUR",
-          paymentType: "BALANCE",
-          status: "PENDING",
-          scheduledFor,
-          description: `Balance payment for booking ${booking.bookingNumber}`,
-        },
-      });
-    }
-  }
-
-  await prisma.booking.update({
-    where: { id: booking.id },
-    data: { status: newStatus as any },
-  });
+  // Update payment record
+  await supabase
+    .from('payments')
+    .update({
+      status: "REFUNDED",
+      refund_amount: payment.amount,
+      is_refundable: false,
+    })
+    .eq('id', paymentId);
 
   return {
-    success: true,
-    payment: updatedPayment,
-    booking: await prisma.booking.findUnique({
-      where: { id: booking.id },
-    }),
+    refundId: refund.id,
+    amount: refund.amount,
+    status: refund.status,
   };
 }
 
 /**
- * Handle Stripe webhook events
+ * Handle Stripe webhook
  */
-export async function handleStripeWebhook(event: Stripe.Event) {
-  switch (event.type) {
-    case "payment_intent.succeeded": {
-      const paymentIntent = event.data.object as Stripe.PaymentIntent;
-      await confirmPayment(paymentIntent.id);
-      break;
-    }
-
-    case "payment_intent.payment_failed": {
-      const paymentIntent = event.data.object as Stripe.PaymentIntent;
-      const payment = await prisma.payment.findUnique({
-        where: { stripePaymentIntentId: paymentIntent.id },
-      });
-
-      if (payment) {
-        await prisma.payment.update({
-          where: { id: payment.id },
-          data: {
-            status: "FAILED",
-            lastError: paymentIntent.last_payment_error?.message,
-            failureCount: payment.failureCount + 1,
-          },
-        });
-      }
-      break;
-    }
-
-    case "charge.refunded": {
-      const charge = event.data.object as Stripe.Charge;
-      const payment = await prisma.payment.findUnique({
-        where: { stripeChargeId: charge.id as string },
-      });
-
-      if (payment) {
-        await prisma.payment.update({
-          where: { id: payment.id },
-          data: {
-            status: "REFUNDED",
-            stripeRefundId: charge.refunds.data[0]?.id,
-          },
-        });
-      }
-      break;
-    }
-  }
-}
-
-/**
- * Refund a payment
- */
-export async function refundPayment(
-  bookingId: string,
-  userId: string,
-  reason?: string,
+export async function handleStripeWebhook(
+  eventType: string,
+  event: any,
 ) {
-  const booking = await prisma.booking.findUnique({
-    where: { id: bookingId },
-  });
+  switch (eventType) {
+    case "payment_intent.succeeded":
+      await processSuccessfulPayment(event.data.object.id, event.data.object.charges?.data[0]?.id);
+      break;
 
-  if (!booking) {
-    throw new NotFoundError("Booking not found");
+    case "payment_intent.payment_failed":
+      await handlePaymentFailure(event.data.object.id);
+      break;
+
+    case "charge.dispute.created":
+      await handleDispute(event.data.object);
+      break;
+
+    default:
+      console.log(`Unhandled webhook event: ${eventType}`);
   }
-
-  if (booking.userId !== userId) {
-    throw new AppError(403, "Unauthorized access to this booking");
-  }
-
-  if (!["CONFIRMED", "DEPOSIT_PAID"].includes(booking.status)) {
-    throw new AppError(400, "This booking cannot be refunded");
-  }
-
-  // Get successful payment
-  const payment = await prisma.payment.findFirst({
-    where: {
-      bookingId,
-      status: "SUCCEEDED",
-    },
-  });
-
-  if (!payment || !payment.stripeChargeId) {
-    throw new AppError(400, "No successful payment found to refund");
-  }
-
-  // Calculate refund based on cancellation policy
-  const daysBeforeCheckIn = Math.ceil(
-    (booking.checkInDate.getTime() - new Date().getTime()) /
-      (1000 * 60 * 60 * 24),
-  );
-
-  let refundPercentage = 0;
-  if (daysBeforeCheckIn > 60) {
-    refundPercentage = 0.75;
-  } else if (daysBeforeCheckIn > 30) {
-    refundPercentage = 0.5;
-  }
-
-  const refundAmount = Math.round(booking.totalPrice * refundPercentage * 100);
-
-    if (refundAmount > 0) {
-      // Create Stripe refund
-      const refund = await getStripe().refunds.create({
-        charge: payment.stripeChargeId,
-        amount: refundAmount,
-        metadata: {
-          bookingId,
-          reason: reason || "Cancellation",
-        },
-      });
-
-    // Update payment
-    await prisma.payment.update({
-      where: { id: payment.id },
-      data: {
-        status: "REFUNDED",
-        stripeRefundId: refund.id,
-      },
-    });
-  }
-
-  // Update booking
-  await prisma.booking.update({
-    where: { id: bookingId },
-    data: {
-      status: "CANCELLED",
-      cancellationReason: reason,
-      cancelledAt: new Date(),
-    },
-  });
-
-  return {
-    success: true,
-    refundAmount: refundAmount / 100,
-    refundPercentage: Math.round(refundPercentage * 100),
-  };
 }
 
 /**
- * Get payment history for booking
+ * Handle payment failure
+ */
+async function handlePaymentFailure(paymentIntentId: string) {
+  const { data: payment } = await supabase
+    .from('payments')
+    .select('*')
+    .eq('stripe_payment_intent_id', paymentIntentId)
+    .single();
+
+  if (!payment) return;
+
+  await supabase
+    .from('payments')
+    .update({
+      status: "FAILED",
+      last_error: "Payment failed",
+      failure_count: (payment.failure_count || 0) + 1,
+    })
+    .eq('id', payment.id);
+}
+
+/**
+ * Get payment history for a booking
  */
 export async function getPaymentHistory(bookingId: string) {
-  const payments = await prisma.payment.findMany({
-    where: { bookingId },
-    orderBy: { createdAt: "desc" },
-  });
+  const { data: payments } = await supabase
+    .from('payments')
+    .select('*')
+    .eq('booking_id', bookingId)
+    .order('created_at', { ascending: false });
 
-  return payments;
+  return payments || [];
 }
 
 /**
- * Process scheduled payments (called by a cron job)
+ * Handle payment dispute
  */
-export async function processScheduledPayments() {
-  const now = new Date();
+async function handleDispute(charge: any) {
+  // Find payment by charge ID
+  const { data: payment } = await supabase
+    .from('payments')
+    .select('*')
+    .eq('stripe_charge_id', charge.id)
+    .single();
 
-  const scheduledPayments = await prisma.payment.findMany({
-    where: {
-      status: "PENDING",
-      scheduledFor: { lte: now },
-    },
-  });
+  if (!payment) return;
 
-  for (const payment of scheduledPayments) {
-    try {
-      // Create payment intent for scheduled payment
-      const paymentIntent = await getStripe().paymentIntents.create({
-        amount: Math.round(payment.amount * 100),
-        currency: payment.currency.toLowerCase(),
-        metadata: {
-          paymentId: payment.id,
-          bookingId: payment.bookingId,
-          paymentType: payment.paymentType,
-        },
-      });
+  // Update payment with dispute information
+  await supabase
+    .from('payments')
+    .update({
+      status: "DISPUTED",
+      last_error: `Payment disputed: ${charge.reason}`,
+    })
+    .eq('id', payment.id);
 
-      await prisma.payment.update({
-        where: { id: payment.id },
-        data: {
-          stripePaymentIntentId: paymentIntent.id,
-          status: "PROCESSING",
-        },
-      });
-    } catch (error: any) {
-      console.error(`Error processing scheduled payment ${payment.id}:`, error);
-      await prisma.payment.update({
-        where: { id: payment.id },
-        data: {
-          failureCount: payment.failureCount + 1,
-          lastError: error.message,
-        },
-      });
-    }
-  }
+  // You might want to:
+  // 1. Notify admin via email
+  // 2. Update booking status
+  // 3. Log the dispute for review
 }

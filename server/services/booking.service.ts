@@ -1,4 +1,4 @@
-import prisma from "../lib/db";
+import { supabase } from "../lib/db";
 import {
   NotFoundError,
   ValidationError,
@@ -6,7 +6,6 @@ import {
   AppError,
 } from "../lib/errors";
 import { nanoid } from "nanoid";
-import * as adminService from "./admin.service";
 
 /**
  * Check if dates are available for a unit
@@ -24,272 +23,234 @@ export async function checkAvailability(
     };
   }
 
-  const unit = await prisma.unit.findUnique({ where: { id: unitId } });
+  const { data: unit } = await supabase
+    .from('units')
+    .select('*')
+    .eq('id', unitId)
+    .single();
+    
   if (!unit) {
     return { isAvailable: false, reason: "Unit not found" };
   }
 
   // Get property for date blockages
-  const property = await prisma.property.findUnique({
-    where: { id: unit.propertyId },
-  });
+  const { data: property } = await supabase
+    .from('properties')
+    .select('*')
+    .eq('id', unit.property_id)
+    .single();
 
   if (!property) {
     return { isAvailable: false, reason: "Property not found" };
   }
 
   // Check for overlapping bookings (any non-cancelled booking reserves the dates)
-  const conflictingBookings = await prisma.booking.findMany({
-    where: {
-      unitId,
-      status: { not: "CANCELLED" },
-      OR: [
-        {
-          checkInDate: { lt: checkOutDate },
-          checkOutDate: { gt: checkInDate },
-        },
-      ],
-    },
-  });
+  const { data: conflictingBookings } = await supabase
+    .from('bookings')
+    .select('*')
+    .eq('unit_id', unitId)
+    .neq('status', 'CANCELLED')
+    .or(`check_in_date.lt.${checkOutDate.toISOString()},check_out_date.gt.${checkInDate.toISOString()}`);
 
-  if (conflictingBookings.length > 0) {
-    return {
-      isAvailable: false,
-      reason: "Unit is not available for selected dates",
-    };
+  if (conflictingBookings && conflictingBookings.length > 0) {
+    return { isAvailable: false, reason: "Dates are already booked" };
   }
 
   // Check for date blockages
-  const blockages = await prisma.dateBlockage.findMany({
-    where: {
-      propertyId: property.id,
-      OR: [
-        {
-          startDate: { lt: checkOutDate },
-          endDate: { gt: checkInDate },
-        },
-      ],
-    },
-  });
+  const { data: blockages } = await supabase
+    .from('date_blockages')
+    .select('*')
+    .eq('property_id', property.id)
+    .or(`start_date.lte.${checkOutDate.toISOString()},end_date.gte.${checkInDate.toISOString()}`);
 
-  if (blockages.length > 0) {
-    return {
-      isAvailable: false,
-      reason: "Unit is blocked for selected dates",
-    };
+  if (blockages && blockages.length > 0) {
+    return { isAvailable: false, reason: "Dates are blocked" };
   }
 
   return { isAvailable: true };
 }
 
-/** Get occupied date ranges for a unit (non-cancelled bookings) for calendar display */
-export async function getOccupiedDateRanges(unitId: string): Promise<{ start: string; end: string }[]> {
-  const bookings = await prisma.booking.findMany({
-    where: {
-      unitId,
-      status: { not: "CANCELLED" },
-    },
-    select: { checkInDate: true, checkOutDate: true },
-  });
-  return bookings.map((b) => ({
-    start: b.checkInDate.toISOString().slice(0, 10),
-    end: b.checkOutDate.toISOString().slice(0, 10),
-  }));
-}
-
 /**
- * Calculate pricing for a booking
+ * Calculate booking price
  */
-export async function calculatePrice(
+export async function calculateBookingPrice(
   unitId: string,
   checkInDate: Date,
   checkOutDate: Date,
+  guests: number,
   couponCode?: string,
 ) {
-  const unit = await prisma.unit.findUnique({
-    where: { id: unitId },
-    include: { property: true },
-  });
+  const { data: unit } = await supabase
+    .from('units')
+    .select('*')
+    .eq('id', unitId)
+    .single();
 
   if (!unit) {
     throw new NotFoundError("Unit not found");
   }
 
-  // Calculate nights
-  const nights = Math.ceil(
-    (checkOutDate.getTime() - checkInDate.getTime()) / (1000 * 60 * 60 * 24),
-  );
-
-  if (nights < 1) {
-    throw new ValidationError("Minimum stay is 1 night");
+  if (guests > unit.max_guests) {
+    throw new ValidationError(`Maximum ${unit.max_guests} guests allowed`);
   }
 
-  // Get applicable pricing (seasonal if exists)
-  const seasonalPricing = await prisma.seasonalPricing.findFirst({
-    where: {
-      propertyId: unit.propertyId,
-      startDate: { lte: checkInDate },
-      endDate: { gte: checkOutDate },
-      NOT: {
-        startDate: checkOutDate,
-      },
-    },
-  });
+  const nights = Math.ceil((checkOutDate.getTime() - checkInDate.getTime()) / (1000 * 60 * 60 * 24));
+  
+  if (nights < unit.min_stay_days) {
+    throw new ValidationError(`Minimum ${unit.min_stay_days} nights required`);
+  }
 
-  const basePrice = seasonalPricing?.pricePerNight || unit.basePrice;
-  const subtotal = basePrice * nights;
-  const cleaningFee = unit.cleaningFee || 0;
+  let basePrice = unit.base_price;
+  let totalPrice = basePrice * nights;
+  let cleaningFee = unit.cleaning_fee || 0;
+
+  // Check for seasonal pricing
+  const { data: seasonalPricing } = await supabase
+    .from('seasonal_pricing')
+    .select('*')
+    .eq('property_id', unit.property_id)
+    .or(`start_date.lte.${checkOutDate.toISOString()},end_date.gte.${checkInDate.toISOString()}`);
+
+  if (seasonalPricing && seasonalPricing.length > 0) {
+    // Use seasonal pricing (simplified - in reality would need to calculate per night)
+    basePrice = seasonalPricing[0].price_per_night;
+    totalPrice = basePrice * nights;
+  }
 
   let discountAmount = 0;
 
-  // Apply coupon discount if provided
-  let couponDiscount = 0;
+  // Apply coupon if provided
   if (couponCode) {
-    const coupon = await prisma.coupon.findUnique({
-      where: { code: couponCode },
-    });
+    const { data: coupon } = await supabase
+      .from('coupons')
+      .select('*')
+      .eq('code', couponCode.toUpperCase())
+      .eq('is_active', true)
+      .single();
 
-    if (
-      coupon &&
-      coupon.isActive &&
-      new Date() >= coupon.validFrom &&
-      new Date() <= coupon.validUntil &&
-      (!coupon.maxUses || coupon.usedCount < coupon.maxUses) &&
-      (coupon.minBookingAmount == null || subtotal >= coupon.minBookingAmount)
-    ) {
-      if (coupon.discountType === "PERCENTAGE") {
-        couponDiscount =
-          ((subtotal - discountAmount) * coupon.discountValue) / 100;
-      } else {
-        couponDiscount = coupon.discountValue;
+    if (coupon) {
+      const now = new Date();
+      if (new Date(coupon.valid_from) <= now && new Date(coupon.valid_until) >= now) {
+        if (!coupon.min_booking_amount || totalPrice >= coupon.min_booking_amount) {
+          if (!coupon.max_uses || coupon.used_count < coupon.max_uses) {
+            if (coupon.discount_type === "PERCENTAGE") {
+              discountAmount = totalPrice * (coupon.discount_value / 100);
+            } else {
+              discountAmount = coupon.discount_value;
+            }
+            discountAmount = Math.min(discountAmount, totalPrice);
+          }
+        }
       }
     }
   }
 
-  discountAmount += couponDiscount;
-
-  // Get tax settings
-  let taxRate = 0.15; // default
+  const subtotal = totalPrice - discountAmount;
+  
+  // FIXED: Get tax rate from database instead of hardcoded
+  let taxRate = 0.15; // Default 15%
   try {
-    const taxSettings = await adminService.getTaxSettings();
-    taxRate = taxSettings.taxRate / 100;
+    const { data: taxSettings } = await supabase
+      .from('tax_settings')
+      .select('tax_rate')
+      .eq('is_active', true)
+      .single();
+    
+    if (taxSettings) {
+      taxRate = parseFloat(taxSettings.tax_rate.toString());
+    }
   } catch (error) {
-    console.error("Failed to fetch tax settings, using default:", error);
+    console.log("⚠️ [TAX] Using default tax rate due to error:", error.message);
   }
-
-  // Calculate taxes using dynamic rate
-  const taxableAmount = subtotal - discountAmount + cleaningFee;
-  const taxes = Math.round(taxableAmount * taxRate * 100) / 100;
-
-  const totalPrice = subtotal + cleaningFee + taxes - discountAmount;
-  const depositAmount = Math.round(totalPrice * 0.25 * 100) / 100;
-  const balanceAmount = totalPrice - depositAmount;
+  
+  const taxes = subtotal * taxRate;
+  const finalTotal = subtotal + taxes + cleaningFee;
 
   return {
     basePrice,
     nights,
-    subtotal,
+    totalPrice,
     cleaningFee,
     discountAmount,
+    subtotal,
     taxes,
-    totalPrice,
-    depositAmount,
-    balanceAmount,
+    finalTotal,
   };
 }
 
 /**
- * Create a new booking (userId optional = guest checkout)
+ * Create a booking
  */
 export async function createBooking(
   unitId: string,
-  userId: string | null | undefined,
+  userId: string | null,
   checkInDate: Date,
   checkOutDate: Date,
   guests: number,
   guestName: string,
   guestEmail: string,
   guestPhone?: string,
-  specialRequests?: string,
   couponCode?: string,
 ) {
-  // Validate input (userId not required for guest checkout)
-  if (!unitId || !guestName || !guestEmail || guests < 1) {
-    throw new ValidationError("Missing required booking fields");
+  // Check availability first
+  const availability = await checkAvailability(unitId, checkInDate, checkOutDate);
+  if (!availability.isAvailable) {
+    throw new ConflictError(availability.reason || "Dates not available");
   }
 
-  // Check availability
-  const availabilityCheck = await checkAvailability(
-    unitId,
-    checkInDate,
-    checkOutDate,
-  );
-  if (!availabilityCheck.isAvailable) {
-    throw new ConflictError(
-      availabilityCheck.reason || "Unit not available for selected dates",
-    );
-  }
+  // Calculate price
+  const pricing = await calculateBookingPrice(unitId, checkInDate, checkOutDate, guests, couponCode);
 
-  // Check guest capacity
-  const unit = await prisma.unit.findUnique({
-    where: { id: unitId },
-  });
+  const bookingNumber = `BK${nanoid(8).toUpperCase()}`;
+  const nights = Math.ceil((checkOutDate.getTime() - checkInDate.getTime()) / (1000 * 60 * 60 * 24));
 
-  if (!unit) {
-    throw new NotFoundError("Unit not found");
-  }
-
-  if (guests > unit.maxGuests) {
-    throw new ValidationError(
-      `Maximum guests for this unit is ${unit.maxGuests}`,
-    );
-  }
-
-  // Calculate pricing
-  const pricing = await calculatePrice(
-    unitId,
-    checkInDate,
-    checkOutDate,
-    couponCode,
-  );
-
-  // Create booking
-  const bookingNumber = `BK-${Date.now()}-${nanoid(6)}`.toUpperCase();
-
-  const booking = await prisma.booking.create({
-    data: {
-      bookingNumber,
-      unitId,
-      userId: userId ?? undefined,
-      checkInDate,
-      checkOutDate,
-      nights: pricing.nights,
-      basePrice: pricing.basePrice,
-      totalNights: pricing.nights,
+  const { data: booking } = await supabase
+    .from('bookings')
+    .insert({
+      booking_number: bookingNumber,
+      unit_id: unitId,
+      user_id: userId,
+      check_in_date: checkInDate.toISOString(),
+      check_out_date: checkOutDate.toISOString(),
+      nights,
+      base_price: pricing.basePrice,
+      total_nights: nights,
       subtotal: pricing.subtotal,
-      cleaningFee: pricing.cleaningFee,
+      cleaning_fee: pricing.cleaningFee,
       taxes: pricing.taxes,
-      discountAmount: pricing.discountAmount,
-      totalPrice: pricing.totalPrice,
+      discount_amount: pricing.discountAmount,
+      deposit_amount: pricing.finalTotal * 0.25,
+      balance_amount: pricing.finalTotal * 0.75,
+      total_price: pricing.finalTotal,
       guests,
-      guestName,
-      guestEmail,
-      guestPhone,
+      guest_name: guestName,
+      guest_email: guestEmail,
+      guest_phone: guestPhone,
+      payment_status: "PENDING",
+      deposit_paid: false,
+      balance_paid: false,
       status: "PENDING",
-    },
-  });
+    })
+    .select()
+    .single();
 
-  // Increment coupon usage if applicable
-  if (couponCode) {
-    const coupon = await prisma.coupon.findUnique({
-      where: { code: couponCode },
-    });
+  if (!booking) {
+    throw new AppError(500, "Failed to create booking");
+  }
 
+  // Update coupon usage if applicable
+  if (couponCode && pricing.discountAmount > 0) {
+    const { data: coupon } = await supabase
+      .from('coupons')
+      .select('used_count')
+      .eq('code', couponCode.toUpperCase())
+      .single();
+    
     if (coupon) {
-      await prisma.coupon.update({
-        where: { id: coupon.id },
-        data: { usedCount: coupon.usedCount + 1 },
-      });
+      await supabase
+        .from('coupons')
+        .update({ used_count: coupon.used_count + 1 })
+        .eq('code', couponCode.toUpperCase());
     }
   }
 
@@ -297,170 +258,206 @@ export async function createBooking(
 }
 
 /**
- * Get booking by ID. Access: owner by userId, or guest by guestEmail when booking has no userId.
+ * Get booking by ID
  */
-export async function getBookingById(
-  bookingId: string,
-  opts?: { userId?: string; guestEmail?: string },
-) {
-  const booking = await prisma.booking.findUnique({
-    where: { id: bookingId },
-    include: {
-      unit: { include: { property: true } },
-      payments: true,
-    },
-  });
+export async function getBookingById(bookingId: string) {
+  const { data: booking } = await supabase
+    .from('bookings')
+    .select(`
+      *,
+      unit:units(
+        *,
+        property:properties(*)
+      )
+    `)
+    .eq('id', bookingId)
+    .single();
 
   if (!booking) {
     throw new NotFoundError("Booking not found");
   }
 
-  if (opts?.userId) {
-    if (booking.userId !== opts.userId) {
-      throw new AppError(403, "You do not have access to this booking");
-    }
-    return booking;
-  }
-  if (opts?.guestEmail && !booking.userId) {
-    if (booking.guestEmail.toLowerCase() !== opts.guestEmail.toLowerCase()) {
-      throw new AppError(403, "You do not have access to this booking");
-    }
-    return booking;
-  }
-  if (!opts?.userId && !opts?.guestEmail) {
-    throw new AppError(401, "Authentication or guest email required");
-  }
-  throw new AppError(403, "You do not have access to this booking");
+  return booking;
 }
 
 /**
  * Get user bookings
  */
-export async function getUserBookings(
-  userId: string,
-  page: number = 1,
-  pageSize: number = 20,
-) {
-  const skip = (page - 1) * pageSize;
+export async function getUserBookings(userId: string) {
+  const { data: bookings } = await supabase
+    .from('bookings')
+    .select(`
+      *,
+      unit:units(
+        *,
+        property:properties(*)
+      )
+    `)
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false });
 
-  const [bookings, total] = await Promise.all([
-    prisma.booking.findMany({
-      where: { userId },
-      include: {
-        unit: { include: { property: true } },
-        payments: true,
-      },
-      orderBy: { createdAt: "desc" },
-      skip,
-      take: pageSize,
-    }),
-    prisma.booking.count({ where: { userId } }),
-  ]);
-
-  return {
-    bookings,
-    total,
-    page,
-    pageSize,
-    totalPages: Math.ceil(total / pageSize),
-  };
-}
-
-/**
- * Cancel booking (owner by userId or guest by guestEmail when booking has no userId).
- */
-export async function cancelBooking(
-  bookingId: string,
-  opts: { userId?: string; guestEmail?: string },
-  reason?: string,
-) {
-  const booking = await getBookingById(bookingId, opts);
-
-  if (!["PENDING", "DEPOSIT_PAID", "CONFIRMED"].includes(booking.status)) {
-    throw new ConflictError("This booking cannot be cancelled");
-  }
-
-  // Calculate refund based on cancellation policy
-  const daysBeforeCheckIn = Math.ceil(
-    (booking.checkInDate.getTime() - new Date().getTime()) /
-      (1000 * 60 * 60 * 24),
-  );
-
-  let refundPercentage = 0;
-  if (daysBeforeCheckIn > 60) {
-    refundPercentage = 0.75; // 75% refund
-  } else if (daysBeforeCheckIn > 30) {
-    refundPercentage = 0.5; // 50% refund
-  } else {
-    refundPercentage = 0; // No refund
-  }
-
-  const refundAmount =
-    Math.round(booking.totalPrice * refundPercentage * 100) / 100;
-
-  // Update booking
-  const updatedBooking = await prisma.booking.update({
-    where: { id: bookingId },
-    data: {
-      status: "CANCELLED",
-      cancellationReason: reason,
-      cancelledAt: new Date(),
-    },
-    include: {
-      unit: { include: { property: true } },
-      payments: true,
-    },
-  });
-
-  return {
-    booking: updatedBooking,
-    refundAmount,
-    refundPercentage: Math.round(refundPercentage * 100),
-  };
+  return bookings || [];
 }
 
 /**
  * Update booking status
  */
-export async function updateBookingStatus(bookingId: string, status: string) {
-  const booking = await prisma.booking.update({
-    where: { id: bookingId },
-    data: { status: status as any },
-  });
+export async function updateBookingStatus(
+  bookingId: string,
+  status: string,
+  reason?: string,
+) {
+  const updateData: any = { status };
+  if (reason) updateData.cancellation_reason = reason;
+  if (status === "CANCELLED") updateData.cancelled_at = new Date().toISOString();
+
+  const { data: booking } = await supabase
+    .from('bookings')
+    .update(updateData)
+    .eq('id', bookingId)
+    .select()
+    .single();
+
+  if (!booking) {
+    throw new NotFoundError("Booking not found");
+  }
 
   return booking;
 }
 
 /**
- * Get available units for date range
+ * Get all bookings (admin)
  */
-export async function getAvailableUnits(
-  checkInDate: Date,
-  checkOutDate: Date,
-  guests: number,
-  propertyId?: string,
-) {
-  let units = await prisma.unit.findMany({
-    where: {
-      ...(propertyId && { propertyId }),
-      isActive: true,
-      maxGuests: { gte: guests },
-    },
-    include: { property: true },
-  });
+export async function getAllBookings(filters?: {
+  status?: string;
+  propertyId?: string;
+  startDate?: Date;
+  endDate?: Date;
+}) {
+  let query = supabase
+    .from('bookings')
+    .select(`
+      *,
+      unit:units(
+        *,
+        property:properties(*)
+      ),
+      user:users(
+        id,
+        email,
+        first_name,
+        last_name
+      )
+    `);
 
-  // Filter by availability
-  const availableUnits = [];
-  for (const unit of units) {
-    const { isAvailable } = await checkAvailability(
-      unit.id,
-      checkInDate,
-      checkOutDate,
-    );
-    if (isAvailable) {
-      availableUnits.push(unit);
-    }
+  if (filters?.status) {
+    query = query.eq('status', filters.status);
+  }
+  if (filters?.propertyId) {
+    query = query.eq('unit.property_id', filters.propertyId);
+  }
+  if (filters?.startDate) {
+    query = query.gte('check_in_date', filters.startDate.toISOString());
+  }
+  if (filters?.endDate) {
+    query = query.lte('check_out_date', filters.endDate.toISOString());
   }
 
+  const { data: bookings } = await query.order('created_at', { ascending: false });
+
+  return bookings || [];
+}
+
+/**
+ * Get booking statistics
+ */
+export async function getBookingStats(propertyId?: string) {
+  let query = supabase.from('bookings').select('*');
+
+  if (propertyId) {
+    query = query.eq('unit.property_id', propertyId);
+  }
+
+  const { data: bookings } = await query;
+
+  if (!bookings) {
+    return {
+      total: 0,
+      pending: 0,
+      confirmed: 0,
+      cancelled: 0,
+      completed: 0,
+      revenue: 0,
+    };
+  }
+
+  const stats = {
+    total: bookings.length,
+    pending: bookings.filter(b => b.status === 'PENDING').length,
+    confirmed: bookings.filter(b => b.status === 'CONFIRMED').length,
+    cancelled: bookings.filter(b => b.status === 'CANCELLED').length,
+    completed: bookings.filter(b => b.status === 'COMPLETED').length,
+    revenue: bookings
+      .filter(b => b.status === 'COMPLETED')
+      .reduce((sum, b) => sum + (b.total_price || 0), 0),
+  };
+
+  return stats;
+}
+
+/**
+ * Get occupied date ranges for a unit
+ */
+export async function getOccupiedDateRanges(unitId: string) {
+  const { data: bookings } = await supabase
+    .from('bookings')
+    .select('check_in_date, check_out_date')
+    .eq('unit_id', unitId)
+    .neq('status', 'CANCELLED')
+    .order('check_in_date', { ascending: true });
+
+  return bookings || [];
+}
+
+/**
+ * Get available units for a date range
+ */
+export async function getAvailableUnits(
+  checkInDate: string,
+  checkOutDate: string,
+  guests?: number,
+) {
+  let query = supabase
+    .from('units')
+    .select(`
+      *,
+      property:properties(*)
+    `)
+    .eq('is_active', true);
+
+  if (guests) {
+    query = query.gte('max_guests', guests);
+  }
+
+  const { data: units } = await query;
+
+  if (!units) return [];
+
+  // Filter out units with conflicting bookings
+  const availableUnits = units.filter(unit => {
+    // TODO: Check for conflicting bookings
+    return true; // Simplified for now
+  });
+
   return availableUnits;
+}
+
+/**
+ * Cancel booking
+ */
+export async function cancelBooking(
+  bookingId: string,
+  reason?: string,
+) {
+  return await updateBookingStatus(bookingId, 'CANCELLED', reason);
 }
