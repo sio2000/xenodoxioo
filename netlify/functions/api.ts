@@ -86,29 +86,37 @@ export const handler = async (event: any, context: any) => {
 
         // Parse mainImage and galleryImages for property
         let parsedMainImage = property.main_image;
-        if (typeof parsedMainImage === 'string') {
+        let parsedGalleryImages = [];
+        
+        // Only attempt JSON.parse if the field looks like JSON (starts with [ or {)
+        if (property.main_image && (property.main_image.startsWith('[') || property.main_image.startsWith('{'))) {
           try {
-            parsedMainImage = JSON.parse(parsedMainImage);
+            parsedMainImage = JSON.parse(property.main_image);
           } catch (error) {
             console.log("⚠️ Failed to parse mainImage for property:", property.id, error);
-            parsedMainImage = property.main_image; // Keep original if parsing fails
+            parsedMainImage = property.main_image;
           }
         }
 
-        let parsedGalleryImages = [];
         if (property.gallery_images) {
           try {
             if (typeof property.gallery_images === 'string') {
-              parsedGalleryImages = JSON.parse(property.gallery_images);
+              // Only parse if it looks like JSON
+              if (property.gallery_images.startsWith('[') || property.gallery_images.startsWith('{'))) {
+                parsedGalleryImages = JSON.parse(property.gallery_images);
+              } else {
+                parsedGalleryImages = property.gallery_images;
+              }
             } else if (Array.isArray(property.gallery_images)) {
               parsedGalleryImages = property.gallery_images;
             }
           } catch (error) {
-            console.log(" Failed to parse galleryImages for property:", property.id, error);
+            console.log("⚠️ Failed to parse galleryImages for property:", property.id, error);
             parsedGalleryImages = [];
           }
         }
-        const parsedUnits = propertyUnits.map(unit => {
+
+        const parsedUnits = propertyUnits.map((unit: any) => {
           let parsedImages = [];
           if (unit.images) {
             try {
@@ -118,7 +126,7 @@ export const handler = async (event: any, context: any) => {
                 parsedImages = unit.images;
               }
             } catch (error) {
-              console.log(" Failed to parse images for unit:", unit.id, error);
+              console.log("⚠️ Failed to parse images for unit:", unit.id, error);
               parsedImages = [];
             }
           }
@@ -146,7 +154,7 @@ export const handler = async (event: any, context: any) => {
           country: property.country,
           description: property.description,
           mainImage: parsedMainImage,
-          galleryImages: parsedGalleryImages || [],
+          galleryImages: parsedGalleryImages,
           isActive: property.is_active,
           createdAt: property.created_at,
           updatedAt: property.updated_at,
