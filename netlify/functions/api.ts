@@ -304,6 +304,125 @@ export const handler = async (event: any, context: any) => {
       };
     }
 
+    // POST /api/bookings
+    if (path === '/api/bookings' && method === 'POST') {
+      console.log(`🔍 [${requestId}] Creating booking...`);
+      
+      try {
+        const body = JSON.parse(event.body || '{}');
+        console.log(`📝 [${requestId}] Booking data:`, JSON.stringify(body, null, 2));
+        
+        // Validate required fields
+        if (!body.unitId || !body.checkInDate || !body.checkOutDate || !body.guests) {
+          return {
+            statusCode: 400,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              success: false,
+              message: 'Missing required fields: unitId, checkInDate, checkOutDate, guests'
+            })
+          };
+        }
+        
+        // Generate booking number
+        const bookingNumber = `BK-${Date.now()}-${Math.random().toString(36).substr(2, 9).toUpperCase()}`;
+        
+        // Calculate nights
+        const checkIn = new Date(body.checkInDate);
+        const checkOut = new Date(body.checkOutDate);
+        const nights = Math.ceil((checkOut.getTime() - checkIn.getTime()) / (1000 * 60 * 60 * 24));
+        
+        // Get unit details for pricing
+        const { data: unit } = await supabase
+          .from('units')
+          .select('*')
+          .eq('id', body.unitId)
+          .single();
+          
+        if (!unit) {
+          return {
+            statusCode: 404,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              success: false,
+              message: 'Unit not found'
+            })
+          };
+        }
+        
+        // Calculate total price
+        const basePrice = Number(unit.base_price) || 0;
+        const cleaningFee = Number(unit.cleaning_fee) || 0;
+        const totalPrice = (basePrice * nights) + cleaningFee;
+        
+        // Create booking
+        const { data: booking, error } = await supabase
+          .from('bookings')
+          .insert([{
+            booking_number: bookingNumber,
+            unit_id: body.unitId,
+            guest_name: body.guestName || '',
+            guest_email: body.guestEmail || '',
+            guest_phone: body.guestPhone || '',
+            check_in_date: body.checkInDate,
+            check_out_date: body.checkOutDate,
+            nights: nights,
+            guests: parseInt(body.guests) || 1,
+            base_price: basePrice,
+            cleaning_fee: cleaningFee,
+            total_price: totalPrice,
+            status: 'PENDING'
+          }])
+          .select()
+          .single();
+
+        if (error) {
+          console.error(`❌ [${requestId}] Booking creation error:`, error);
+          return {
+            statusCode: 500,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              success: false,
+              message: 'Failed to create booking',
+              error: error.message
+            })
+          };
+        }
+
+        console.log(`✅ [${requestId}] Booking created:`, booking);
+        
+        return {
+          statusCode: 200,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            success: true,
+            data: {
+              ...booking,
+              unit: {
+                name: unit.name,
+                property: {
+                  name: (await supabase.from('properties').select('name').eq('id', unit.property_id).single())?.data?.name || ''
+                }
+              }
+            }
+            }
+          })
+        };
+        
+      } catch (error: any) {
+        console.error(`❌ [${requestId}] Booking creation error:`, error);
+        return {
+          statusCode: 500,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            success: false,
+            message: 'Server error',
+            error: error.message
+          })
+        };
+      }
+    }
+
     // Handle admin routes
     if (path.startsWith('/api/admin/')) {
       return await handleAdminRoutes(path, method, supabase, event, requestId);
