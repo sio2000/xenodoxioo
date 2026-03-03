@@ -84,7 +84,30 @@ export const handler = async (event: any, context: any) => {
           ? Math.min(...propertyUnits.map((u) => u.base_price))
           : 0;
 
-        // Parse unit images
+        // Parse mainImage and galleryImages for property
+        let parsedMainImage = property.main_image;
+        if (typeof parsedMainImage === 'string') {
+          try {
+            parsedMainImage = JSON.parse(parsedMainImage);
+          } catch (error) {
+            console.log("⚠️ Failed to parse mainImage for property:", property.id, error);
+            parsedMainImage = property.main_image; // Keep original if parsing fails
+          }
+        }
+
+        let parsedGalleryImages = [];
+        if (property.gallery_images) {
+          try {
+            if (typeof property.gallery_images === 'string') {
+              parsedGalleryImages = JSON.parse(property.gallery_images);
+            } else if (Array.isArray(property.gallery_images)) {
+              parsedGalleryImages = property.gallery_images;
+            }
+          } catch (error) {
+            console.log(" Failed to parse galleryImages for property:", property.id, error);
+            parsedGalleryImages = [];
+          }
+        }
         const parsedUnits = propertyUnits.map(unit => {
           let parsedImages = [];
           if (unit.images) {
@@ -95,7 +118,7 @@ export const handler = async (event: any, context: any) => {
                 parsedImages = unit.images;
               }
             } catch (error) {
-              console.log("⚠️ Failed to parse images for unit:", unit.id, error);
+              console.log(" Failed to parse images for unit:", unit.id, error);
               parsedImages = [];
             }
           }
@@ -122,8 +145,8 @@ export const handler = async (event: any, context: any) => {
           city: property.city,
           country: property.country,
           description: property.description,
-          mainImage: property.main_image,
-          galleryImages: property.gallery_images,
+          mainImage: parsedMainImage,
+          galleryImages: parsedGalleryImages || [],
           isActive: property.is_active,
           createdAt: property.created_at,
           updatedAt: property.updated_at,
@@ -139,7 +162,7 @@ export const handler = async (event: any, context: any) => {
         };
       });
 
-      console.log(`✅ Returning ${aggregatedProperties.length} complete properties`);
+      console.log(` Returning ${aggregatedProperties.length} complete properties`);
 
       return {
         statusCode: 200,
@@ -147,6 +170,65 @@ export const handler = async (event: any, context: any) => {
         body: JSON.stringify({
           success: true,
           data: aggregatedProperties
+        })
+      };
+    }
+
+    // Handle individual property detail requests
+    if (path.startsWith('/api/properties/id/') || path.startsWith('/properties/id/')) {
+      const propertyId = path.split('/').pop();
+      console.log(` Fetching property detail for ID: ${propertyId}`);
+      
+      if (!propertyId) {
+        return {
+          statusCode: 400,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            success: false,
+            message: 'Property ID is required'
+          })
+        };
+      }
+
+      // Fetch property by ID
+      const { data: property, error } = await supabase
+        .from('properties')
+        .select('*')
+        .eq('id', propertyId)
+        .eq('is_active', true)
+        .single();
+
+      if (error || !property) {
+        console.error(' Property not found:', error);
+        return {
+          statusCode: 404,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            success: false,
+            message: 'Property not found'
+          })
+        };
+      }
+
+      // Get units for this property
+      const { data: units } = await supabase
+        .from('units')
+        .select('*')
+        .eq('property_id', propertyId)
+        .eq('is_active', true)
+        .order('base_price', { ascending: true });
+
+      console.log(` Found property: ${property.name} with ${units?.length || 0} units`);
+
+      return {
+        statusCode: 200,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          success: true,
+          data: {
+            ...property,
+            units: units || []
+          }
         })
       };
     }
