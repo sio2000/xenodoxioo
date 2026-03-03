@@ -2,6 +2,7 @@
   command = "pnpm install && pnpm run build:client"
   functions = "netlify/functions"
   publish = "dist/spa"
+  environment = { NODE_ENV = "production" }
 
 [functions]
   external_node_modules = ["express"]
@@ -26,3 +27,12 @@
   from = "/*"
   to = "/index.html"
   status = 200
+
+# Headers for security and caching
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Frame-Options = "DENY"
+    X-XSS-Protection = "1; mode=block"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
