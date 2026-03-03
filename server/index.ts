@@ -1,4 +1,4 @@
-import "dotenv/config";
+import "./lib/env";
 import express from "express";
 import cors from "cors";
 import multer from "multer";
@@ -57,8 +57,44 @@ export function createServer() {
   app.use(express.json({ limit: '10mb' }));
   app.use(express.urlencoded({ extended: true, limit: '10mb' }));
   
+  // Request logging middleware for debugging
+  app.use((req, res, next) => {
+    const start = Date.now();
+    console.log("🌐 [REQUEST] Incoming:", {
+      method: req.method,
+      url: req.url,
+      headers: {
+        'user-agent': req.get('User-Agent'),
+        'referer': req.get('Referer')
+      },
+      timestamp: new Date().toISOString()
+    });
+    
+    // Log response when it finishes
+    res.on('finish', () => {
+      const duration = Date.now() - start;
+      console.log("🌐 [RESPONSE] Completed:", {
+        method: req.method,
+        url: req.url,
+        statusCode: res.statusCode,
+        duration: `${duration}ms`,
+        timestamp: new Date().toISOString()
+      });
+    });
+    
+    next();
+  });
+  
   // Serve uploaded files
-  app.use('/uploads', express.static(uploadsDir));
+  app.use('/uploads', express.static(uploadsDir, {
+    setHeaders: (res, filePath) => {
+      console.log("🖼️ [SERVER] Serving image file:", {
+        filePath,
+        timestamp: new Date().toISOString(),
+        userAgent: res.get('User-Agent')
+      });
+    }
+  }));
 
   // Serve view videos from public/viewvideos via API (guaranteed correct path)
   app.use("/api/viewvideos", viewVideosRouter);
