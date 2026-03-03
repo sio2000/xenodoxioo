@@ -1,3 +1,8 @@
+/**
+ * ⚠️ WARNING: This script REPLACES all property main images with random picsum.photos URLs!
+ * DO NOT RUN unless you want to destroy your real property images.
+ * Use admin panel to upload proper images instead.
+ */
 const { createClient } = require('@supabase/supabase-js');
 require('dotenv').config();
 

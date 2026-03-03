@@ -14,33 +14,38 @@ export function apiUrl(path: string): string {
   return `${API_BASE}${p}`;
 }
 
+/** Placeholder when no image is available - gray SVG (no external picsum) */
+const PLACEHOLDER_IMAGE = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='300' viewBox='0 0 400 300'%3E%3Crect fill='%23e5e7eb' width='400' height='300'/%3E%3Ctext x='50%25' y='50%25' text-anchor='middle' dy='.3em' fill='%239ca3af' font-family='sans-serif' font-size='14'%3ENo image%3C/text%3E%3C/svg%3E";
+
 /** Resolve image path - handle both legacy /uploads/ and Supabase URLs */
-export function imageUrl(path: string | null | undefined): string {
-  console.log(`🖼️ [IMAGE] Resolving image path:`, { path });
-  
-  if (!path || typeof path !== "string") {
-    console.log(`⚠️ [IMAGE] Invalid path, returning empty string`);
-    return "";
+export function imageUrl(path: string | null | undefined | Record<string, unknown>): string {
+  let resolved: string;
+  if (path == null) resolved = "";
+  else if (typeof path === "string") resolved = path;
+  else if (typeof path === "object" && path !== null) {
+    const obj = path as Record<string, unknown>;
+    resolved = (typeof obj.url === "string" ? obj.url : typeof obj.src === "string" ? obj.src : "") as string;
+  } else resolved = "";
+
+  if (!resolved) return PLACEHOLDER_IMAGE;
+
+  // If it's already a full URL, return as-is (including Supabase, picsum legacy in DB, etc.)
+  if (resolved.startsWith("http://") || resolved.startsWith("https://")) {
+    return resolved;
   }
-  
-  // If it's already a full URL, return as-is
-  if (path.startsWith("http://") || path.startsWith("https://")) {
-    console.log(`✅ [IMAGE] Already a full URL: ${path}`);
-    return path;
-  }
-  
+
   // Handle legacy /uploads/ paths - redirect to Supabase Storage
-  if (path.startsWith("/uploads/")) {
-    const filename = path.replace('/uploads/', '');
-    // Use the actual Supabase URL from environment
-    const supabaseUrl = "https://jkolkjvhlguaqcfgaaig.supabase.co";
-    const supabaseStorageUrl = `${supabaseUrl}/storage/v1/object/public/uploads/${filename}`;
-    console.log(`🔄 [IMAGE] Legacy path converted to Supabase: ${supabaseStorageUrl}`);
-    return supabaseStorageUrl;
+  if (resolved.startsWith("/uploads/")) {
+    const filename = resolved.replace("/uploads/", "");
+    const supabaseUrl = import.meta.env?.VITE_SUPABASE_URL ?? "https://jkolkjvhlguaqcfgaaig.supabase.co";
+    return `${supabaseUrl}/storage/v1/object/public/uploads/${filename}`;
   }
-  
+
   // For other paths, prepend API_BASE
-  const finalUrl = apiUrl(path.startsWith("/") ? path : `/${path}`);
-  console.log(`🔗 [IMAGE] Final resolved URL: ${finalUrl}`);
-  return finalUrl;
+  return apiUrl(resolved.startsWith("/") ? resolved : `/${resolved}`);
+}
+
+/** Return placeholder when image fails or is empty */
+export function placeholderImage(): string {
+  return PLACEHOLDER_IMAGE;
 }

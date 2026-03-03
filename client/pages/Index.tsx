@@ -226,19 +226,14 @@ export default function Index() {
                   {/* Image */}
                   <div className="relative h-64 overflow-hidden bg-muted">
                     <img
-                      src={imageUrl(property.mainImage) || `https://images.unsplash.com/photo-1566073775-4b56bc6404798012d8f0b?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80`}
+                      src={imageUrl(property.mainImage ?? (property as { main_image?: string }).main_image)}
                       alt={property.name}
                       className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
                     />
-                    {property.startingFrom !== null && (
+                    {property.startingFrom != null && (
                       <div className="absolute top-4 right-4 bg-white rounded-lg px-3 py-1 shadow-lg">
                         <span className="text-primary font-bold">
-                          {formatCurrency(
-                            typeof property.startingFrom === 'object' && property.startingFrom !== null 
-                              ? (property.startingFrom as any).basePrice || 0 
-                              : property.startingFrom, 
-                            language
-                          )}
+                          {formatCurrency(property.startingFrom, language)}
                         </span>
                         <span className="text-muted-foreground text-sm">
                           /night

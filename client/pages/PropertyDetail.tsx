@@ -27,7 +27,7 @@ import {
   AccordionTrigger,
 } from "@/components/ui/accordion";
 import { useLanguage } from "@/hooks/useLanguage";
-import { apiUrl, imageUrl } from "@/lib/api";
+import { apiUrl, imageUrl, placeholderImage } from "@/lib/api";
 import formatCurrency from "@/lib/currency";
 
 type ApiUnit = {
@@ -222,6 +222,7 @@ export default function PropertyDetail() {
                     loading="eager"
                     decoding="async"
                     className="w-full h-full object-cover"
+                    onError={(e) => { e.currentTarget.src = placeholderImage(); }}
                   />
                 )}
                 {images.length > 1 && (
@@ -324,10 +325,11 @@ export default function PropertyDetail() {
                       <img
                         src={imageUrl(image)}
                         alt={`View ${idx + 1}`}
-                            loading="lazy"
-                            decoding="async"
-                            className="w-full h-full object-cover hover:scale-105 transition-transform"
-                          />
+                        loading="lazy"
+                        decoding="async"
+                        className="w-full h-full object-cover hover:scale-105 transition-transform"
+                        onError={(e) => { e.currentTarget.src = placeholderImage(); }}
+                      />
                         </button>
                       ))}
                     </div>

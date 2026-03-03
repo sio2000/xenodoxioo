@@ -1,5 +1,5 @@
 import Layout from "@/components/Layout";
-import { apiUrl, imageUrl } from "@/lib/api";
+import { apiUrl, imageUrl, placeholderImage } from "@/lib/api";
 import { Link, useSearchParams } from "react-router-dom";
 import { MapPin, Users, Bed, Bath } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -22,6 +22,7 @@ type UnitWithProperty = {
     city: string;
     country: string;
     location: string;
+    main_image?: string;
   } | null;
 };
 
@@ -87,6 +88,7 @@ export default function Properties() {
                 city: u.property.city,
                 country: u.property.country,
                 location: u.property.location,
+                main_image: u.property.main_image ?? u.property.mainImage,
               }
             : null,
         }));
@@ -246,11 +248,15 @@ export default function Properties() {
                       <div className="relative h-64 md:h-full rounded-lg overflow-hidden bg-muted group">
                         <img
                           src={
-                            imageUrl(unit.images[0]) ||
-                            "https://images.unsplash.com/photo-1566073775-4b56bc6404798012d8f0b?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80"
+                            (unit.images?.length && unit.images[0])
+                              ? imageUrl(unit.images[0])
+                              : unit.property?.main_image
+                                ? imageUrl(unit.property.main_image)
+                                : placeholderImage()
                           }
                           alt={unit.name}
                           className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
+                          onError={(e) => { e.currentTarget.src = placeholderImage(); }}
                         />
                       </div>
                     </div>

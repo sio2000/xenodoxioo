@@ -7,35 +7,30 @@ const localeMap: Record<Language, string> = {
   el: "el-GR",
 };
 
-export function formatCurrency(amount: number | undefined | null, lang: Language = "en") {
-  console.log(`💰 [CURRENCY] Formatting amount:`, { amount, lang });
-  
-  // Handle undefined/null values
-  if (amount === undefined || amount === null) {
-    console.error("❌ [CURRENCY] Amount is undefined/null:", amount);
+export function formatCurrency(amount: number | string | undefined | null | Record<string, unknown>, lang: Language = "en") {
+  if (amount === undefined || amount === null) return "0.00 €";
+
+  let numericAmount: number;
+  if (typeof amount === "number") numericAmount = amount;
+  else if (typeof amount === "string") numericAmount = parseFloat(amount);
+  else if (typeof amount === "object" && amount !== null) {
+    const obj = amount as Record<string, unknown>;
+    const v = obj.basePrice ?? obj.value ?? obj.amount ?? 0;
+    numericAmount = typeof v === "number" ? v : parseFloat(String(v));
+  } else {
     return "0.00 €";
   }
-  
-  // Convert to number if string
-  const numericAmount = typeof amount === 'string' ? parseFloat(amount) : amount;
-  
-  if (typeof numericAmount !== 'number' || isNaN(numericAmount)) {
-    console.error("❌ [CURRENCY] Invalid amount after conversion:", { original: amount, converted: numericAmount });
-    return "0.00 €";
-  }
+
+  if (isNaN(numericAmount)) return "0.00 €";
   
   const locale = localeMap[lang] || "en-IE";
   try {
-    const formatted = new Intl.NumberFormat(locale, {
+    return new Intl.NumberFormat(locale, {
       style: "currency",
       currency: "EUR",
       minimumFractionDigits: 2,
     }).format(numericAmount);
-    
-    console.log(`✅ [CURRENCY] Successfully formatted:`, { input: numericAmount, output: formatted });
-    return formatted;
-  } catch (e) {
-    console.error("❌ [CURRENCY] Format error:", e);
+  } catch {
     return `€${numericAmount.toFixed(2)}`;
   }
 }

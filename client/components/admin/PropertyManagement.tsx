@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { apiUrl, imageUrl } from "@/lib/api";
+import { apiUrl, imageUrl, placeholderImage } from "@/lib/api";
 import { Plus, Edit, Trash2, BedDouble, Image as ImageIcon } from "lucide-react";
 import { useLanguage } from "@/hooks/useLanguage";
 import formatCurrency from "@/lib/currency";
@@ -90,8 +90,8 @@ export default function PropertyManagement() {
 
   const handleCreateProperty = async (formData: any) => {
     try {
-      let mainImageUrl = "https://picsum.photos/400/300?random=" + Date.now();
-      
+      let mainImageUrl = "";
+
       // Upload main image if provided
       if (formData.mainImage instanceof File) {
         const imageFormData = new FormData();
@@ -104,15 +104,16 @@ export default function PropertyManagement() {
         
         if (uploadResponse.ok) {
           const uploadResult = await uploadResponse.json();
-          if (uploadResult.success) {
+          if (uploadResult.success && uploadResult.imageUrl) {
             mainImageUrl = uploadResult.imageUrl;
-            console.log("✅ Image uploaded:", mainImageUrl);
           }
-        } else {
-          console.error("❌ Image upload failed");
         }
       }
-      
+      if (!mainImageUrl) {
+        alert("Please upload a main image for the property.");
+        return;
+      }
+
       const submitData = {
         name: formData.name,
         description: formData.description || "",
@@ -316,8 +317,6 @@ export default function PropertyManagement() {
       <div className="space-y-6">
         {properties.map((property) => {
           const imageUrlSrc = imageUrl(property.main_image);
-          console.log(`🖼️ [IMAGE] Property: ${property.name}, Image URL: ${imageUrlSrc}`);
-          
           return (
           <div key={property.id} className="bg-card border border-border rounded-lg p-6">
             <div className="flex justify-between items-start mb-4">
@@ -325,20 +324,9 @@ export default function PropertyManagement() {
                 <img
                   src={imageUrlSrc}
                   alt={property.name}
-                  className="w-24 h-24 object-cover rounded-lg border border-border"
-                  style={{
-                    backgroundColor: '#f3f4f6',
-                    backgroundImage: `url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300"><rect fill="%23f3f4f6" width="400" height="300"/><text x="50%" y="50%" text-anchor="middle" dy=".3em" fill="%239ca3af" font-family="sans-serif" font-size="14">Loading...</text></svg>')`,
-                    backgroundSize: 'cover',
-                    backgroundPosition: 'center'
-                  }}
-                  onError={(e: any) => {
-                    console.error(`❌ [IMAGE] Failed to load: ${imageUrlSrc}`);
-                    e.currentTarget.src = `https://picsum.photos/400/300?random=${property.id}&blur=2`;
-                  }}
-                  onLoad={(e: any) => {
-                    console.log(`✅ [IMAGE] Loaded: ${property.name}`);
-                    e.currentTarget.style.backgroundImage = 'none';
+                  className="w-24 h-24 object-cover rounded-lg border border-border bg-muted"
+                  onError={(e: React.SyntheticEvent<HTMLImageElement>) => {
+                    e.currentTarget.src = placeholderImage();
                   }}
                 />
                 <div>
@@ -523,12 +511,15 @@ function PropertyForm({ property, onSubmit, onClose }: any) {
               className="w-full p-2 border border-border rounded-md bg-background text-foreground"
               required={!property}
             />
-            {(formData.mainImage || property?.mainImage) && (
+            {(formData.mainImage || property?.main_image) && (
               <div className="mt-2">
                 <img 
-                  src={formData.mainImage ? URL.createObjectURL(formData.mainImage) : imageUrl(property?.mainImage)} 
+                  src={formData.mainImage ? URL.createObjectURL(formData.mainImage) : imageUrl(property?.main_image)} 
                   alt="Preview" 
                   className="w-32 h-32 object-cover rounded-lg border border-border"
+                  onError={(e: React.SyntheticEvent<HTMLImageElement>) => {
+                    e.currentTarget.src = placeholderImage();
+                  }}
                 />
               </div>
             )}
@@ -730,12 +721,11 @@ function UnitForm({ unit, propertyId, properties, onSubmit, onClose, onPropertyC
                 {formData.existingImages.map((url: string, i: number) => (
                   <div key={i} className="relative">
                     <img 
-                      src={imageUrl(url)} 
+                      src={imageUrl(typeof url === "string" ? url : String(url))} 
                       alt="" 
                       className="w-20 h-20 object-cover rounded border" 
-                      onError={(e: any) => {
-                        console.error(`❌ [UNIT IMAGE] Failed to load: ${url}`);
-                        e.currentTarget.src = `https://picsum.photos/80/80?random=${i}&blur=2`;
+                      onError={(e: React.SyntheticEvent<HTMLImageElement>) => {
+                        e.currentTarget.src = placeholderImage();
                       }}
                     />
                     <button

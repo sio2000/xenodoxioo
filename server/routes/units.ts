@@ -42,8 +42,8 @@ router.get("/", async (_req, res, next) => {
         maxGuests: unit.max_guests,
         bedrooms: unit.bedrooms,
         bathrooms: unit.bathrooms,
-        basePrice: unit.base_price || 0, // Ensure basePrice is never undefined/null
-        cleaningFee: unit.cleaning_fee || 0,
+        basePrice: Number(unit.base_price) || 0,
+        cleaningFee: Number(unit.cleaning_fee) || 0,
         images: parsedImages, // Use parsed array instead of JSON string
         minStayDays: unit.min_stay_days || 1,
         isActive: unit.is_active

@@ -28,8 +28,8 @@ router.get("/", async (_req, res, next) => {
     // Aggregate units per property
     const aggregatedProperties = properties.map((property) => {
       const propertyUnits = units?.filter((u) => u.property_id === property.id) || [];
-      const minPrice = propertyUnits.length > 0 
-        ? Math.min(...propertyUnits.map((u) => u.base_price))
+      const minPrice = propertyUnits.length > 0
+        ? Math.min(...propertyUnits.map((u) => Number(u.base_price) || 0))
         : 0;
 
       // Parse unit images
@@ -55,8 +55,8 @@ router.get("/", async (_req, res, next) => {
           maxGuests: unit.max_guests,
           bedrooms: unit.bedrooms,
           bathrooms: unit.bathrooms,
-          basePrice: unit.base_price,
-          cleaningFee: unit.cleaning_fee,
+          basePrice: Number(unit.base_price) || 0,
+          cleaningFee: Number(unit.cleaning_fee) || 0,
           minStayDays: unit.min_stay_days,
           isActive: unit.is_active
         };
@@ -148,8 +148,8 @@ router.get("/:slug", async (req, res, next) => {
         maxGuests: unit.max_guests,
         bedrooms: unit.bedrooms,
         bathrooms: unit.bathrooms,
-        basePrice: unit.base_price || 0, // Ensure basePrice is never undefined/null
-        cleaningFee: unit.cleaning_fee || 0,
+        basePrice: Number(unit.base_price) || 0,
+        cleaningFee: Number(unit.cleaning_fee) || 0,
         minStayDays: unit.min_stay_days || 1,
         isActive: unit.is_active
       };
@@ -235,8 +235,8 @@ router.get("/id/:id", async (req, res) => {
           maxGuests: unit.max_guests,
           bedrooms: unit.bedrooms,
           bathrooms: unit.bathrooms,
-          basePrice: unit.base_price || 0, // Ensure basePrice is never undefined/null
-          cleaningFee: unit.cleaning_fee || 0,
+          basePrice: Number(unit.base_price) || 0,
+          cleaningFee: Number(unit.cleaning_fee) || 0,
           minStayDays: unit.min_stay_days || 1,
           isActive: unit.is_active
         };
