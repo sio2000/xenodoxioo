@@ -5,7 +5,7 @@
   environment = { NODE_ENV = "production" }
 
 [functions]
-  external_node_modules = ["express"]
+  external_node_modules = ["express", "serverless-http"]
   node_bundler = "esbuild"
 
 # API: rewrite /api/* to serverless function (must come first)
