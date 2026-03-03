@@ -103,7 +103,7 @@ export const handler = async (event: any, context: any) => {
           try {
             if (typeof property.gallery_images === 'string') {
               // Only parse if it looks like JSON
-              if (property.gallery_images.startsWith('[') || property.gallery_images.startsWith('{'))) {
+              if (property.gallery_images.startsWith('[') || property.gallery_images.startsWith('{')) {
                 parsedGalleryImages = JSON.parse(property.gallery_images);
               } else {
                 parsedGalleryImages = property.gallery_images;
