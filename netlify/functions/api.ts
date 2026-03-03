@@ -136,6 +136,174 @@ export const handler = async (event: any, context: any) => {
       };
     }
 
+    // GET /api/properties/:id
+    if (path.startsWith('/api/properties/') && method === 'GET' && !path.includes('/id/')) {
+      // Extract ID from path like /api/properties/eb483818-92f9-43dd-bd62-9c3767324271
+      const id = path.split('/').pop();
+      console.log(`🔍 [${requestId}] Fetching property detail for ID: ${id}`);
+      
+      const { data: property, error } = await supabase
+        .from('properties')
+        .select(`
+          *,
+          units:units(*)
+        `)
+        .eq('id', id)
+        .eq('is_active', true)
+        .single();
+
+      if (error || !property) {
+        console.error(`❌ [${requestId}] Property not found:`, error);
+        return {
+          statusCode: 404,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            success: false,
+            message: "Property not found",
+            error: error?.message
+          })
+        };
+      }
+
+      // Get units for this property
+      const { data: units } = await supabase
+        .from('units')
+        .select('*')
+        .eq('property_id', property.id)
+        .eq('is_active', true)
+        .order('base_price', { ascending: true });
+
+      console.log(`✅ [${requestId}] Found property with ${units?.length || 0} units`);
+
+      // Transform data to match frontend expectations
+      const transformedProperty = {
+        ...property,
+        gallery_images: property.gallery_images || [],
+        units: (units || []).map((unit: any) => {
+          // Parse images JSON string to array
+          let parsedImages = [];
+          if (unit.images) {
+            try {
+              if (typeof unit.images === 'string') {
+                parsedImages = JSON.parse(unit.images);
+              } else if (Array.isArray(unit.images)) {
+                parsedImages = unit.images;
+              }
+            } catch (error) {
+              console.log(`⚠️ [${requestId}] Failed to parse images for unit:`, unit.id, error);
+              parsedImages = [];
+            }
+          }
+
+          return {
+            ...unit,
+            images: parsedImages,
+            propertyId: unit.property_id,
+            maxGuests: unit.max_guests,
+            bedrooms: unit.bedrooms,
+            bathrooms: unit.bathrooms,
+            basePrice: Number(unit.base_price) || 0,
+            cleaningFee: Number(unit.cleaning_fee) || 0,
+            minStayDays: unit.min_stay_days || 1,
+            isActive: unit.is_active
+          };
+        })
+      };
+
+      return {
+        statusCode: 200,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          success: true,
+          data: transformedProperty
+        })
+      };
+    }
+
+    // GET /api/properties/id/:id (legacy route)
+    if (path.startsWith('/api/properties/id/') && method === 'GET') {
+      // Extract ID from path like /api/properties/id/eb483818-92f9-43dd-bd62-9c3767324271
+      const id = path.split('/').pop();
+      console.log(`🔍 [${requestId}] Fetching property detail for ID: ${id}`);
+      
+      const { data: property, error } = await supabase
+        .from('properties')
+        .select(`
+          *,
+          units:units(*)
+        `)
+        .eq('id', id)
+        .eq('is_active', true)
+        .single();
+
+      if (error || !property) {
+        console.error(`❌ [${requestId}] Property not found:`, error);
+        return {
+          statusCode: 404,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            success: false,
+            message: "Property not found",
+            error: error?.message
+          })
+        };
+      }
+
+      // Get units for this property
+      const { data: units } = await supabase
+        .from('units')
+        .select('*')
+        .eq('property_id', property.id)
+        .eq('is_active', true)
+        .order('base_price', { ascending: true });
+
+      console.log(`✅ [${requestId}] Found property with ${units?.length || 0} units`);
+
+      // Transform data to match frontend expectations
+      const transformedProperty = {
+        ...property,
+        gallery_images: property.gallery_images || [],
+        units: (units || []).map((unit: any) => {
+          // Parse images JSON string to array
+          let parsedImages = [];
+          if (unit.images) {
+            try {
+              if (typeof unit.images === 'string') {
+                parsedImages = JSON.parse(unit.images);
+              } else if (Array.isArray(unit.images)) {
+                parsedImages = unit.images;
+              }
+            } catch (error) {
+              console.log(`⚠️ [${requestId}] Failed to parse images for unit:`, unit.id, error);
+              parsedImages = [];
+            }
+          }
+
+          return {
+            ...unit,
+            images: parsedImages,
+            propertyId: unit.property_id,
+            maxGuests: unit.max_guests,
+            bedrooms: unit.bedrooms,
+            bathrooms: unit.bathrooms,
+            basePrice: Number(unit.base_price) || 0,
+            cleaningFee: Number(unit.cleaning_fee) || 0,
+            minStayDays: unit.min_stay_days || 1,
+            isActive: unit.is_active
+          };
+        })
+      };
+
+      return {
+        statusCode: 200,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          success: true,
+          data: transformedProperty
+        })
+      };
+    }
+
     // Handle admin routes
     if (path.startsWith('/api/admin/')) {
       return await handleAdminRoutes(path, method, supabase, event, requestId);
@@ -234,7 +402,10 @@ async function handleAdminRoutes(path: string, method: string, supabase: any, ev
     if (path === '/api/admin/properties' && method === 'GET') {
       const { data: properties, error } = await supabase
         .from('properties')
-        .select('*')
+        .select(`
+          *,
+          units:units(*)
+        `)
         .order('created_at', { ascending: false });
 
       if (error) {
@@ -245,12 +416,29 @@ async function handleAdminRoutes(path: string, method: string, supabase: any, ev
         };
       }
 
+      // Transform data to match expected interface
+      const transformedProperties = properties?.map((property: any) => ({
+        ...property,
+        main_image: property.main_image,
+        gallery_images: property.gallery_images,
+        is_active: property.is_active,
+        units: property.units?.map((unit: any) => ({
+          ...unit,
+          propertyId: unit.property_id,
+          maxGuests: unit.max_guests,
+          bedrooms: unit.bedrooms,
+          bathrooms: unit.bathrooms,
+          beds: unit.beds,
+          basePrice: unit.base_price
+        })) || []
+      })) || [];
+
       return {
         statusCode: 200,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           success: true,
-          data: properties || []
+          data: transformedProperties
         })
       };
     }
@@ -259,7 +447,10 @@ async function handleAdminRoutes(path: string, method: string, supabase: any, ev
     if (path === '/api/admin/units' && method === 'GET') {
       const { data: units, error } = await supabase
         .from('units')
-        .select('*')
+        .select(`
+          *,
+          property:properties(*)
+        `)
         .order('created_at', { ascending: false });
 
       if (error) {
@@ -270,12 +461,111 @@ async function handleAdminRoutes(path: string, method: string, supabase: any, ev
         };
       }
 
+      // Transform the data to match the expected interface
+      const transformedUnits = units?.map((unit: any) => {
+        // Parse images JSON string to array
+        let parsedImages = [];
+        if (unit.images) {
+          try {
+            if (typeof unit.images === 'string') {
+              parsedImages = JSON.parse(unit.images);
+            } else if (Array.isArray(unit.images)) {
+              parsedImages = unit.images;
+            }
+          } catch (error) {
+            console.log("⚠️ [UNITS] Failed to parse images for unit:", unit.id, error);
+            parsedImages = [];
+          }
+        }
+
+        return {
+          ...unit,
+          propertyId: unit.property_id,
+          maxGuests: unit.max_guests,
+          bedrooms: unit.bedrooms,
+          bathrooms: unit.bathrooms,
+          basePrice: unit.base_price || 0, // Ensure basePrice is never undefined/null
+          cleaningFee: unit.cleaning_fee || 0,
+          images: parsedImages, // Use parsed array instead of JSON string
+          minStayDays: unit.min_stay_days || 1,
+          isActive: unit.is_active
+        };
+      }) || [];
+
       return {
         statusCode: 200,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           success: true,
-          data: units || []
+          data: transformedUnits
+        })
+      };
+    }
+
+    // PUT /api/admin/units/:id
+    if (path.startsWith('/api/admin/units/') && method === 'PUT') {
+      const id = path.split('/').pop();
+      const body = JSON.parse(event.body || '{}');
+      
+      console.log(`🔍 [${requestId}] Updating unit: ${id}`);
+      console.log(`🔍 [${requestId}] Update data:`, body);
+      
+      // Transform the data for database
+      const updateData: any = {
+        property_id: body.propertyId,
+        name: body.name,
+        description: body.description || '',
+        max_guests: body.maxGuests,
+        bedrooms: body.bedrooms,
+        bathrooms: body.bathrooms,
+        base_price: body.basePrice,
+        cleaning_fee: body.cleaningFee || 0,
+        min_stay_days: body.minStayDays || 1,
+        images: body.images || [] // Send as array, not JSON string
+      };
+      
+      const { data: unit, error } = await supabase
+        .from('units')
+        .update(updateData)
+        .eq('id', id)
+        .select(`
+          *,
+          property:properties(*)
+        `)
+        .single();
+
+      if (error) {
+        console.error(`❌ [${requestId}] Update error:`, error);
+        return {
+          statusCode: 500,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ 
+            success: false, 
+            error: error.message 
+          })
+        };
+      }
+
+      // Transform response for frontend
+      const transformedUnit = {
+        ...unit,
+        propertyId: unit.property_id,
+        maxGuests: unit.max_guests,
+        bedrooms: unit.bedrooms,
+        bathrooms: unit.bathrooms,
+        basePrice: unit.base_price,
+        cleaningFee: unit.cleaning_fee,
+        images: unit.images ? (typeof unit.images === 'string' ? JSON.parse(unit.images) : unit.images) : [],
+        minStayDays: unit.min_stay_days,
+        isActive: unit.is_active
+      };
+
+      return {
+        statusCode: 200,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          success: true,
+          data: transformedUnit
         })
       };
     }

@@ -67,14 +67,22 @@ export default function PropertyManagement() {
       console.log("🔍 [PROPERTIES] Units response:", unitsRes.status, unitsRes.ok);
 
       if (propertiesRes.ok && unitsRes.ok) {
-        const propertiesData = await propertiesRes.json();
-        const unitsData = await unitsRes.json();
+        const propertiesResponse = await propertiesRes.json();
+        const unitsResponse = await unitsRes.json();
+        
+        console.log("✅ [PROPERTIES] Properties response:", propertiesResponse);
+        console.log("✅ [PROPERTIES] Units response:", unitsResponse);
+        
+        // Handle wrapped response format from Netlify functions
+        const propertiesData = propertiesResponse.success ? propertiesResponse.data : propertiesResponse;
+        const unitsData = unitsResponse.success ? unitsResponse.data : unitsResponse;
         
         console.log("✅ [PROPERTIES] Properties data:", propertiesData);
         console.log("✅ [PROPERTIES] Units data:", unitsData);
         
-        setProperties(propertiesData);
-        setUnits(unitsData);
+        // Ensure we have arrays before setting state
+        setProperties(Array.isArray(propertiesData) ? propertiesData : []);
+        setUnits(Array.isArray(unitsData) ? unitsData : []);
       } else {
         console.error("❌ [PROPERTIES] Failed to fetch:", {
           properties: propertiesRes.status,
