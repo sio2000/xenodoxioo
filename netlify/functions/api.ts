@@ -477,8 +477,36 @@ async function handleImageServe(path: string, supabase: any) {
   try {
     const filename = path.replace('/uploads/', '');
     
-    // For now, redirect to a placeholder image service
-    // In production, you'd serve from Supabase storage or CDN
+    // Check if this is a real uploaded file in the uploads directory
+    const fs = await import('fs');
+    const pathModule = await import('path');
+    
+    const uploadsDir = pathModule.join(process.cwd(), 'uploads');
+    const filePath = pathModule.join(uploadsDir, filename);
+    
+    // Check if file exists locally
+    if (fs.existsSync(filePath)) {
+      const fileContent = fs.readFileSync(filePath);
+      const ext = filename.split('.').pop()?.toLowerCase();
+      
+      const contentType = ext === 'jpg' || ext === 'jpeg' ? 'image/jpeg' :
+                        ext === 'png' ? 'image/png' :
+                        ext === 'gif' ? 'image/gif' :
+                        ext === 'webp' ? 'image/webp' :
+                        'image/jpeg';
+      
+      return {
+        statusCode: 200,
+        headers: {
+          'Content-Type': contentType,
+          'Cache-Control': 'public, max-age=3600'
+        },
+        body: fileContent.toString('base64'),
+        isBase64Encoded: true
+      };
+    }
+    
+    // Fallback to placeholder if file not found
     const placeholderUrl = `https://picsum.photos/400/300?random=${filename}`;
     
     return {

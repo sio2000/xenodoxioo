@@ -336,7 +336,7 @@ function PricingAndDiscounts() {
                         <td className="py-2 font-mono font-medium text-foreground">{c.code}</td>
                         <td className="py-2 text-muted-foreground">{c.discountType}</td>
                         <td className="py-2 text-foreground">
-                          {c.discountType === "PERCENTAGE" ? `${c.discountValue}%` : formatCurrency(c.discountValue, language)}
+                          {c.discountType === "PERCENTAGE" ? `${c.discountValue}%` : formatCurrency(c.discountValue || 0, language)}
                         </td>
                         <td className="py-2 text-muted-foreground">
                           {new Date(c.validFrom).toLocaleDateString()}
