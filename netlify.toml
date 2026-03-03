@@ -22,13 +22,13 @@
   status = 200
   to = "/.netlify/functions/debug"
 
-# Legacy uploads: redirect to Supabase Storage instead of API function
-# This prevents unnecessary function calls and serves images directly from Supabase
+# Uploads: serve from public folder (static files) instead of redirecting to Supabase
+# This allows images to be served directly from the build output
 [[redirects]]
-  force = true
+  force = false
   from = "/uploads/*"
-  status = 301
-  to = "https://your-project.supabase.co/storage/v1/object/public/uploads/:splat"
+  status = 200
+  to = "/uploads/:splat"
 
 # SPA fallback: routes without a matching file serve index.html (fixes /admin, /about, /contact)
 [[redirects]]
@@ -54,5 +54,11 @@
 # Cache headers for images (if any remain in /public/)
 [[headers]]
   for = "/images/*"
+  [headers.values]
+    Cache-Control = "public, max-age=86400"
+
+# Cache headers for uploads folder
+[[headers]]
+  for = "/uploads/*"
   [headers.values]
     Cache-Control = "public, max-age=86400"
