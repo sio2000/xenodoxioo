@@ -233,7 +233,7 @@ export default function Index() {
                     {property.startingFrom !== null && (
                       <div className="absolute top-4 right-4 bg-white rounded-lg px-3 py-1 shadow-lg">
                         <span className="text-primary font-bold">
-                          {formatCurrency(property.startingFrom, language)}
+                          {formatCurrency(typeof property.startingFrom === 'object' ? property.startingFrom : property.startingFrom, language)}
                         </span>
                         <span className="text-muted-foreground text-sm">
                           /night

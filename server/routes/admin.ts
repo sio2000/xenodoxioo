@@ -221,6 +221,11 @@ router.post("/properties", async (req, res) => {
     // Add the unique slug
     propertyData.slug = slug;
     
+    // Add default main_image if not provided
+    if (!propertyData.main_image) {
+      propertyData.main_image = '';
+    }
+    
     const { data: property, error } = await supabase
       .from('properties')
       .insert(propertyData)

@@ -15,12 +15,20 @@
   status = 200
   to = "/.netlify/functions/api/:splat"
 
-# Uploads: proxy to API function so /uploads/* images work
+# Debug endpoint for system verification
+[[redirects]]
+  force = true
+  from = "/debug"
+  status = 200
+  to = "/.netlify/functions/debug"
+
+# Legacy uploads: redirect to Supabase Storage instead of API function
+# This prevents unnecessary function calls and serves images directly from Supabase
 [[redirects]]
   force = true
   from = "/uploads/*"
-  status = 200
-  to = "/.netlify/functions/api/uploads/:splat"
+  status = 301
+  to = "https://your-project.supabase.co/storage/v1/object/public/uploads/:splat"
 
 # SPA fallback: routes without a matching file serve index.html (fixes /admin, /about, /contact)
 [[redirects]]
@@ -36,3 +44,15 @@
     X-XSS-Protection = "1; mode=block"
     X-Content-Type-Options = "nosniff"
     Referrer-Policy = "strict-origin-when-cross-origin"
+
+# Cache headers for static assets
+[[headers]]
+  for = "/static/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+# Cache headers for images (if any remain in /public/)
+[[headers]]
+  for = "/images/*"
+  [headers.values]
+    Cache-Control = "public, max-age=86400"
