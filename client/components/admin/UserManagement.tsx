@@ -96,7 +96,7 @@ export default function UserManagement() {
     <div>
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-2xl font-bold text-foreground">
-          User Management
+          {t("admin.userManagement")}
         </h2>
       </div>
 
@@ -108,7 +108,7 @@ export default function UserManagement() {
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground" size={20} />
               <input
                 type="text"
-                placeholder="Search users..."
+                placeholder={t("admin.searchUsers")}
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="w-full pl-10 pr-4 py-2 border border-border rounded-md bg-background text-foreground"
@@ -122,10 +122,10 @@ export default function UserManagement() {
               onChange={(e) => setStatusFilter(e.target.value)}
               className="px-3 py-2 border border-border rounded-md bg-background text-foreground"
             >
-              <option value="ALL">All Status</option>
-              <option value="ACTIVE">Active</option>
-              <option value="INACTIVE">Inactive</option>
-              <option value="SUSPENDED">Suspended</option>
+              <option value="ALL">{t("admin.allStatus")}</option>
+              <option value="ACTIVE">{t("admin.statusActive")}</option>
+              <option value="INACTIVE">{t("admin.statusInactive")}</option>
+              <option value="SUSPENDED">{t("admin.statusSuspended")}</option>
             </select>
           </div>
         </div>
@@ -137,13 +137,13 @@ export default function UserManagement() {
           <table className="w-full">
             <thead className="bg-muted/50">
               <tr>
-                <th className="px-4 py-3 text-left text-sm font-medium text-foreground">User</th>
-                <th className="px-4 py-3 text-left text-sm font-medium text-foreground">Email</th>
-                <th className="px-4 py-3 text-left text-sm font-medium text-foreground">Status</th>
-                <th className="px-4 py-3 text-left text-sm font-medium text-foreground">Verified</th>
-                <th className="px-4 py-3 text-left text-sm font-medium text-foreground">Bookings</th>
-                <th className="px-4 py-3 text-left text-sm font-medium text-foreground">Joined</th>
-                <th className="px-4 py-3 text-left text-sm font-medium text-foreground">Actions</th>
+                <th className="px-4 py-3 text-left text-sm font-medium text-foreground">{t("admin.tableUser")}</th>
+                <th className="px-4 py-3 text-left text-sm font-medium text-foreground">{t("admin.tableEmail")}</th>
+                <th className="px-4 py-3 text-left text-sm font-medium text-foreground">{t("admin.tableStatus")}</th>
+                <th className="px-4 py-3 text-left text-sm font-medium text-foreground">{t("admin.tableVerified")}</th>
+                <th className="px-4 py-3 text-left text-sm font-medium text-foreground">{t("admin.tableBookings")}</th>
+                <th className="px-4 py-3 text-left text-sm font-medium text-foreground">{t("admin.tableJoined")}</th>
+                <th className="px-4 py-3 text-left text-sm font-medium text-foreground">{t("admin.tableActions")}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
@@ -171,13 +171,13 @@ export default function UserManagement() {
                         ? "text-green-600 bg-green-100" 
                         : "text-yellow-600 bg-yellow-100"
                     }`}>
-                      {user.isEmailVerified ? "Verified" : "Not Verified"}
+                      {user.isEmailVerified ? t("admin.verified") : t("admin.notVerified")}
                     </span>
                   </td>
                   <td className="px-4 py-3 text-sm text-foreground">
                     <div className="flex items-center gap-1">
                       <BookOpen size={14} className="text-muted-foreground" />
-                      {user._count?.bookings || 0} bookings
+                      {t("admin.userBookingsCount").replace("{count}", String(user._count?.bookings || 0))}
                     </div>
                   </td>
                   <td className="px-4 py-3 text-sm text-foreground">
@@ -191,13 +191,13 @@ export default function UserManagement() {
                       <button
                         onClick={() => setSelectedUser(user)}
                         className="btn-secondary-sm"
-                        title="View Details"
+                        title={t("admin.viewDetails")}
                       >
                         <Eye size={14} />
                       </button>
                       <button
                         className="btn-secondary-sm"
-                        title="Edit User"
+                        title={t("admin.editUser")}
                       >
                         <Edit size={14} />
                       </button>
@@ -211,7 +211,7 @@ export default function UserManagement() {
 
         {users.length === 0 && !loading && (
           <div className="text-center py-12">
-            <p className="text-muted-foreground">No users found</p>
+            <p className="text-muted-foreground">{t("admin.noUsersFound")}</p>
           </div>
         )}
       </div>
@@ -224,17 +224,17 @@ export default function UserManagement() {
             disabled={currentPage === 1}
             className="btn-secondary-sm"
           >
-            Previous
+            {t("admin.previous")}
           </button>
           <span className="text-sm text-muted-foreground">
-            Page {currentPage} of {totalPages}
+            {t("admin.pageOf").replace("{current}", String(currentPage)).replace("{total}", String(totalPages))}
           </span>
           <button
             onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
             disabled={currentPage === totalPages}
             className="btn-secondary-sm"
           >
-            Next
+            {t("admin.next")}
           </button>
         </div>
       )}
@@ -253,6 +253,7 @@ export default function UserManagement() {
 
 // User Details Modal Component
 function UserDetailsModal({ user, onClose, onStatusUpdate }: any) {
+  const { t } = useLanguage();
   const [newStatus, setNewStatus] = useState(user.status);
 
   const handleStatusChange = () => {
@@ -266,7 +267,7 @@ function UserDetailsModal({ user, onClose, onStatusUpdate }: any) {
       <div className="bg-card border border-border rounded-lg p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
         <div className="flex justify-between items-start mb-6">
           <h3 className="text-xl font-bold text-foreground">
-            User Details
+            {t("admin.userDetails")}
           </h3>
           <button onClick={onClose} className="text-muted-foreground hover:text-foreground">
             ×
@@ -276,36 +277,36 @@ function UserDetailsModal({ user, onClose, onStatusUpdate }: any) {
         <div className="grid gap-6">
           {/* User Information */}
           <div className="bg-muted/30 rounded-lg p-4">
-            <h4 className="font-semibold text-foreground mb-3">User Information</h4>
+            <h4 className="font-semibold text-foreground mb-3">{t("admin.userInformation")}</h4>
             <div className="grid grid-cols-2 gap-4 text-sm">
               <div>
-                <span className="text-muted-foreground">Name:</span>
+                <span className="text-muted-foreground">{t("admin.nameField")}</span>
                 <p className="text-foreground">
                   {user.firstName} {user.lastName}
                 </p>
               </div>
               <div>
-                <span className="text-muted-foreground">Email:</span>
+                <span className="text-muted-foreground">{t("admin.emailField")}</span>
                 <p className="text-foreground">{user.email}</p>
               </div>
               <div>
-                <span className="text-muted-foreground">Email Verified:</span>
+                <span className="text-muted-foreground">{t("admin.emailVerifiedField")}</span>
                 <p className="text-foreground">
-                  {user.isEmailVerified ? "Yes" : "No"}
+                  {user.isEmailVerified ? t("common.yes") : t("common.no")}
                 </p>
               </div>
               <div>
-                <span className="text-muted-foreground">Member Since:</span>
+                <span className="text-muted-foreground">{t("admin.memberSince")}</span>
                 <p className="text-foreground">
                   {new Date(user.createdAt).toLocaleDateString()}
                 </p>
               </div>
               <div>
-                <span className="text-muted-foreground">Total Bookings:</span>
+                <span className="text-muted-foreground">{t("admin.totalBookingsField")}</span>
                 <p className="text-foreground">{user._count?.bookings || 0}</p>
               </div>
               <div>
-                <span className="text-muted-foreground">Current Status:</span>
+                <span className="text-muted-foreground">{t("admin.currentStatusField")}</span>
                 <p className="text-foreground">{user.status}</p>
               </div>
             </div>
@@ -313,20 +314,20 @@ function UserDetailsModal({ user, onClose, onStatusUpdate }: any) {
 
           {/* Status Management */}
           <div className="bg-muted/30 rounded-lg p-4">
-            <h4 className="font-semibold text-foreground mb-3">Status Management</h4>
+            <h4 className="font-semibold text-foreground mb-3">{t("admin.statusManagement")}</h4>
             <div className="flex gap-4 items-end">
               <div className="flex-1">
                 <label className="block text-sm font-medium text-foreground mb-1">
-                  User Status
+                  {t("admin.userStatus")}
                 </label>
                 <select
                   value={newStatus}
                   onChange={(e) => setNewStatus(e.target.value)}
                   className="w-full p-2 border border-border rounded-md bg-background text-foreground"
                 >
-                  <option value="ACTIVE">Active</option>
-                  <option value="INACTIVE">Inactive</option>
-                  <option value="SUSPENDED">Suspended</option>
+                  <option value="ACTIVE">{t("admin.statusActive")}</option>
+                  <option value="INACTIVE">{t("admin.statusInactive")}</option>
+                  <option value="SUSPENDED">{t("admin.statusSuspended")}</option>
                 </select>
               </div>
               <button
@@ -334,26 +335,26 @@ function UserDetailsModal({ user, onClose, onStatusUpdate }: any) {
                 disabled={newStatus === user.status}
                 className="btn-primary"
               >
-                Update Status
+                {t("admin.updateStatus")}
               </button>
             </div>
           </div>
 
           {/* Quick Actions */}
           <div className="bg-muted/30 rounded-lg p-4">
-            <h4 className="font-semibold text-foreground mb-3">Quick Actions</h4>
+            <h4 className="font-semibold text-foreground mb-3">{t("admin.quickActions")}</h4>
             <div className="grid grid-cols-2 gap-4">
               <button className="btn-secondary">
-                Send Password Reset Email
+                {t("admin.sendPasswordReset")}
               </button>
               <button className="btn-secondary">
-                View Booking History
+                {t("admin.viewBookingHistory")}
               </button>
               <button className="btn-secondary">
-                Apply Custom Discount
+                {t("admin.applyCustomDiscount")}
               </button>
               <button className="btn-secondary">
-                Send Promotional Email
+                {t("admin.sendPromoEmail")}
               </button>
             </div>
           </div>
@@ -361,7 +362,7 @@ function UserDetailsModal({ user, onClose, onStatusUpdate }: any) {
 
         <div className="flex gap-2 pt-6">
           <button onClick={onClose} className="btn-secondary">
-            Close
+            {t("admin.close")}
           </button>
         </div>
       </div>

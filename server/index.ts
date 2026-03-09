@@ -11,113 +11,126 @@ import { authRouter } from "./routes/auth";
 import { bookingRouter } from "./routes/bookings";
 import { propertiesRouter } from "./routes/properties";
 import { unitsRouter } from "./routes/units";
+import { inquiryRouter } from "./routes/inquiries";
 import viewVideosRouter from "./routes/viewvideos";
-// import { startScheduler } from "./services/scheduler";
+import { startScheduler } from "./services/scheduler";
+import { errorHandler } from "./middleware/error";
+
+function validateStripeConfig() {
+  const secretKey = process.env.STRIPE_SECRET_KEY;
+  const publishableKey = process.env.STRIPE_PUBLISHABLE_KEY || process.env.VITE_STRIPE_PUBLISHABLE_KEY;
+  const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
+
+  console.log("\n╔══════════════════════════════════════════════╗");
+  console.log("║         STRIPE CONFIGURATION STATUS          ║");
+  console.log("╠══════════════════════════════════════════════╣");
+
+  if (!secretKey) {
+    console.log("║ ✗ STRIPE_SECRET_KEY          — MISSING       ║");
+    console.log("║   Add sk_test_... to .env                    ║");
+  } else {
+    const isTest = secretKey.startsWith("sk_test_");
+    console.log(`║ ✓ STRIPE_SECRET_KEY          — ${isTest ? "TEST MODE" : "LIVE MODE"}   ║`);
+  }
+
+  if (!publishableKey) {
+    console.log("║ ✗ STRIPE_PUBLISHABLE_KEY     — MISSING       ║");
+  } else {
+    console.log("║ ✓ STRIPE_PUBLISHABLE_KEY     — SET           ║");
+  }
+
+  if (!webhookSecret) {
+    console.log("║ ⚠ STRIPE_WEBHOOK_SECRET      — NOT SET       ║");
+    console.log("║                                              ║");
+    console.log("║   Webhooks will be accepted WITHOUT          ║");
+    console.log("║   signature verification.                    ║");
+    console.log("║                                              ║");
+    console.log("║   To enable verification:                    ║");
+    console.log("║   1. Run: stripe listen --forward-to         ║");
+    console.log("║      localhost:8080/api/payments/webhook      ║");
+    console.log("║   2. Copy the whsec_... secret               ║");
+    console.log("║   3. Set STRIPE_WEBHOOK_SECRET in .env       ║");
+    console.log("║   4. Restart the server                      ║");
+  } else {
+    console.log("║ ✓ STRIPE_WEBHOOK_SECRET      — SET           ║");
+  }
+
+  console.log("╚══════════════════════════════════════════════╝\n");
+}
 
 export function createServer() {
   const app = express();
 
-  // Create uploads directory if it doesn't exist
+  if (process.env.NODE_ENV !== "test") {
+    validateStripeConfig();
+  }
+
   const uploadsDir = path.join(process.cwd(), "uploads");
   if (!fs.existsSync(uploadsDir)) {
     fs.mkdirSync(uploadsDir, { recursive: true });
   }
 
-  // Serve static files from uploads directory
   app.use("/uploads", express.static(uploadsDir));
 
-  // Configure multer for file uploads
   const storage = multer.diskStorage({
-    destination: (req, file, cb) => {
-      cb(null, uploadsDir);
+    destination: (_req, _file, cb) => cb(null, uploadsDir),
+    filename: (_req, file, cb) => {
+      const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
+      cb(null, file.fieldname + "-" + uniqueSuffix + path.extname(file.originalname));
     },
-    filename: (req, file, cb) => {
-      const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-      cb(null, file.fieldname + '-' + uniqueSuffix + path.extname(file.originalname));
-    }
   });
 
   const upload = multer({
     storage,
-    limits: { fileSize: 10 * 1024 * 1024 }, // 10MB
-    fileFilter: (req: express.Request, file: Express.Multer.File, cb: multer.FileFilterCallback) => {
-      if (file.mimetype.startsWith('image/')) cb(null, true);
-      else cb(new Error('Only image files are allowed'));
+    limits: { fileSize: 10 * 1024 * 1024 },
+    fileFilter: (_req: express.Request, file: Express.Multer.File, cb: multer.FileFilterCallback) => {
+      if (file.mimetype.startsWith("image/")) cb(null, true);
+      else cb(new Error("Only image files are allowed"));
     },
   });
 
-  // Accept any file field - fixes "Unexpected field" (client may send various field names)
   const uploadAny = upload.any();
-
   app.locals.upload = upload;
   app.locals.uploadAny = uploadAny;
 
-  // Middleware
   app.use(cors());
-  app.use(express.json({ limit: '10mb' }));
-  app.use(express.urlencoded({ extended: true, limit: '10mb' }));
-  
-  // Request logging middleware for debugging
-  app.use((req, res, next) => {
-    const start = Date.now();
-    console.log("🌐 [REQUEST] Incoming:", {
-      method: req.method,
-      url: req.url,
-      headers: {
-        'user-agent': req.get('User-Agent'),
-        'referer': req.get('Referer')
-      },
-      timestamp: new Date().toISOString()
-    });
-    
-    // Log response when it finishes
-    res.on('finish', () => {
-      const duration = Date.now() - start;
-      console.log("🌐 [RESPONSE] Completed:", {
-        method: req.method,
-        url: req.url,
-        statusCode: res.statusCode,
-        duration: `${duration}ms`,
-        timestamp: new Date().toISOString()
-      });
-    });
-    
+
+  // Stripe webhook needs raw body — register BEFORE express.json()
+  app.use(
+    "/api/payments/webhook",
+    express.raw({ type: "application/json" }),
+  );
+
+  app.use(express.json({ limit: "10mb" }));
+  app.use(express.urlencoded({ extended: true, limit: "10mb" }));
+
+  app.use((req, _res, next) => {
+    if (process.env.NODE_ENV !== "production") {
+      console.log(`[${req.method}] ${req.url}`);
+    }
     next();
   });
-  
-  // Serve uploaded files
-  app.use('/uploads', express.static(uploadsDir, {
-    setHeaders: (res, filePath) => {
-      console.log("🖼️ [SERVER] Serving image file:", {
-        filePath,
-        timestamp: new Date().toISOString(),
-        userAgent: res.get('User-Agent')
-      });
-    }
-  }));
 
-  // Serve view videos from public/viewvideos via API (guaranteed correct path)
+  app.use("/uploads", express.static(uploadsDir));
   app.use("/api/viewvideos", viewVideosRouter);
 
-  // Health check
   app.get("/api/ping", (_req, res) => {
-    const ping = process.env.PING_MESSAGE ?? "ping";
-    res.json({ message: ping });
+    res.json({ message: process.env.PING_MESSAGE ?? "ping" });
   });
-
   app.get("/api/demo", handleDemo);
 
-  // API routes
   app.use("/api/payments", paymentRouter);
   app.use("/api/admin", adminRouter);
   app.use("/api/auth", authRouter);
   app.use("/api/bookings", bookingRouter);
   app.use("/api/properties", propertiesRouter);
   app.use("/api/units", unitsRouter);
+  app.use("/api/inquiries", inquiryRouter);
 
-  // Start payment scheduler
+  app.use(errorHandler);
+
   if (process.env.NODE_ENV !== "test") {
-    // startScheduler(); // TODO: Implement with Supabase
+    startScheduler();
   }
 
   return app;

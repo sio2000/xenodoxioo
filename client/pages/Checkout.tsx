@@ -1,30 +1,108 @@
 import Layout from "@/components/Layout";
 import { apiUrl } from "@/lib/api";
 import { useSearchParams, Link, useNavigate } from "react-router-dom";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useLanguage } from "@/hooks/useLanguage";
 import formatCurrency from "@/lib/currency";
-import { CreditCard, Lock, User } from "lucide-react";
+import { CreditCard, Lock, User, AlertCircle, CheckCircle2 } from "lucide-react";
+import { loadStripe, Stripe } from "@stripe/stripe-js";
+import { Elements, PaymentElement, useStripe, useElements } from "@stripe/react-stripe-js";
+
+const stripePublishableKey = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY || "";
+const stripePromise = stripePublishableKey ? loadStripe(stripePublishableKey) : null;
 
 type QuoteResponse = {
-  unit: {
-    id: string;
-    name: string;
-    maxGuests: number;
-    basePrice: number;
-    cleaningFee: number;
-  };
+  unit: { id: string; name?: string; maxGuests?: number; basePrice?: number; cleaningFee?: number };
   pricing: {
     nights: number;
+    basePrice: number;
     subtotal: number;
     cleaningFee: number;
     discountAmount: number;
     taxes: number;
+    taxRate: number;
     totalPrice: number;
     depositAmount: number;
     balanceAmount: number;
+    isFullPayment: boolean;
+    scheduledChargeDate: string | null;
   };
 };
+
+// ── Stripe Payment Form ────────────────────────────────────────────
+
+function StripePaymentForm({
+  onSuccess,
+  isProcessing,
+  setIsProcessing,
+  clientSecret,
+}: {
+  onSuccess: () => void;
+  isProcessing: boolean;
+  setIsProcessing: (v: boolean) => void;
+  clientSecret: string;
+}) {
+  const stripe = useStripe();
+  const elements = useElements();
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!stripe || !elements) return;
+
+    setIsProcessing(true);
+    setErrorMessage(null);
+
+    const { error } = await stripe.confirmPayment({
+      elements,
+      confirmParams: {
+        return_url: window.location.origin + "/dashboard",
+      },
+      redirect: "if_required",
+    });
+
+    if (error) {
+      setErrorMessage(error.message || "Payment failed");
+      setIsProcessing(false);
+      return;
+    }
+
+    const { paymentIntent } = await stripe.retrievePaymentIntent(clientSecret);
+    if (paymentIntent?.status === "succeeded") {
+      console.log("[CHECKOUT] Payment confirmed as succeeded via Stripe:", paymentIntent.id);
+      onSuccess();
+    } else {
+      console.warn("[CHECKOUT] Payment status after confirm:", paymentIntent?.status);
+      if (paymentIntent?.status === "processing") {
+        onSuccess();
+      } else {
+        setErrorMessage(`Payment status: ${paymentIntent?.status || "unknown"}. Please try again.`);
+        setIsProcessing(false);
+      }
+    }
+  };
+
+  return (
+    <form onSubmit={handleSubmit}>
+      <PaymentElement />
+      {errorMessage && (
+        <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-lg flex items-center gap-2">
+          <AlertCircle size={16} className="text-red-500 flex-shrink-0" />
+          <p className="text-sm text-red-700">{errorMessage}</p>
+        </div>
+      )}
+      <button
+        type="submit"
+        disabled={isProcessing || !stripe || !elements}
+        className="btn-primary w-full justify-center text-lg py-3 mt-4 disabled:opacity-50 disabled:cursor-not-allowed"
+      >
+        {isProcessing ? "Processing..." : "Pay Now"}
+      </button>
+    </form>
+  );
+}
+
+// ── Main Checkout ──────────────────────────────────────────────────
 
 export default function Checkout() {
   const [searchParams] = useSearchParams();
@@ -34,13 +112,17 @@ export default function Checkout() {
   const [loadingQuote, setLoadingQuote] = useState(true);
   const [quoteError, setQuoteError] = useState<string | null>(null);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [userEmail, setUserEmail] = useState("");
   const [couponCode, setCouponCode] = useState("");
   const [applyingCoupon, setApplyingCoupon] = useState(false);
   const [couponError, setCouponError] = useState<string | null>(null);
   const [appliedCoupon, setAppliedCoupon] = useState<any>(null);
-  const [taxSettings, setTaxSettings] = useState({ taxRate: 15, additionalFees: 0 });
-  const [quoteWithCoupon, setQuoteWithCoupon] = useState<QuoteResponse | null>(null);
+
+  // Payment state
+  const [bookingId, setBookingId] = useState<string | null>(null);
+  const [clientSecret, setClientSecret] = useState<string | null>(null);
+  const [paymentType, setPaymentType] = useState<string>("DEPOSIT");
+  const [paymentComplete, setPaymentComplete] = useState(false);
+  const [step, setStep] = useState<"info" | "payment">("info");
 
   const unitId = searchParams.get("unit");
   const propertyId = searchParams.get("property");
@@ -51,24 +133,14 @@ export default function Checkout() {
   const { language, t } = useLanguage();
 
   useEffect(() => {
-    // Check authentication status
     try {
       const auth = localStorage.getItem("auth");
       if (auth) {
         const parsed = JSON.parse(auth);
         setIsLoggedIn(true);
-        setUserEmail(parsed.email || "");
-      } else {
-        setIsLoggedIn(false);
-        setUserEmail("");
+        setFormData((prev) => ({ ...prev, email: parsed.email || "" }));
       }
-    } catch {
-      setIsLoggedIn(false);
-      setUserEmail("");
-    }
-    
-    // Fetch tax settings
-    fetchTaxSettings();
+    } catch {}
   }, []);
 
   const [formData, setFormData] = useState({
@@ -82,44 +154,63 @@ export default function Checkout() {
     country: "",
   });
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  // Load quote
+  useEffect(() => {
+    const loadQuote = async () => {
+      if (!unitId || !checkIn || !checkOut) {
+        setQuoteError("Missing booking details. Please start your booking again.");
+        setLoadingQuote(false);
+        return;
+      }
+      try {
+        const response = await fetch(apiUrl("/api/bookings/quote"), {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            unitId,
+            checkInDate: checkIn,
+            checkOutDate: checkOut,
+            guests: Number(guests) || 1,
+          }),
+        });
+        if (!response.ok) {
+          const text = await response.text();
+          setQuoteError(text.includes("<!doctype") ? "Server error" : text || "Dates not available");
+          return;
+        }
+        const json = await response.json();
+        setQuote(json.data as QuoteResponse);
+      } catch {
+        setQuoteError("Unable to load pricing. Please try again.");
+      } finally {
+        setLoadingQuote(false);
+      }
+    };
+    loadQuote();
+  }, [unitId, checkIn, checkOut, guests]);
 
+  // Step 1: Create booking + payment intent
+  const handleCreateBooking = async (e: React.FormEvent) => {
+    e.preventDefault();
     if (!unitId || !checkIn || !checkOut) {
-      alert("Missing booking details. Please start your booking again.");
+      alert("Missing booking details.");
       return;
     }
 
-    // Optional: send auth if logged in so booking is attributed to account
     let accessToken: string | null = null;
     try {
-      const rawAuth = localStorage.getItem("auth");
-      if (rawAuth) {
-        const parsed = JSON.parse(rawAuth);
-        accessToken = parsed.accessToken ?? null;
-      }
-    } catch {
-      accessToken = null;
-    }
+      const raw = localStorage.getItem("auth");
+      if (raw) accessToken = JSON.parse(raw).accessToken ?? null;
+    } catch {}
 
-    const headers: Record<string, string> = {
-      "Content-Type": "application/json",
-    };
-    if (accessToken) {
-      headers.Authorization = `Bearer ${accessToken}`;
-    }
+    const headers: Record<string, string> = { "Content-Type": "application/json" };
+    if (accessToken) headers.Authorization = `Bearer ${accessToken}`;
 
     setIsProcessing(true);
 
     try {
-      console.log("🔍 [CHECKOUT] Creating booking via API", {
-        unitId,
-        checkIn,
-        checkOut,
-        guests,
-      });
-
-      const response = await fetch(apiUrl("/api/bookings"), {
+      // 1. Create booking
+      const bookingRes = await fetch(apiUrl("/api/bookings"), {
         method: "POST",
         headers,
         body: JSON.stringify({
@@ -130,56 +221,99 @@ export default function Checkout() {
           guestName: `${formData.firstName} ${formData.lastName}`.trim(),
           guestEmail: formData.email,
           guestPhone: formData.phone,
+          couponCode: appliedCoupon?.code,
         }),
       });
 
-      const json = await response.json().catch(() => ({}));
-
-      if (!response.ok) {
-        console.error("❌ [CHECKOUT] Booking creation failed:", json);
-        alert(
-          json.error ||
-            "There was a problem completing your booking. Please try again.",
-        );
+      const bookingJson = await bookingRes.json().catch(() => ({}));
+      if (!bookingRes.ok) {
+        alert(bookingJson.error || "Failed to create booking");
         setIsProcessing(false);
         return;
       }
 
+      const newBookingId = bookingJson.data?.id;
+      if (!newBookingId) {
+        alert("Booking creation failed — no ID returned");
+        setIsProcessing(false);
+        return;
+      }
+      setBookingId(newBookingId);
+
+      // 2. Create payment intent
+      const paymentEndpoint = accessToken
+        ? "/api/payments/create-intent"
+        : "/api/payments/create-guest-intent";
+
+      const paymentRes = await fetch(apiUrl(paymentEndpoint), {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ bookingId: newBookingId }),
+      });
+
+      const paymentJson = await paymentRes.json().catch(() => ({}));
+      if (!paymentRes.ok || !paymentJson.data?.clientSecret) {
+        alert(paymentJson.error || "Failed to initialize payment");
+        setIsProcessing(false);
+        return;
+      }
+
+      setClientSecret(paymentJson.data.clientSecret);
+      setPaymentType(paymentJson.data.paymentType || "DEPOSIT");
+      setStep("payment");
+    } catch (err) {
+      console.error("Checkout error:", err);
+      alert("Something went wrong. Please try again.");
+    } finally {
       setIsProcessing(false);
-      alert(
-        "Booking confirmed! A confirmation email will be sent to " +
-          formData.email,
-      );
-      navigate(accessToken ? "/dashboard" : "/");
-    } catch (error) {
-      console.error("❌ [CHECKOUT] Error completing booking", error);
-      setIsProcessing(false);
-      alert("There was a problem completing your booking. Please try again.");
     }
   };
 
-  const handleInputChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>,
-  ) => {
-    const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
+  const handlePaymentSuccess = async () => {
+    if (bookingId) {
+      for (let attempt = 1; attempt <= 3; attempt++) {
+        try {
+          console.log(`[CHECKOUT] Confirming payment status (attempt ${attempt})...`);
+          const res = await fetch(apiUrl(`/api/payments/confirm-status/${bookingId}`), {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+          });
+          const json = await res.json().catch(() => ({}));
+          console.log("[CHECKOUT] Confirm response:", json);
+          if (res.ok && (json.data?.confirmed || json.data?.alreadyConfirmed)) {
+            console.log("[CHECKOUT] Booking confirmed successfully!");
+            break;
+          }
+          if (attempt < 3) {
+            await new Promise((r) => setTimeout(r, 1000 * attempt));
+          }
+        } catch (err) {
+          console.error(`[CHECKOUT] Confirm attempt ${attempt} failed:`, err);
+          if (attempt < 3) {
+            await new Promise((r) => setTimeout(r, 1000 * attempt));
+          }
+        }
+      }
+    }
+    setPaymentComplete(true);
+    setIsProcessing(false);
+    setTimeout(() => {
+      navigate(isLoggedIn ? "/dashboard" : "/");
+    }, 3000);
+  };
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+    setFormData((prev) => ({ ...prev, [e.target.name]: e.target.value }));
   };
 
   const handleApplyCoupon = async () => {
-    if (!couponCode.trim()) {
-      setCouponError("Please enter a coupon code");
-      return;
-    }
-
+    if (!couponCode.trim()) { setCouponError("Enter a coupon code"); return; }
     setApplyingCoupon(true);
     setCouponError(null);
-
     try {
-      const response = await fetch(apiUrl("/api/admin/coupons/validate"), {
+      const res = await fetch(apiUrl("/api/admin/coupons/validate"), {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           code: couponCode.trim().toUpperCase(),
           unitId,
@@ -188,236 +322,88 @@ export default function Checkout() {
           guests: Number(guests) || 1,
         }),
       });
-
-      const data = await response.json();
-
-      if (response.ok) {
+      const data = await res.json();
+      if (res.ok) {
         setAppliedCoupon(data.coupon);
-        
-        // Fetch new quote with coupon applied
-        try {
-          const quoteResponse = await fetch(apiUrl("/api/bookings/quote"), {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              unitId,
-              checkInDate: checkIn,
-              checkOutDate: checkOut,
-              guests: Number(guests) || 1,
-              couponCode: couponCode.trim().toUpperCase()
-            }),
-          });
-          
-          if (quoteResponse.ok) {
-            const quoteData = await quoteResponse.json();
-            setQuoteWithCoupon(quoteData.data);
-            alert("Coupon applied successfully!");
-          } else {
-            const errorText = await quoteResponse.text();
-            console.error("Failed to fetch updated quote:", errorText);
-            alert("Coupon applied but failed to update pricing");
-          }
-        } catch (error) {
-          console.error("Failed to fetch updated quote:", error);
-          alert("Coupon applied but failed to update pricing");
+        // Refresh quote with coupon
+        const qRes = await fetch(apiUrl("/api/bookings/quote"), {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            unitId, checkInDate: checkIn, checkOutDate: checkOut,
+            guests: Number(guests) || 1, couponCode: couponCode.trim().toUpperCase(),
+          }),
+        });
+        if (qRes.ok) {
+          const qData = await qRes.json();
+          setQuote(qData.data);
         }
       } else {
-        setCouponError(data.error || "Invalid coupon code");
+        setCouponError(data.error || "Invalid coupon");
       }
-    } catch (error) {
-      setCouponError("Failed to apply coupon. Please try again.");
-    } finally {
-      setApplyingCoupon(false);
-    }
+    } catch { setCouponError("Failed to apply coupon"); }
+    finally { setApplyingCoupon(false); }
   };
 
   const handleRemoveCoupon = async () => {
     setAppliedCoupon(null);
     setCouponCode("");
     setCouponError(null);
-    setQuoteWithCoupon(null);
-    
-    // Fetch original quote without coupon
     try {
-      const response = await fetch(apiUrl("/api/bookings/quote"), {
+      const res = await fetch(apiUrl("/api/bookings/quote"), {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          unitId,
-          checkInDate: checkIn,
-          checkOutDate: checkOut,
-          guests: Number(guests) || 1,
-        }),
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ unitId, checkInDate: checkIn, checkOutDate: checkOut, guests: Number(guests) || 1 }),
       });
-      
-      if (response.ok) {
-        const data = await response.json();
-        setQuote(data.data);
-      } else {
-        const errorText = await response.text();
-        console.error("Failed to fetch original quote:", errorText);
-      }
-    } catch (error) {
-      console.error("Failed to fetch original quote:", error);
-    }
+      if (res.ok) { const d = await res.json(); setQuote(d.data); }
+    } catch {}
   };
 
-  const fetchTaxSettings = async () => {
-    try {
-      const response = await fetch(apiUrl("/api/admin/settings/tax"));
-      if (response.ok) {
-        const settings = await response.json();
-        setTaxSettings(settings);
-        
-        // Refresh quote with new tax settings
-        if (unitId && checkIn && checkOut) {
-          try {
-            const quoteResponse = await fetch(apiUrl("/api/bookings/quote"), {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-              },
-              body: JSON.stringify({
-                unitId,
-                checkInDate: checkIn,
-                checkOutDate: checkOut,
-                guests: Number(guests) || 1,
-                couponCode: appliedCoupon?.code
-              }),
-            });
-            
-            if (quoteResponse.ok) {
-              const quoteData = await quoteResponse.json();
-              if (appliedCoupon) {
-                setQuoteWithCoupon(quoteData.data);
-              } else {
-                setQuote(quoteData.data);
-              }
-            } else {
-              const errorText = await quoteResponse.text();
-              console.error("Failed to refresh quote with new tax settings:", errorText);
-            }
-          } catch (error) {
-            console.error("Failed to refresh quote with new tax settings:", error);
-          }
-        }
-      } else {
-        const errorText = await response.text();
-        console.error("Failed to fetch tax settings:", errorText);
-      }
-    } catch (error) {
-      console.error("Failed to fetch tax settings:", error);
-    }
-  };
+  // Derived pricing
+  const pricing = quote?.pricing;
+  const nights = pricing?.nights ?? 0;
+  const basePrice = pricing?.basePrice ?? 0;
+  const cleaningFee = pricing?.cleaningFee ?? 0;
+  const discountAmount = pricing?.discountAmount ?? 0;
+  const taxes = pricing?.taxes ?? 0;
+  const taxRate = pricing?.taxRate ?? 15;
+  const total = pricing?.totalPrice ?? 0;
+  const depositAmount = pricing?.depositAmount ?? 0;
+  const balanceAmount = pricing?.balanceAmount ?? 0;
+  const isFullPayment = pricing?.isFullPayment ?? false;
 
-  useEffect(() => {
-    const loadQuote = async () => {
-      if (!unitId || !checkIn || !checkOut) {
-        setQuoteError("Missing booking details. Please start your booking again.");
-        setLoadingQuote(false);
-        return;
-      }
+  const formattedCheckIn = checkIn ? new Date(checkIn).toLocaleDateString() : "";
+  const formattedCheckOut = checkOut ? new Date(checkOut).toLocaleDateString() : "";
 
-      try {
-        console.log("🔍 [CHECKOUT] Fetching quote from server...", {
-          unitId,
-          checkIn,
-          checkOut,
-          guests,
-        });
-        const response = await fetch(apiUrl("/api/bookings/quote"), {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            unitId,
-            checkInDate: checkIn,
-            checkOutDate: checkOut,
-            guests: Number(guests) || 1,
-          }),
-        });
-
-        if (!response.ok) {
-          const errorText = await response.text();
-          console.error("❌ [CHECKOUT] Quote error response:", errorText);
-          setQuoteError(
-            errorText.includes("<!doctype") 
-              ? "Server error. Please try again." 
-              : errorText || "Selected dates are not available for this unit."
-          );
-          return;
-        }
-
-        const json = await response.json();
-        setQuote(json.data as QuoteResponse);
-      } catch (error) {
-        console.error("❌ [CHECKOUT] Network error while fetching quote", error);
-        setQuoteError("Unable to load pricing. Please try again.");
-      } finally {
-        setLoadingQuote(false);
-      }
-    };
-
-    loadQuote();
-  }, [unitId, checkIn, checkOut, guests]);
-
-  const nights = quote?.pricing.nights ?? 0;
-  const basePrice = quote?.unit.basePrice ?? 0;
-  const cleaningFee = quote?.pricing.cleaningFee ?? 0;
-  
-  // Dynamic price calculation
-  const subtotal = basePrice * nights;
-  
-  // Calculate discount from coupon if applied
-  let discountAmount = 0;
-  if (appliedCoupon) {
-    if (appliedCoupon.discountType === "PERCENTAGE") {
-      discountAmount = (subtotal * appliedCoupon.discountValue) / 100;
-    } else {
-      discountAmount = appliedCoupon.discountValue;
-    }
+  // Payment success screen
+  if (paymentComplete) {
+    return (
+      <Layout>
+        <div className="container-max py-20 text-center">
+          <CheckCircle2 size={64} className="text-green-500 mx-auto mb-6" />
+          <h1 className="text-3xl font-bold mb-4">Payment Successful!</h1>
+          <p className="text-lg text-muted-foreground mb-2">
+            Your booking has been confirmed. A confirmation email will be sent to {formData.email}.
+          </p>
+          <p className="text-sm text-muted-foreground">Redirecting...</p>
+        </div>
+      </Layout>
+    );
   }
-  
-  // Calculate taxes using dynamic tax rate
-  const taxableAmount = subtotal - discountAmount + cleaningFee;
-  const taxes = Math.round(taxableAmount * (taxSettings.taxRate / 100) * 100) / 100;
-  
-  // Calculate final totals
-  const total = subtotal + cleaningFee + taxes - discountAmount;
-  const depositAmount = Math.round(total * 0.25);
-  const balanceAmount = total - depositAmount;
-
-  const formattedCheckIn =
-    checkIn ? new Date(checkIn).toLocaleDateString() : "";
-  const formattedCheckOut =
-    checkOut ? new Date(checkOut).toLocaleDateString() : "";
 
   return (
     <Layout>
       <div className="container-max py-12">
-        {/* Header */}
         <div className="mb-12">
           {propertyId && (
-            <Link
-              to={`/properties/${propertyId}`}
-              className="text-primary hover:text-primary/80 mb-4 inline-block"
-            >
-              ← {t("property.backToProperty")}
+            <Link to={`/properties/${propertyId}`} className="text-primary hover:text-primary/80 mb-4 inline-block">
+              &larr; {t("property.backToProperty")}
             </Link>
           )}
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-3xl md:text-4xl font-bold text-foreground">
-                {t("checkout.title")}
-              </h1>
-              <p className="text-muted-foreground text-lg mt-2">
-                {t("checkout.subtitle")}
-              </p>
+              <h1 className="text-3xl md:text-4xl font-bold text-foreground">{t("checkout.title")}</h1>
+              <p className="text-muted-foreground text-lg mt-2">{t("checkout.subtitle")}</p>
             </div>
             <div className="flex items-center gap-2">
               {isLoggedIn ? (
@@ -433,440 +419,290 @@ export default function Checkout() {
               )}
             </div>
           </div>
+
+          {/* Step indicator */}
+          <div className="flex items-center gap-4 mt-6">
+            <div className={`flex items-center gap-2 ${step === "info" ? "text-primary font-bold" : "text-muted-foreground"}`}>
+              <span className={`w-8 h-8 rounded-full flex items-center justify-center text-sm ${step === "info" ? "bg-primary text-white" : "bg-muted"}`}>1</span>
+              Details
+            </div>
+            <div className="h-px flex-1 bg-border" />
+            <div className={`flex items-center gap-2 ${step === "payment" ? "text-primary font-bold" : "text-muted-foreground"}`}>
+              <span className={`w-8 h-8 rounded-full flex items-center justify-center text-sm ${step === "payment" ? "bg-primary text-white" : "bg-muted"}`}>2</span>
+              Payment
+            </div>
+          </div>
         </div>
 
         <div className="grid lg:grid-cols-3 gap-8">
-          {/* Main Form */}
           <div className="lg:col-span-2">
-            <form onSubmit={handleSubmit} className="space-y-8">
-              {/* Guest Information */}
-              <div className="bg-card border border-border rounded-lg p-6">
-                <h2 className="text-xl font-bold text-foreground mb-6">
-                  {t("checkout.guestInfo")}
-                </h2>
-
-                <div className="grid md:grid-cols-2 gap-4 mb-6">
-                  <div>
-                    <label className="block text-sm font-semibold text-foreground mb-2">
-                      {t("checkout.firstName")} *
-                    </label>
-                    <input
-                      type="text"
-                      name="firstName"
-                      value={formData.firstName}
-                      onChange={handleInputChange}
-                      required
-                      className="w-full px-4 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary text-foreground"
-                      placeholder={t("auth.firstNamePlaceholder")}
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-semibold text-foreground mb-2">
-                      {t("checkout.lastName")} *
-                    </label>
-                    <input
-                      type="text"
-                      name="lastName"
-                      value={formData.lastName}
-                      onChange={handleInputChange}
-                      required
-                      className="w-full px-4 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary text-foreground"
-                      placeholder={t("auth.lastNamePlaceholder")}
-                    />
-                  </div>
-                </div>
-
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-semibold text-foreground mb-2">
-                      {t("checkout.email")} *
-                    </label>
-                    <input
-                      type="email"
-                      name="email"
-                      value={formData.email}
-                      onChange={handleInputChange}
-                      required
-                      className="w-full px-4 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary text-foreground"
-                      placeholder={t("auth.emailPlaceholder")}
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-semibold text-foreground mb-2">
-                      {t("checkout.phone")} *
-                    </label>
-                    <input
-                      type="tel"
-                      name="phone"
-                      value={formData.phone}
-                      onChange={handleInputChange}
-                      required
-                      className="w-full px-4 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary text-foreground"
-                      placeholder={t("checkout.phonePlaceholder")}
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* Billing Address */}
-              <div className="bg-card border border-border rounded-lg p-6">
-                <h2 className="text-xl font-bold text-foreground mb-6">
-                  {t("checkout.billingAddress")}
-                </h2>
-
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-semibold text-foreground mb-2">
-                      {t("checkout.address")} *
-                    </label>
-                    <input
-                      type="text"
-                      name="address"
-                      value={formData.address}
-                      onChange={handleInputChange}
-                      required
-                      className="w-full px-4 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary text-foreground"
-                      placeholder={t("checkout.addressPlaceholder")}
-                    />
-                  </div>
-
-                  <div className="grid md:grid-cols-2 gap-4">
+            {step === "info" ? (
+              <form onSubmit={handleCreateBooking} className="space-y-8">
+                {/* Guest Info */}
+                <div className="bg-card border border-border rounded-lg p-6">
+                  <h2 className="text-xl font-bold text-foreground mb-6">{t("checkout.guestInfo")}</h2>
+                  <div className="grid md:grid-cols-2 gap-4 mb-6">
                     <div>
-                      <label className="block text-sm font-semibold text-foreground mb-2">
-                        {t("checkout.city")} *
-                      </label>
-                      <input
-                        type="text"
-                        name="city"
-                        value={formData.city}
-                        onChange={handleInputChange}
-                        required
-                        className="w-full px-4 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary text-foreground"
-                        placeholder={t("checkout.cityPlaceholder")}
-                      />
+                      <label className="block text-sm font-semibold text-foreground mb-2">{t("checkout.firstName")} *</label>
+                      <input type="text" name="firstName" value={formData.firstName} onChange={handleInputChange} required
+                        className="w-full px-4 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary text-foreground" />
                     </div>
                     <div>
-                      <label className="block text-sm font-semibold text-foreground mb-2">
-                        {t("checkout.zipCode")} *
-                      </label>
-                      <input
-                        type="text"
-                        name="zipCode"
-                        value={formData.zipCode}
-                        onChange={handleInputChange}
-                        required
-                        className="w-full px-4 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary text-foreground"
-                        placeholder={t("checkout.zipPlaceholder")}
-                      />
+                      <label className="block text-sm font-semibold text-foreground mb-2">{t("checkout.lastName")} *</label>
+                      <input type="text" name="lastName" value={formData.lastName} onChange={handleInputChange} required
+                        className="w-full px-4 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary text-foreground" />
                     </div>
                   </div>
-
-                  <div>
-                    <label className="block text-sm font-semibold text-foreground mb-2">
-                      Country *
-                    </label>
-                    <select
-                      name="country"
-                      value={formData.country}
-                      onChange={handleInputChange}
-                      required
-                      className="w-full px-4 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary text-foreground"
-                    >
-                      <option value="">Select a country</option>
-                      <option value="US">United States</option>
-                      <option value="UK">United Kingdom</option>
-                      <option value="GR">Greece</option>
-                      <option value="DE">Germany</option>
-                      <option value="FR">France</option>
-                    </select>
-                  </div>
-                </div>
-              </div>
-
-              {/* Coupon Code */}
-              <div className="bg-card border border-border rounded-lg p-6">
-                <h2 className="text-xl font-bold text-foreground mb-6">
-                  {t("checkout.couponCode")}
-                </h2>
-                
-                {!appliedCoupon ? (
                   <div className="space-y-4">
-                    <div className="flex gap-2">
-                      <input
-                        type="text"
-                        value={couponCode}
-                        onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
-                        placeholder={t("checkout.couponPlaceholder")}
-                        className="flex-1 px-4 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary text-foreground"
-                      />
-                      <button
-                        type="button"
-                        onClick={handleApplyCoupon}
-                        disabled={applyingCoupon || !couponCode.trim()}
-                        className="btn-secondary px-6 disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        {applyingCoupon ? t("common.applying") : t("checkout.applyCoupon")}
-                      </button>
+                    <div>
+                      <label className="block text-sm font-semibold text-foreground mb-2">{t("checkout.email")} *</label>
+                      <input type="email" name="email" value={formData.email} onChange={handleInputChange} required
+                        className="w-full px-4 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary text-foreground" />
                     </div>
-                    {couponError && (
-                      <p className="text-sm text-destructive">{couponError}</p>
-                    )}
+                    <div>
+                      <label className="block text-sm font-semibold text-foreground mb-2">{t("checkout.phone")} *</label>
+                      <input type="tel" name="phone" value={formData.phone} onChange={handleInputChange} required
+                        className="w-full px-4 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary text-foreground" />
+                    </div>
                   </div>
-                ) : (
-                  <div className="flex items-center justify-between p-3 bg-green-50 border border-green-200 rounded-lg">
-                    <div className="flex items-center gap-2">
-                      <span className="text-green-600">✓</span>
+                </div>
+
+                {/* Billing Address */}
+                <div className="bg-card border border-border rounded-lg p-6">
+                  <h2 className="text-xl font-bold text-foreground mb-6">{t("checkout.billingAddress")}</h2>
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-semibold text-foreground mb-2">{t("checkout.address")} *</label>
+                      <input type="text" name="address" value={formData.address} onChange={handleInputChange} required
+                        className="w-full px-4 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary text-foreground" />
+                    </div>
+                    <div className="grid md:grid-cols-2 gap-4">
                       <div>
-                        <p className="font-semibold text-green-700">{appliedCoupon.code}</p>
-                        <p className="text-sm text-green-600">
-                          {appliedCoupon.discountType === "PERCENTAGE" 
-                            ? `${appliedCoupon.discountValue}% off` 
-                            : `€${appliedCoupon.discountValue} off`}
-                        </p>
+                        <label className="block text-sm font-semibold text-foreground mb-2">{t("checkout.city")} *</label>
+                        <input type="text" name="city" value={formData.city} onChange={handleInputChange} required
+                          className="w-full px-4 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary text-foreground" />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-semibold text-foreground mb-2">{t("checkout.zipCode")} *</label>
+                        <input type="text" name="zipCode" value={formData.zipCode} onChange={handleInputChange} required
+                          className="w-full px-4 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary text-foreground" />
                       </div>
                     </div>
-                    <button
-                      type="button"
-                      onClick={handleRemoveCoupon}
-                      className="text-red-500 hover:text-red-700 text-sm font-medium"
-                    >
-                      {t("checkout.removeCoupon")}
-                    </button>
+                    <div>
+                      <label className="block text-sm font-semibold text-foreground mb-2">Country *</label>
+                      <select name="country" value={formData.country} onChange={handleInputChange} required
+                        className="w-full px-4 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary text-foreground">
+                        <option value="">Select a country</option>
+                        <option value="GR">Greece</option>
+                        <option value="US">United States</option>
+                        <option value="UK">United Kingdom</option>
+                        <option value="DE">Germany</option>
+                        <option value="FR">France</option>
+                        <option value="IT">Italy</option>
+                        <option value="ES">Spain</option>
+                        <option value="NL">Netherlands</option>
+                      </select>
+                    </div>
                   </div>
-                )}
-              </div>
+                </div>
 
-              {/* Payment Information */}
+                {/* Coupon */}
+                <div className="bg-card border border-border rounded-lg p-6">
+                  <h2 className="text-xl font-bold text-foreground mb-6">{t("checkout.couponCode")}</h2>
+                  {!appliedCoupon ? (
+                    <div className="space-y-4">
+                      <div className="flex gap-2">
+                        <input type="text" value={couponCode} onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
+                          placeholder={t("checkout.couponPlaceholder")}
+                          className="flex-1 px-4 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary text-foreground" />
+                        <button type="button" onClick={handleApplyCoupon} disabled={applyingCoupon || !couponCode.trim()}
+                          className="btn-secondary px-6 disabled:opacity-50 disabled:cursor-not-allowed">
+                          {applyingCoupon ? "Applying..." : t("checkout.applyCoupon")}
+                        </button>
+                      </div>
+                      {couponError && <p className="text-sm text-destructive">{couponError}</p>}
+                    </div>
+                  ) : (
+                    <div className="flex items-center justify-between p-3 bg-green-50 border border-green-200 rounded-lg">
+                      <div className="flex items-center gap-2">
+                        <span className="text-green-600">&#10003;</span>
+                        <div>
+                          <p className="font-semibold text-green-700">{appliedCoupon.code}</p>
+                          <p className="text-sm text-green-600">
+                            {appliedCoupon.discountType === "PERCENTAGE" ? `${appliedCoupon.discountValue}% off` : `€${appliedCoupon.discountValue} off`}
+                          </p>
+                        </div>
+                      </div>
+                      <button type="button" onClick={handleRemoveCoupon} className="text-red-500 hover:text-red-700 text-sm font-medium">
+                        {t("checkout.removeCoupon")}
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                {/* Terms */}
+                <div className="space-y-4">
+                  <label className="flex items-start gap-3 cursor-pointer">
+                    <input type="checkbox" required className="mt-1 w-4 h-4" />
+                    <span className="text-sm text-foreground">{t("checkout.agreeTerms")}</span>
+                  </label>
+                </div>
+
+                <button type="submit" disabled={isProcessing}
+                  className="btn-primary w-full justify-center text-lg py-3 disabled:opacity-50 disabled:cursor-not-allowed">
+                  {isProcessing ? "Creating booking..." : "Continue to Payment"}
+                </button>
+              </form>
+            ) : (
+              /* Step 2: Stripe Payment */
               <div className="bg-card border border-border rounded-lg p-6">
-                <h2 className="text-xl font-bold text-foreground mb-6 flex items-center gap-2">
+                <h2 className="text-xl font-bold text-foreground mb-2 flex items-center gap-2">
                   <CreditCard size={24} />
                   {t("checkout.payment")}
                 </h2>
+                <p className="text-muted-foreground mb-6">
+                  {isFullPayment
+                    ? `Full payment: ${formatCurrency(total, language)}`
+                    : `Deposit (${Math.round((depositAmount / total) * 100)}%): ${formatCurrency(depositAmount, language)}`}
+                </p>
 
-                <div className="p-4 bg-primary/5 rounded-lg mb-4 flex items-center gap-2">
+                <div className="p-4 bg-primary/5 rounded-lg mb-6 flex items-center gap-2">
                   <Lock size={18} className="text-primary" />
-                  <p className="text-sm text-foreground">{t("checkout.securePaymentText")}</p>
+                  <p className="text-sm text-foreground">Secure payment powered by Stripe</p>
                 </div>
 
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-semibold text-foreground mb-2">
-                      Card Number *
-                    </label>
-                    <input
-                      type="text"
-                      placeholder={t("checkout.cardNumberPlaceholder")}
-                      className="w-full px-4 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary text-foreground"
+                {clientSecret && stripePromise ? (
+                  <Elements
+                    stripe={stripePromise}
+                    options={{
+                      clientSecret,
+                      appearance: { theme: "stripe", variables: { colorPrimary: "#0f172a" } },
+                    }}
+                  >
+                    <StripePaymentForm
+                      onSuccess={handlePaymentSuccess}
+                      isProcessing={isProcessing}
+                      setIsProcessing={setIsProcessing}
+                      clientSecret={clientSecret}
                     />
+                  </Elements>
+                ) : (
+                  <div className="text-center py-8">
+                    <p className="text-muted-foreground">Loading payment form...</p>
                   </div>
+                )}
 
-                  <div className="grid md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-semibold text-foreground mb-2">
-                        Expiry Date *
-                      </label>
-                      <input
-                        type="text"
-                        placeholder={t("checkout.expiryPlaceholder")}
-                        className="w-full px-4 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary text-foreground"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-semibold text-foreground mb-2">
-                        CVV *
-                      </label>
-                      <input
-                        type="text"
-                        placeholder={t("checkout.cvvPlaceholder")}
-                        className="w-full px-4 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary text-foreground"
-                      />
-                    </div>
-                  </div>
-                </div>
+                <button
+                  type="button"
+                  onClick={() => setStep("info")}
+                  className="mt-4 text-sm text-muted-foreground hover:text-foreground"
+                >
+                  &larr; Back to details
+                </button>
               </div>
-
-              {/* Terms & Policies */}
-              <div className="space-y-4">
-                <label className="flex items-start gap-3 cursor-pointer">
-                  <input type="checkbox" required className="mt-1 w-4 h-4" />
-                  <span className="text-sm text-foreground">{t("checkout.agreeTerms")}</span>
-                </label>
-
-                <label className="flex items-start gap-3 cursor-pointer">
-                  <input type="checkbox" className="mt-1 w-4 h-4" />
-                  <span className="text-sm text-foreground">{t("checkout.sendUpdates")}</span>
-                </label>
-              </div>
-
-              {/* Submit Button */}
-              <button
-                type="submit"
-                disabled={isProcessing}
-                className="btn-primary w-full justify-center text-lg py-3 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {isProcessing ? t("checkout.processingPayment") : t("checkout.completeBooking")}
-              </button>
-
-              <p className="text-xs text-muted-foreground text-center">
-                {t("checkout.depositNoteStart")} {formatCurrency(depositAmount, language)} {t("checkout.depositNoteMiddle")} {formatCurrency(total - depositAmount, language)} {t("checkout.depositNoteEnd")}
-              </p>
-            </form>
+            )}
           </div>
 
-          {/* Booking Summary */}
+          {/* Booking Summary Sidebar */}
           <div className="lg:col-span-1">
             <div className="sticky top-20 bg-card border border-border rounded-lg p-6">
-              <h3 className="text-lg font-bold text-foreground mb-6">
-                {t("checkout.bookingSummary")}
-              </h3>
+              <h3 className="text-lg font-bold text-foreground mb-6">{t("checkout.bookingSummary")}</h3>
 
               <div className="space-y-4 mb-6 pb-6 border-b border-border">
                 <div>
-                  <p className="text-sm text-muted-foreground">{t("checkout.property")}</p>
+                  <p className="text-sm text-muted-foreground">{t("checkout.checkInOut")}</p>
                   <p className="font-semibold text-foreground">
-                    {quote?.unit.name ?? "Selected unit"}
+                    {formattedCheckIn && formattedCheckOut ? `${formattedCheckIn} - ${formattedCheckOut} (${nights} ${t("common.nights")})` : "—"}
                   </p>
                 </div>
-
                 <div>
-                  <p className="text-sm text-muted-foreground">
-                    {t("checkout.checkInOut")}
-                  </p>
-                  <p className="font-semibold text-foreground">
-                    {formattedCheckIn && formattedCheckOut
-                      ? `${formattedCheckIn} - ${formattedCheckOut} (${nights} ${t("common.nights")})`
-                      : t("checkout.datesNotSelected")}
-                  </p>
-                </div>
-
-                <div>
-                  <p className="text-sm text-muted-foreground">
-                    {t("checkout.guests")}
-                  </p>
-                  <p className="font-semibold text-foreground">2 {t("common.guests")}</p>
+                  <p className="text-sm text-muted-foreground">{t("checkout.guests")}</p>
+                  <p className="font-semibold text-foreground">{guests} {t("common.guests")}</p>
                 </div>
               </div>
 
-              {/* Price Breakdown */}
               <div className="space-y-3 mb-6 pb-6 border-b border-border text-sm">
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">
-                    {nights} {t("common.nights")} × {formatCurrency(basePrice, language)}
-                  </span>
-                  <span className="font-semibold text-foreground">
-                    {formatCurrency(subtotal, language)}
-                  </span>
+                  <span className="text-muted-foreground">{nights} {t("common.nights")} x {formatCurrency(basePrice, language)}</span>
+                  <span className="font-semibold">{formatCurrency(basePrice * nights, language)}</span>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">{t("checkout.cleaningFee")}</span>
-                  <span className="font-semibold text-foreground">
-                    {formatCurrency(cleaningFee, language)}
-                  </span>
-                </div>
+                {cleaningFee > 0 && (
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">{t("checkout.cleaningFee")}</span>
+                    <span className="font-semibold">{formatCurrency(cleaningFee, language)}</span>
+                  </div>
+                )}
                 {discountAmount > 0 && (
                   <div className="flex justify-between">
-                    <span className="text-green-600">
-                      {appliedCoupon?.code} {t("checkout.discount")}
-                    </span>
-                    <span className="font-semibold text-green-600">
-                      -{formatCurrency(discountAmount, language)}
-                    </span>
+                    <span className="text-green-600">{appliedCoupon?.code} discount</span>
+                    <span className="font-semibold text-green-600">-{formatCurrency(discountAmount, language)}</span>
                   </div>
                 )}
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">
-                    {t("checkout.taxes")} ({taxSettings.taxRate}%)
-                  </span>
-                  <span className="font-semibold text-foreground">
-                    {formatCurrency(taxes, language)}
-                  </span>
+                  <span className="text-muted-foreground">{t("checkout.taxes")} ({taxRate}%)</span>
+                  <span className="font-semibold">{formatCurrency(taxes, language)}</span>
                 </div>
               </div>
 
-              {/* Total */}
               <div className="mb-6">
                 <div className="flex justify-between items-baseline mb-2">
-                  <span className="font-semibold text-foreground">{t("checkout.total")}</span>
-                  <span className="text-3xl font-bold text-primary">
-                    {formatCurrency(total, language)}
-                  </span>
+                  <span className="font-semibold">{t("checkout.total")}</span>
+                  <span className="text-3xl font-bold text-primary">{formatCurrency(total, language)}</span>
                 </div>
-                <p className="text-xs text-muted-foreground">
-                  {t("checkout.depositDue")}: {formatCurrency(depositAmount, language)}
-                </p>
               </div>
 
               {/* Payment Schedule */}
               <div className="bg-gradient-to-r from-primary/10 to-accent/10 border border-primary/20 rounded-xl p-6 mb-6">
                 <h4 className="font-bold text-foreground mb-4 flex items-center gap-2">
                   <div className="w-8 h-8 bg-primary/20 rounded-full flex items-center justify-center">
-                    <span className="text-primary font-bold text-sm">€</span>
+                    <span className="text-primary font-bold text-sm">&euro;</span>
                   </div>
                   {t("checkout.paymentSchedule")}
                 </h4>
                 <div className="space-y-4">
-                  <div className="flex items-center justify-between p-3 bg-white/50 rounded-lg border border-primary/10">
-                    <div className="flex items-center gap-3">
-                      <div className="w-6 h-6 bg-green-100 rounded-full flex items-center justify-center">
-                        <span className="text-green-600 text-xs font-bold">✓</span>
-                      </div>
+                  {isFullPayment ? (
+                    <div className="flex items-center justify-between p-3 bg-white/50 rounded-lg border border-primary/10">
                       <div>
-                        <p className="font-semibold text-foreground">{t("checkout.deposit")}</p>
-                        <p className="text-xs text-muted-foreground">{t("checkout.dueNow")}</p>
+                        <p className="font-semibold text-foreground">Full Payment</p>
+                        <p className="text-xs text-muted-foreground">Due now (check-in within 21 days)</p>
                       </div>
+                      <p className="font-bold text-lg text-primary">{formatCurrency(total, language)}</p>
                     </div>
-                    <div className="text-right">
-                      <p className="font-bold text-lg text-primary">
-                        {formatCurrency(depositAmount, language)}
-                      </p>
-                      <p className="text-xs text-muted-foreground">25% {t("checkout.ofTotal")}</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center justify-between p-3 bg-white/50 rounded-lg border border-primary/10">
-                    <div className="flex items-center gap-3">
-                      <div className="w-6 h-6 bg-blue-100 rounded-full flex items-center justify-center">
-                        <span className="text-blue-600 text-xs font-bold">⏰</span>
+                  ) : (
+                    <>
+                      <div className="flex items-center justify-between p-3 bg-white/50 rounded-lg border border-primary/10">
+                        <div>
+                          <p className="font-semibold text-foreground">{t("checkout.deposit")}</p>
+                          <p className="text-xs text-muted-foreground">{t("checkout.dueNow")}</p>
+                        </div>
+                        <div className="text-right">
+                          <p className="font-bold text-lg text-primary">{formatCurrency(depositAmount, language)}</p>
+                          <p className="text-xs text-muted-foreground">{Math.round((depositAmount / total) * 100)}%</p>
+                        </div>
                       </div>
-                      <div>
-                        <p className="font-semibold text-foreground">{t("checkout.balancePayment")}</p>
-                        <p className="text-xs text-muted-foreground">{t("checkout.due30DaysBefore")}</p>
+                      <div className="flex items-center justify-between p-3 bg-white/50 rounded-lg border border-primary/10">
+                        <div>
+                          <p className="font-semibold text-foreground">{t("checkout.balancePayment")}</p>
+                          <p className="text-xs text-muted-foreground">21 days before check-in</p>
+                        </div>
+                        <div className="text-right">
+                          <p className="font-bold text-lg text-primary">{formatCurrency(balanceAmount, language)}</p>
+                          <p className="text-xs text-muted-foreground">{Math.round((balanceAmount / total) * 100)}%</p>
+                        </div>
                       </div>
-                    </div>
-                    <div className="text-right">
-                      <p className="font-bold text-lg text-primary">
-                        {formatCurrency(balanceAmount, language)}
-                      </p>
-                      <p className="text-xs text-muted-foreground">75% {t("checkout.ofTotal")}</p>
-                    </div>
-                  </div>
-                </div>
-                <div className="mt-4 pt-4 border-t border-primary/20">
-                  <div className="flex items-center justify-between">
-                    <span className="font-semibold text-foreground">{t("checkout.totalAmount")}</span>
-                    <span className="text-2xl font-bold text-primary">
-                      {formatCurrency(total, language)}
-                    </span>
-                  </div>
+                    </>
+                  )}
                 </div>
               </div>
 
-              {/* Trust Badges */}
               <div className="space-y-2 text-xs text-muted-foreground border-t border-border pt-4">
-                <p>✓ {t("checkout.securePayment")}</p>
-                <p>✓ {t("checkout.freeCancellation")}</p>
-                <p>✓ {t("checkout.moneyBackGuarantee")}</p>
+                <p>&#10003; Secure payment via Stripe</p>
+                <p>&#10003; {isFullPayment ? "Full amount charged now" : "Only deposit charged now"}</p>
+                <p>&#10003; Instant confirmation</p>
               </div>
             </div>
-            {loadingQuote && (
-              <p className="text-xs text-muted-foreground mt-4">
-                {t("checkout.loadingPricing")}
-              </p>
-            )}
-            {quoteError && (
-              <p className="text-xs text-destructive mt-4">
-                {quoteError}
-              </p>
-            )}
+            {loadingQuote && <p className="text-xs text-muted-foreground mt-4">Loading pricing...</p>}
+            {quoteError && <p className="text-xs text-destructive mt-4">{quoteError}</p>}
           </div>
         </div>
       </div>

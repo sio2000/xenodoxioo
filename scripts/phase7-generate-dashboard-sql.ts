@@ -11,7 +11,7 @@ import { readFileSync, writeFileSync, existsSync } from "fs";
 type Baseline = {
   timestamp?: string;
   data?: {
-    unit?: Array<{ id: string; basePrice: number; cleaningFee: number }>;
+    unit?: Array<{ id: string; slug?: string; basePrice: number; cleaningFee: number }>;
     booking?: Array<{
       id: string;
       bookingNumber: string;
@@ -62,41 +62,49 @@ function main() {
   const bookings = baseline.data?.booking ?? [];
   const coupons = baseline.data?.coupon ?? [];
 
-  const unitRows = units.map(
-    (u) => `(${sqlString(u.id)}, ${sqlNum(u.basePrice)}, ${sqlNum(u.cleaningFee)})`
-  );
+  // Compare by stable business keys (slug / bookingNumber / code), not by IDs,
+  // because Supabase may use UUIDs while baseline uses cuid().
+  const unitRows = units
+    .filter((u) => typeof u.slug === "string" && u.slug.length > 0)
+    .map((u) => `(${sqlString(u.slug!)}, ${sqlNum(u.basePrice)}, ${sqlNum(u.cleaningFee)})`);
 
   const bookingRows = bookings.map(
     (b) =>
-      `(${sqlString(b.id)}, ${sqlString(b.bookingNumber)}, ${sqlNum(b.basePrice)}, ${sqlNum(
-        b.subtotal
-      )}, ${sqlNum(b.cleaningFee)}, ${sqlNum(b.taxes)}, ${sqlNum(b.discountAmount)}, ${sqlNum(
-        b.depositAmount
-      )}, ${sqlNum(b.balanceAmount)}, ${sqlNum(b.totalPrice)})`
+      `(${sqlString(b.bookingNumber)}, ${sqlNum(b.basePrice)}, ${sqlNum(b.subtotal)}, ${sqlNum(
+        b.cleaningFee
+      )}, ${sqlNum(b.taxes)}, ${sqlNum(b.discountAmount)}, ${sqlNum(b.depositAmount)}, ${sqlNum(
+        b.balanceAmount
+      )}, ${sqlNum(b.totalPrice)})`
   );
 
   const couponRows = coupons.map(
     (c) =>
-      `(${sqlString(c.id)}, ${sqlString(c.code)}, ${sqlString(c.discountType)}, ${sqlNum(
-        c.discountValue
-      )})`
+      `(${sqlString(c.code)}, ${sqlString(c.discountType)}, ${sqlNum(c.discountValue)})`
   );
 
-  const sql = `-- PHASE 7: Pricing lock verification (Supabase Dashboard SQL Editor)
+  const sql = `-- PHASE 7: Pricing lock verification (Supabase SQL Editor)
 -- Generated from ${BASELINE_PATH} (timestamp: ${ts})
 -- Tolerance: ${TOL}
+--
+-- Targets Supabase snake_case tables:
+--   public.units / public.bookings / public.coupons
+--
+-- Comparisons:
+--   Unit: slug
+--   Booking: booking_number
+--   Coupon: code
 
--- 1) UNIT PRICING PARITY
-WITH baseline_unit(id, base_price, cleaning_fee) AS (
+-- 1) UNIT PRICING PARITY (counts)
+WITH baseline_unit(slug, base_price, cleaning_fee) AS (
   ${valuesBlock(unitRows)}
 ),
 live_unit AS (
-  SELECT id, "basePrice"::double precision AS base_price, "cleaningFee"::double precision AS cleaning_fee
-  FROM "Unit"
+  SELECT slug, base_price::double precision AS base_price, cleaning_fee::double precision AS cleaning_fee
+  FROM public.units
 ),
-unit_diff AS (
+diff AS (
   SELECT
-    b.id,
+    b.slug,
     b.base_price AS baseline_base_price,
     l.base_price AS live_base_price,
     (l.base_price - b.base_price) AS base_price_diff,
@@ -104,28 +112,28 @@ unit_diff AS (
     l.cleaning_fee AS live_cleaning_fee,
     (l.cleaning_fee - b.cleaning_fee) AS cleaning_fee_diff
   FROM baseline_unit b
-  LEFT JOIN live_unit l ON l.id = b.id
+  LEFT JOIN live_unit l USING (slug)
 )
 SELECT
-  'unit_mismatches' AS check,
+  'unit_mismatches' AS check_name,
   COUNT(*) FILTER (
     WHERE live_base_price IS NULL
        OR ABS(COALESCE(base_price_diff, 0)) > ${TOL}
        OR ABS(COALESCE(cleaning_fee_diff, 0)) > ${TOL}
   ) AS mismatches,
   COUNT(*) AS baseline_rows
-FROM unit_diff;
+FROM diff;
 
--- Detailed unit mismatches
-WITH baseline_unit(id, base_price, cleaning_fee) AS (
+-- Unit mismatches (details)
+WITH baseline_unit(slug, base_price, cleaning_fee) AS (
   ${valuesBlock(unitRows)}
 ),
 live_unit AS (
-  SELECT id, "basePrice"::double precision AS base_price, "cleaningFee"::double precision AS cleaning_fee
-  FROM "Unit"
+  SELECT slug, base_price::double precision AS base_price, cleaning_fee::double precision AS cleaning_fee
+  FROM public.units
 )
 SELECT
-  b.id,
+  b.slug,
   b.base_price AS baseline_base_price,
   l.base_price AS live_base_price,
   (l.base_price - b.base_price) AS base_price_diff,
@@ -133,37 +141,35 @@ SELECT
   l.cleaning_fee AS live_cleaning_fee,
   (l.cleaning_fee - b.cleaning_fee) AS cleaning_fee_diff
 FROM baseline_unit b
-LEFT JOIN live_unit l ON l.id = b.id
-WHERE l.id IS NULL
+LEFT JOIN live_unit l USING (slug)
+WHERE l.slug IS NULL
    OR ABS(COALESCE(l.base_price - b.base_price, 0)) > ${TOL}
    OR ABS(COALESCE(l.cleaning_fee - b.cleaning_fee, 0)) > ${TOL}
-ORDER BY b.id;
+ORDER BY b.slug;
 
--- 2) BOOKING PRICING PARITY
+-- 2) BOOKING PRICING PARITY (counts)
 WITH baseline_booking(
-  id, booking_number, base_price, subtotal, cleaning_fee, taxes, discount_amount, deposit_amount, balance_amount, total_price
+  booking_number, base_price, subtotal, cleaning_fee, taxes, discount_amount, deposit_amount, balance_amount, total_price
 ) AS (
   ${valuesBlock(bookingRows)}
 ),
 live_booking AS (
   SELECT
-    id,
-    "bookingNumber" AS booking_number,
-    "basePrice"::double precision AS base_price,
-    "subtotal"::double precision AS subtotal,
-    "cleaningFee"::double precision AS cleaning_fee,
-    "taxes"::double precision AS taxes,
-    "discountAmount"::double precision AS discount_amount,
-    "depositAmount"::double precision AS deposit_amount,
-    "balanceAmount"::double precision AS balance_amount,
-    "totalPrice"::double precision AS total_price
-  FROM "Booking"
+    booking_number,
+    base_price::double precision AS base_price,
+    subtotal::double precision AS subtotal,
+    cleaning_fee::double precision AS cleaning_fee,
+    taxes::double precision AS taxes,
+    discount_amount::double precision AS discount_amount,
+    deposit_amount::double precision AS deposit_amount,
+    balance_amount::double precision AS balance_amount,
+    total_price::double precision AS total_price
+  FROM public.bookings
 ),
-booking_diff AS (
+diff AS (
   SELECT
-    b.id,
     b.booking_number,
-    l.id AS live_id,
+    l.booking_number AS live_booking_number,
     (l.base_price - b.base_price) AS base_price_diff,
     (l.subtotal - b.subtotal) AS subtotal_diff,
     (l.cleaning_fee - b.cleaning_fee) AS cleaning_fee_diff,
@@ -173,12 +179,12 @@ booking_diff AS (
     (l.balance_amount - b.balance_amount) AS balance_amount_diff,
     (l.total_price - b.total_price) AS total_price_diff
   FROM baseline_booking b
-  LEFT JOIN live_booking l ON l.id = b.id
+  LEFT JOIN live_booking l USING (booking_number)
 )
 SELECT
-  'booking_mismatches' AS check,
+  'booking_mismatches' AS check_name,
   COUNT(*) FILTER (
-    WHERE live_id IS NULL
+    WHERE live_booking_number IS NULL
        OR ABS(COALESCE(base_price_diff, 0)) > ${TOL}
        OR ABS(COALESCE(subtotal_diff, 0)) > ${TOL}
        OR ABS(COALESCE(cleaning_fee_diff, 0)) > ${TOL}
@@ -189,32 +195,29 @@ SELECT
        OR ABS(COALESCE(total_price_diff, 0)) > ${TOL}
   ) AS mismatches,
   COUNT(*) AS baseline_rows
-FROM booking_diff;
+FROM diff;
 
--- Detailed booking mismatches
+-- Booking mismatches (details)
 WITH baseline_booking(
-  id, booking_number, base_price, subtotal, cleaning_fee, taxes, discount_amount, deposit_amount, balance_amount, total_price
+  booking_number, base_price, subtotal, cleaning_fee, taxes, discount_amount, deposit_amount, balance_amount, total_price
 ) AS (
   ${valuesBlock(bookingRows)}
 ),
 live_booking AS (
   SELECT
-    id,
-    "bookingNumber" AS booking_number,
-    "basePrice"::double precision AS base_price,
-    "subtotal"::double precision AS subtotal,
-    "cleaningFee"::double precision AS cleaning_fee,
-    "taxes"::double precision AS taxes,
-    "discountAmount"::double precision AS discount_amount,
-    "depositAmount"::double precision AS deposit_amount,
-    "balanceAmount"::double precision AS balance_amount,
-    "totalPrice"::double precision AS total_price
-  FROM "Booking"
+    booking_number,
+    base_price::double precision AS base_price,
+    subtotal::double precision AS subtotal,
+    cleaning_fee::double precision AS cleaning_fee,
+    taxes::double precision AS taxes,
+    discount_amount::double precision AS discount_amount,
+    deposit_amount::double precision AS deposit_amount,
+    balance_amount::double precision AS balance_amount,
+    total_price::double precision AS total_price
+  FROM public.bookings
 )
 SELECT
-  b.id,
   b.booking_number,
-  l.id AS live_id,
   b.total_price AS baseline_total_price,
   l.total_price AS live_total_price,
   (l.total_price - b.total_price) AS total_price_diff,
@@ -222,8 +225,8 @@ SELECT
   l.subtotal AS live_subtotal,
   (l.subtotal - b.subtotal) AS subtotal_diff
 FROM baseline_booking b
-LEFT JOIN live_booking l ON l.id = b.id
-WHERE l.id IS NULL
+LEFT JOIN live_booking l USING (booking_number)
+WHERE l.booking_number IS NULL
    OR ABS(COALESCE(l.base_price - b.base_price, 0)) > ${TOL}
    OR ABS(COALESCE(l.subtotal - b.subtotal, 0)) > ${TOL}
    OR ABS(COALESCE(l.cleaning_fee - b.cleaning_fee, 0)) > ${TOL}
@@ -232,67 +235,62 @@ WHERE l.id IS NULL
    OR ABS(COALESCE(l.deposit_amount - b.deposit_amount, 0)) > ${TOL}
    OR ABS(COALESCE(l.balance_amount - b.balance_amount, 0)) > ${TOL}
    OR ABS(COALESCE(l.total_price - b.total_price, 0)) > ${TOL}
-ORDER BY b.id;
+ORDER BY b.booking_number;
 
--- 3) COUPON NUMERIC VALUES
-WITH baseline_coupon(id, code, discount_type, discount_value) AS (
+-- 3) COUPON VALUES (counts)
+WITH baseline_coupon(code, discount_type, discount_value) AS (
   ${valuesBlock(couponRows)}
 ),
 live_coupon AS (
   SELECT
-    id,
     code,
-    "discountType" AS discount_type,
-    "discountValue"::double precision AS discount_value
-  FROM "Coupon"
+    discount_type::text AS discount_type,
+    discount_value::double precision AS discount_value
+  FROM public.coupons
 ),
-coupon_diff AS (
+diff AS (
   SELECT
-    b.id,
     b.code,
-    l.id AS live_id,
+    l.code AS live_code,
     b.discount_type AS baseline_discount_type,
     l.discount_type AS live_discount_type,
     b.discount_value AS baseline_discount_value,
     l.discount_value AS live_discount_value,
     (l.discount_value - b.discount_value) AS discount_value_diff
   FROM baseline_coupon b
-  LEFT JOIN live_coupon l ON l.id = b.id
+  LEFT JOIN live_coupon l USING (code)
 )
 SELECT
-  'coupon_mismatches' AS check,
+  'coupon_mismatches' AS check_name,
   COUNT(*) FILTER (
-    WHERE live_id IS NULL
+    WHERE live_code IS NULL
        OR baseline_discount_type <> live_discount_type
        OR ABS(COALESCE(discount_value_diff, 0)) > ${TOL}
   ) AS mismatches,
   COUNT(*) AS baseline_rows
-FROM coupon_diff;
+FROM diff;
 
--- Detailed coupon mismatches
-WITH baseline_coupon(id, code, discount_type, discount_value) AS (
+-- Coupon mismatches (details)
+WITH baseline_coupon(code, discount_type, discount_value) AS (
   ${valuesBlock(couponRows)}
 ),
 live_coupon AS (
   SELECT
-    id,
     code,
-    "discountType" AS discount_type,
-    "discountValue"::double precision AS discount_value
-  FROM "Coupon"
+    discount_type::text AS discount_type,
+    discount_value::double precision AS discount_value
+  FROM public.coupons
 )
 SELECT
-  b.id,
   b.code,
-  l.id AS live_id,
   b.discount_type AS baseline_discount_type,
   l.discount_type AS live_discount_type,
   b.discount_value AS baseline_discount_value,
   l.discount_value AS live_discount_value,
   (l.discount_value - b.discount_value) AS discount_value_diff
 FROM baseline_coupon b
-LEFT JOIN live_coupon l ON l.id = b.id
-WHERE l.id IS NULL
+LEFT JOIN live_coupon l USING (code)
+WHERE l.code IS NULL
    OR b.discount_type <> l.discount_type
    OR ABS(COALESCE(l.discount_value - b.discount_value, 0)) > ${TOL}
 ORDER BY b.code;

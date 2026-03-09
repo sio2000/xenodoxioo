@@ -29,6 +29,118 @@ import {
 import { useLanguage } from "@/hooks/useLanguage";
 import { apiUrl, imageUrl, placeholderImage } from "@/lib/api";
 import formatCurrency from "@/lib/currency";
+import { Send, MessageSquare } from "lucide-react";
+
+// ── Inquiry Form Component ─────────────────────────────────────────
+
+function InquiryForm({ propertyId }: { propertyId: string }) {
+  const { t } = useLanguage();
+  const [form, setForm] = useState({ guestName: "", guestEmail: "", checkinDate: "", checkoutDate: "", guests: 2, message: "" });
+  const [submitting, setSubmitting] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!propertyId) return;
+    setSubmitting(true);
+    setError(null);
+    try {
+      const res = await fetch(apiUrl("/api/inquiries"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...form, propertyId }),
+      });
+      if (res.ok) {
+        setSubmitted(true);
+      } else {
+        const data = await res.json().catch(() => ({}));
+        setError(data.error || t("inquiry.errorGeneric"));
+      }
+    } catch {
+      setError(t("inquiry.errorNetwork"));
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  if (submitted) {
+    return (
+      <section className="mb-10">
+        <div className="rounded-2xl border border-green-200 bg-green-50 p-8 text-center">
+          <CheckCircle2 size={48} className="text-green-500 mx-auto mb-4" />
+          <h3 className="text-xl font-bold text-green-800 mb-2">{t("inquiry.successTitle")}</h3>
+          <p className="text-green-700">{t("inquiry.successDesc")}</p>
+        </div>
+      </section>
+    );
+  }
+
+  return (
+    <section className="mb-10" aria-labelledby="inquiry-heading">
+      <div className="rounded-2xl border border-border bg-card shadow-sm overflow-hidden">
+        <div className="px-6 py-5 bg-gradient-to-r from-primary/10 to-accent/10 border-b border-border">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-primary/20 rounded-full flex items-center justify-center">
+              <MessageSquare size={20} className="text-primary" />
+            </div>
+            <div>
+              <h2 id="inquiry-heading" className="text-xl font-bold text-foreground">
+                {t("inquiry.title")}
+              </h2>
+              <p className="text-sm text-muted-foreground mt-1">
+                {t("inquiry.subtitle")}
+              </p>
+            </div>
+          </div>
+        </div>
+        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+          <div className="grid md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-semibold text-foreground mb-1">{t("inquiry.name")} *</label>
+              <input type="text" required value={form.guestName} onChange={(e) => setForm((f) => ({ ...f, guestName: e.target.value }))}
+                className="w-full px-4 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary text-foreground" />
+            </div>
+            <div>
+              <label className="block text-sm font-semibold text-foreground mb-1">{t("inquiry.email")} *</label>
+              <input type="email" required value={form.guestEmail} onChange={(e) => setForm((f) => ({ ...f, guestEmail: e.target.value }))}
+                className="w-full px-4 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary text-foreground" />
+            </div>
+          </div>
+          <div className="grid md:grid-cols-3 gap-4">
+            <div>
+              <label className="block text-sm font-semibold text-foreground mb-1">{t("inquiry.checkIn")} *</label>
+              <input type="date" required value={form.checkinDate} onChange={(e) => setForm((f) => ({ ...f, checkinDate: e.target.value }))}
+                className="w-full px-4 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary text-foreground" />
+            </div>
+            <div>
+              <label className="block text-sm font-semibold text-foreground mb-1">{t("inquiry.checkOut")} *</label>
+              <input type="date" required value={form.checkoutDate} onChange={(e) => setForm((f) => ({ ...f, checkoutDate: e.target.value }))}
+                className="w-full px-4 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary text-foreground" />
+            </div>
+            <div>
+              <label className="block text-sm font-semibold text-foreground mb-1">{t("inquiry.guests")} *</label>
+              <input type="number" min={1} max={20} required value={form.guests} onChange={(e) => setForm((f) => ({ ...f, guests: parseInt(e.target.value) || 1 }))}
+                className="w-full px-4 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary text-foreground" />
+            </div>
+          </div>
+          <div>
+            <label className="block text-sm font-semibold text-foreground mb-1">{t("inquiry.message")} *</label>
+            <textarea required rows={4} value={form.message} onChange={(e) => setForm((f) => ({ ...f, message: e.target.value }))}
+              className="w-full px-4 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary text-foreground resize-none"
+              placeholder={t("inquiry.messagePlaceholder")} />
+          </div>
+          {error && <p className="text-sm text-destructive">{error}</p>}
+          <button type="submit" disabled={submitting}
+            className="btn-primary w-full justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
+            <Send size={16} />
+            {submitting ? t("inquiry.sending") : t("inquiry.send")}
+          </button>
+        </form>
+      </div>
+    </section>
+  );
+}
 
 type ApiUnit = {
   id: string;
@@ -630,7 +742,7 @@ export default function PropertyDetail() {
                   </p>
                   <div className="rounded-2xl overflow-hidden border border-border shadow-lg mb-6 h-64 sm:h-80 md:h-96">
                     <iframe
-                      src="https://www.openstreetmap.org/export/embed.html?bbox=22.82%2C37.14%2C22.90%2C37.20&layer=mapnik&marker=37.169%2C22.857"
+                      src="https://www.openstreetmap.org/export/embed.html?bbox=22.865%2C37.207%2C22.906%2C37.247&layer=mapnik&marker=37.22692%2C22.88575"
                       className="w-full h-full border-0"
                       loading="lazy"
                       referrerPolicy="no-referrer-when-downgrade"
@@ -638,7 +750,7 @@ export default function PropertyDetail() {
                     />
                   </div>
                   <a
-                    href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(data.location || `${data.city}, ${data.country}`)}`}
+                    href="https://www.google.com/maps/search/?api=1&query=37.22692,22.88575"
                     target="_blank"
                     rel="noopener noreferrer"
                     className="inline-flex items-center gap-2 text-primary font-medium hover:underline"
@@ -718,6 +830,9 @@ export default function PropertyDetail() {
                     </Accordion>
                   </div>
                 </section>
+
+                {/* Inquiry Form */}
+                <InquiryForm propertyId={data?.id || ""} />
               </>
             )}
           </div>

@@ -118,7 +118,7 @@ export default function PropertyManagement() {
         }
       }
       if (!mainImageUrl) {
-        alert("Please upload a main image for the property.");
+        alert(t("admin.uploadMainImage"));
         return;
       }
 
@@ -265,7 +265,7 @@ export default function PropertyManagement() {
   };
 
   const handleDeleteProperty = async (id: string) => {
-    if (!confirm("Delete this property and all its units?")) return;
+    if (!confirm(t("admin.deletePropertyConfirm"))) return;
     try {
       const response = await fetch(apiUrl(`/api/admin/properties/${id}`), { method: "DELETE" });
       if (response.ok) fetchData();
@@ -275,7 +275,7 @@ export default function PropertyManagement() {
   };
 
   const handleDeleteUnit = async (id: string) => {
-    if (!confirm("Delete this unit?")) return;
+    if (!confirm(t("admin.deleteUnitConfirm"))) return;
     try {
       const response = await fetch(apiUrl(`/api/admin/units/${id}`), { method: "DELETE" });
       if (response.ok) fetchData();
@@ -301,7 +301,7 @@ export default function PropertyManagement() {
     <div>
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-2xl font-bold text-foreground">
-          Property Management
+          {t("admin.propertyManagement")}
         </h2>
         <div className="flex gap-2">
           <button
@@ -309,14 +309,14 @@ export default function PropertyManagement() {
             className="btn-primary flex items-center gap-2"
           >
             <Plus size={16} />
-            Add Property
+            {t("admin.addProperty")}
           </button>
           <button
             onClick={() => setShowUnitForm(true)}
             className="btn-secondary flex items-center gap-2"
           >
             <Plus size={16} />
-            Add Unit
+            {t("admin.addUnit")}
           </button>
         </div>
       </div>
@@ -341,7 +341,7 @@ export default function PropertyManagement() {
                   <h3 className="text-lg font-bold text-foreground">{property.name}</h3>
                   <p className="text-muted-foreground">{property.location}</p>
                   <p className="text-sm text-muted-foreground mt-1">
-                    {property.units?.length || 0} units
+                    {t("admin.unitsLabel").replace("{count}", String(property.units?.length || 0))}
                   </p>
                 </div>
               </div>
@@ -373,10 +373,10 @@ export default function PropertyManagement() {
                         <div className="flex gap-4 mt-2 text-sm text-muted-foreground">
                           <span className="flex items-center gap-1">
                             <BedDouble size={14} />
-                            {unit.bedrooms} bedrooms
+                            {t("admin.bedroomsCount").replace("{count}", String(unit.bedrooms))}
                           </span>
-                          <span>{unit.maxGuests} guests</span>
-                          <span>{formatCurrency(unit.basePrice, language)}/night</span>
+                          <span>{t("admin.guestsCount").replace("{count}", String(unit.maxGuests))}</span>
+                          <span>{formatCurrency(unit.basePrice, language)}{t("admin.perNightSuffix")}</span>
                         </div>
                       </div>
                       <div className="flex gap-2">
@@ -435,6 +435,7 @@ export default function PropertyManagement() {
 
 // Property Form Component
 function PropertyForm({ property, onSubmit, onClose }: any) {
+  const { t } = useLanguage();
   const [formData, setFormData] = useState({
     name: property?.name ?? "",
     location: property?.location ?? "",
@@ -453,12 +454,12 @@ function PropertyForm({ property, onSubmit, onClose }: any) {
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
       <div className="bg-card border border-border rounded-lg p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
         <h3 className="text-xl font-bold text-foreground mb-4">
-          {property ? "Edit Property" : "Add New Property"}
+          {property ? t("admin.editProperty") : t("admin.addNewProperty")}
         </h3>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-foreground mb-1">
-              Property Name
+              {t("admin.propertyName")}
             </label>
             <input
               type="text"
@@ -471,7 +472,7 @@ function PropertyForm({ property, onSubmit, onClose }: any) {
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-foreground mb-1">
-                City
+                {t("admin.city")}
               </label>
               <input
                 type="text"
@@ -483,7 +484,7 @@ function PropertyForm({ property, onSubmit, onClose }: any) {
             </div>
             <div>
               <label className="block text-sm font-medium text-foreground mb-1">
-                Country
+                {t("admin.country")}
               </label>
               <input
                 type="text"
@@ -495,19 +496,19 @@ function PropertyForm({ property, onSubmit, onClose }: any) {
           </div>
           <div>
             <label className="block text-sm font-medium text-foreground mb-1">
-              Location
+              {t("admin.locationLabel")}
             </label>
             <input
               type="text"
               value={formData.location}
               onChange={(e) => setFormData({ ...formData, location: e.target.value })}
               className="w-full p-2 border border-border rounded-md bg-background text-foreground"
-              placeholder="e.g. Leonidion, Arcadia"
+              placeholder={t("admin.locationPlaceholder")}
             />
           </div>
           <div>
             <label className="block text-sm font-medium text-foreground mb-1">
-              Main Image {property && "(leave empty to keep current)"}
+              {property ? t("admin.mainImageKeep") : t("admin.mainImage")}
             </label>
             <input
               type="file"
@@ -534,10 +535,10 @@ function PropertyForm({ property, onSubmit, onClose }: any) {
           </div>
           <div className="flex gap-2 pt-4">
             <button type="submit" className="btn-primary">
-              {property ? "Update Property" : "Create Property"}
+              {property ? t("admin.updateProperty") : t("admin.createProperty")}
             </button>
             <button type="button" onClick={onClose} className="btn-secondary">
-              Cancel
+              {t("common.cancel")}
             </button>
           </div>
         </form>
@@ -548,6 +549,7 @@ function PropertyForm({ property, onSubmit, onClose }: any) {
 
 // Unit Form Component
 function UnitForm({ unit, propertyId, properties, onSubmit, onClose, onPropertyChange }: any) {
+  const { t } = useLanguage();
   const parseImages = (v: string | string[] | undefined): string[] => {
     if (!v) return [];
     if (Array.isArray(v)) return v;
@@ -582,12 +584,12 @@ function UnitForm({ unit, propertyId, properties, onSubmit, onClose, onPropertyC
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
       <div className="bg-card border border-border rounded-lg p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
         <h3 className="text-xl font-bold text-foreground mb-4">
-          {unit ? "Edit Unit" : "Add New Unit"}
+          {unit ? t("admin.editUnit") : t("admin.addNewUnit")}
         </h3>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-foreground mb-1">
-              Property
+              {t("admin.property")}
             </label>
             <select
               value={propertyId}
@@ -598,7 +600,7 @@ function UnitForm({ unit, propertyId, properties, onSubmit, onClose, onPropertyC
               className="w-full p-2 border border-border rounded-md bg-background text-foreground"
               required
             >
-              <option value="">Select a property</option>
+              <option value="">{t("admin.selectProperty")}</option>
               {properties.map((prop: any) => (
                 <option key={prop.id} value={prop.id}>
                   {prop.name}
@@ -608,7 +610,7 @@ function UnitForm({ unit, propertyId, properties, onSubmit, onClose, onPropertyC
           </div>
           <div>
             <label className="block text-sm font-medium text-foreground mb-1">
-              Unit Name
+              {t("admin.unitName")}
             </label>
             <input
               type="text"
@@ -620,7 +622,7 @@ function UnitForm({ unit, propertyId, properties, onSubmit, onClose, onPropertyC
           </div>
           <div>
             <label className="block text-sm font-medium text-foreground mb-1">
-              Description
+              {t("admin.descriptionLabel")}
             </label>
             <textarea
               value={formData.description}
@@ -632,7 +634,7 @@ function UnitForm({ unit, propertyId, properties, onSubmit, onClose, onPropertyC
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-foreground mb-1">
-                Max Guests
+                {t("admin.maxGuestsLabel")}
               </label>
               <input
                 type="number"
@@ -645,7 +647,7 @@ function UnitForm({ unit, propertyId, properties, onSubmit, onClose, onPropertyC
             </div>
             <div>
               <label className="block text-sm font-medium text-foreground mb-1">
-                Bedrooms
+                {t("admin.bedroomsLabel")}
               </label>
               <input
                 type="number"
@@ -658,7 +660,7 @@ function UnitForm({ unit, propertyId, properties, onSubmit, onClose, onPropertyC
             </div>
             <div>
               <label className="block text-sm font-medium text-foreground mb-1">
-                Bathrooms
+                {t("admin.bathroomsLabel")}
               </label>
               <input
                 type="number"
@@ -671,7 +673,7 @@ function UnitForm({ unit, propertyId, properties, onSubmit, onClose, onPropertyC
             </div>
             <div>
               <label className="block text-sm font-medium text-foreground mb-1">
-                Base Price (€/night)
+                {t("admin.basePriceLabel")}
               </label>
               <input
                 type="number"
@@ -685,7 +687,7 @@ function UnitForm({ unit, propertyId, properties, onSubmit, onClose, onPropertyC
             </div>
             <div>
               <label className="block text-sm font-medium text-foreground mb-1">
-                Cleaning Fee (€)
+                {t("admin.cleaningFeeLabel")}
               </label>
               <input
                 type="number"
@@ -698,7 +700,7 @@ function UnitForm({ unit, propertyId, properties, onSubmit, onClose, onPropertyC
             </div>
             <div>
               <label className="block text-sm font-medium text-foreground mb-1">
-                Minimum Stay Days
+                {t("admin.minStayDays")}
               </label>
               <input
                 type="number"
@@ -712,7 +714,7 @@ function UnitForm({ unit, propertyId, properties, onSubmit, onClose, onPropertyC
           </div>
           <div>
             <label className="block text-sm font-medium text-foreground mb-1">
-              Images (multiple allowed)
+              {t("admin.imagesLabel")}
             </label>
             <input
               type="file"
@@ -767,10 +769,10 @@ function UnitForm({ unit, propertyId, properties, onSubmit, onClose, onPropertyC
           </div>
           <div className="flex gap-2 pt-4">
             <button type="submit" className="btn-primary">
-              {unit ? "Update Unit" : "Create Unit"}
+              {unit ? t("admin.updateUnit") : t("admin.createUnit")}
             </button>
             <button type="button" onClick={onClose} className="btn-secondary">
-              Cancel
+              {t("common.cancel")}
             </button>
           </div>
         </form>

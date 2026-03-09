@@ -68,7 +68,7 @@ router.get("/stats", async (req, res) => {
     const confirmedBookings = bookings?.filter(b => b.status === 'CONFIRMED').length || 0;
     const pendingBookings = bookings?.filter(b => b.status === 'PENDING').length || 0;
     const cancelledBookings = bookings?.filter(b => b.status === 'CANCELLED').length || 0;
-    const totalRevenue = bookings?.reduce((sum, b) => sum + (b.total_price || 0), 0) || 0;
+    const totalRevenue = bookings?.reduce((sum, b) => sum + (parseFloat(b.total_paid) || 0), 0) || 0;
     const totalUsers = users?.length || 0;
     const propertiesCount = properties?.length || 0;
     
@@ -673,7 +673,7 @@ router.get("/bookings", async (req, res) => {
       .from('bookings')
       .select(`
         *,
-        unit:units(*),
+        unit:units(*, property:properties(*)),
         user:users(*)
       `);
 
@@ -722,6 +722,11 @@ router.get("/bookings", async (req, res) => {
       nights: booking.nights,
       guests: booking.guests,
       totalPrice: parseFloat(booking.total_price) || 0,
+      totalPaid: parseFloat(booking.total_paid) || 0,
+      remainingAmount: parseFloat(booking.remaining_amount) || 0,
+      depositAmount: parseFloat(booking.deposit_amount) || 0,
+      paymentType: booking.payment_type || "FULL",
+      scheduledChargeDate: booking.scheduled_charge_date || null,
       status: booking.status,
       paymentStatus: booking.payment_status,
       createdAt: booking.created_at
@@ -746,6 +751,46 @@ router.get("/bookings", async (req, res) => {
   } catch (error) {
     console.error("❌ [BOOKINGS] Server error:", error);
     res.status(500).json({ success: false, message: "Failed to fetch bookings" });
+  }
+});
+
+// Admin: Update Booking Status
+router.put("/bookings/:id/status", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status } = req.body;
+
+    if (!status) {
+      return res.status(400).json({ success: false, message: "Status is required" });
+    }
+
+    const validStatuses = ["PENDING", "CONFIRMED", "CHECKED_IN", "CHECKED_OUT", "CANCELLED", "NO_SHOW", "COMPLETED"];
+    if (!validStatuses.includes(status)) {
+      return res.status(400).json({ success: false, message: `Invalid status. Must be one of: ${validStatuses.join(", ")}` });
+    }
+
+    const updateData: Record<string, any> = { status };
+    if (status === "CANCELLED") {
+      updateData.cancelled_at = new Date().toISOString();
+    }
+
+    const { data: booking, error } = await supabase
+      .from("bookings")
+      .update(updateData)
+      .eq("id", id)
+      .select()
+      .single();
+
+    if (error || !booking) {
+      console.error("[ADMIN] Failed to update booking status:", error);
+      return res.status(404).json({ success: false, message: "Booking not found" });
+    }
+
+    console.log(`[ADMIN] Booking ${booking.booking_number} status updated to ${status}`);
+    res.json({ success: true, data: booking });
+  } catch (error) {
+    console.error("[ADMIN] Error updating booking status:", error);
+    res.status(500).json({ success: false, message: "Failed to update booking status" });
   }
 });
 
@@ -1008,7 +1053,7 @@ router.post("/units", upload.any(), async (req, res) => {
       beds: unitData.bedrooms,
       base_price: unitData.basePrice,
       cleaning_fee: unitData.cleaningFee || 0,
-      images: uploadedImages.length > 0 ? `{${uploadedImages.map(img => `"${img}"`).join(',')}}` : '{}',
+      images: uploadedImages.length > 0 ? uploadedImages : [],
       min_stay_days: unitData.minStayDays || 1,
       is_active: true
     };
@@ -1118,10 +1163,10 @@ router.put("/units/:id", upload.any(), async (req, res) => {
     
     // Handle images field properly for database
     if (allImages.length > 0) {
-      updateData.images = JSON.stringify(allImages);
+      updateData.images = allImages; // Send as array, not JSON string
     } else {
-      // For empty arrays, set to NULL or empty JSON object instead of empty array string
-      updateData.images = '{}';
+      // For empty arrays, set to empty array
+      updateData.images = [];
     }
     
     console.log("🔍 [UNITS] Update data:", updateData);
@@ -1291,6 +1336,67 @@ router.put("/settings/tax", async (req, res) => {
   } catch (error) {
     console.error("❌ [TAX] Failed to update tax settings:", error);
     res.status(500).json({ success: false, message: "Failed to update tax settings" });
+  }
+});
+
+// ── Payment Settings ───────────────────────────────────────────────
+
+router.get("/settings/payment", async (_req, res) => {
+  try {
+    const { data, error } = await supabase
+      .from("payment_settings")
+      .select("*")
+      .eq("is_active", true)
+      .single();
+
+    if (error && error.code !== "PGRST116") {
+      return res.status(500).json({ success: false, error: "Failed to fetch payment settings" });
+    }
+
+    res.json({
+      success: true,
+      data: data || {
+        deposit_percentage: 25,
+        balance_charge_days_before: 21,
+        full_payment_threshold_days: 21,
+        refund_deposit_on_cancel: false,
+        currency: "EUR",
+      },
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, error: "Failed to fetch payment settings" });
+  }
+});
+
+router.put("/settings/payment", async (req, res) => {
+  try {
+    const { depositPercentage, balanceChargeDaysBefore, fullPaymentThresholdDays, refundDepositOnCancel } = req.body;
+
+    const updates: Record<string, any> = { updated_at: new Date().toISOString() };
+    if (depositPercentage !== undefined) updates.deposit_percentage = depositPercentage;
+    if (balanceChargeDaysBefore !== undefined) updates.balance_charge_days_before = balanceChargeDaysBefore;
+    if (fullPaymentThresholdDays !== undefined) updates.full_payment_threshold_days = fullPaymentThresholdDays;
+    if (refundDepositOnCancel !== undefined) updates.refund_deposit_on_cancel = refundDepositOnCancel;
+
+    const { data: existing } = await supabase.from("payment_settings").select("id").eq("is_active", true).single();
+
+    if (existing) {
+      await supabase.from("payment_settings").update(updates).eq("id", existing.id);
+    } else {
+      await supabase.from("payment_settings").insert({
+        ...updates,
+        deposit_percentage: depositPercentage ?? 25,
+        balance_charge_days_before: balanceChargeDaysBefore ?? 21,
+        full_payment_threshold_days: fullPaymentThresholdDays ?? 21,
+        refund_deposit_on_cancel: refundDepositOnCancel ?? false,
+        currency: "EUR",
+        is_active: true,
+      });
+    }
+
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ success: false, error: "Failed to update payment settings" });
   }
 });
 

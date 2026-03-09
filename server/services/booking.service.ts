@@ -7,61 +7,80 @@ import {
 } from "../lib/errors";
 import { nanoid } from "nanoid";
 
-/**
- * Check if dates are available for a unit
- */
+// ── Helpers ────────────────────────────────────────────────────────
+
+async function getActiveTaxRate(): Promise<number> {
+  try {
+    const { data } = await supabase
+      .from("tax_settings")
+      .select("tax_rate")
+      .eq("is_active", true)
+      .single();
+    return data ? Number(data.tax_rate) / 100 : 0.15;
+  } catch {
+    return 0.15;
+  }
+}
+
+async function getPaymentSettings() {
+  try {
+    const { data, error } = await supabase
+      .from("payment_settings")
+      .select("*")
+      .eq("is_active", true)
+      .single();
+
+    if (error || !data) {
+      return { depositPercentage: 0.25, fullPaymentThresholdDays: 21, balanceChargeDaysBefore: 21 };
+    }
+
+    return {
+      depositPercentage: (Number(data.deposit_percentage) || 25) / 100,
+      fullPaymentThresholdDays: Number(data.full_payment_threshold_days) || 21,
+      balanceChargeDaysBefore: Number(data.balance_charge_days_before) || 21,
+    };
+  } catch {
+    return { depositPercentage: 0.25, fullPaymentThresholdDays: 21, balanceChargeDaysBefore: 21 };
+  }
+}
+
+function daysUntilDate(dateStr: string | Date): number {
+  const target = typeof dateStr === "string" ? new Date(dateStr) : dateStr;
+  return Math.ceil((target.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+}
+
+// ── Check Availability ─────────────────────────────────────────────
+
 export async function checkAvailability(
   unitId: string,
   checkInDate: Date,
   checkOutDate: Date,
 ): Promise<{ isAvailable: boolean; reason?: string }> {
-  // Validate dates
   if (checkInDate >= checkOutDate) {
-    return {
-      isAvailable: false,
-      reason: "Check-out date must be after check-in date",
-    };
+    return { isAvailable: false, reason: "Check-out date must be after check-in date" };
   }
 
-  const { data: unit } = await supabase
-    .from('units')
-    .select('*')
-    .eq('id', unitId)
-    .single();
-    
-  if (!unit) {
-    return { isAvailable: false, reason: "Unit not found" };
-  }
+  const { data: unit } = await supabase.from("units").select("*").eq("id", unitId).single();
+  if (!unit) return { isAvailable: false, reason: "Unit not found" };
 
-  // Get property for date blockages
-  const { data: property } = await supabase
-    .from('properties')
-    .select('*')
-    .eq('id', unit.property_id)
-    .single();
+  const { data: conflicting } = await supabase
+    .from("bookings")
+    .select("id")
+    .eq("unit_id", unitId)
+    .neq("status", "CANCELLED")
+    .lt("check_in_date", checkOutDate.toISOString())
+    .gt("check_out_date", checkInDate.toISOString());
 
-  if (!property) {
-    return { isAvailable: false, reason: "Property not found" };
-  }
-
-  // Check for overlapping bookings (any non-cancelled booking reserves the dates)
-  const { data: conflictingBookings } = await supabase
-    .from('bookings')
-    .select('*')
-    .eq('unit_id', unitId)
-    .neq('status', 'CANCELLED')
-    .or(`check_in_date.lt.${checkOutDate.toISOString()},check_out_date.gt.${checkInDate.toISOString()}`);
-
-  if (conflictingBookings && conflictingBookings.length > 0) {
+  if (conflicting && conflicting.length > 0) {
     return { isAvailable: false, reason: "Dates are already booked" };
   }
 
-  // Check for date blockages
   const { data: blockages } = await supabase
-    .from('date_blockages')
-    .select('*')
-    .eq('property_id', property.id)
-    .or(`start_date.lte.${checkOutDate.toISOString()},end_date.gte.${checkInDate.toISOString()}`);
+    .from("date_blockages")
+    .select("id")
+    .eq("property_id", unit.property_id)
+    .lte("start_date", checkOutDate.toISOString())
+    .gte("end_date", checkInDate.toISOString());
 
   if (blockages && blockages.length > 0) {
     return { isAvailable: false, reason: "Dates are blocked" };
@@ -70,9 +89,8 @@ export async function checkAvailability(
   return { isAvailable: true };
 }
 
-/**
- * Calculate booking price
- */
+// ── Calculate Booking Price ────────────────────────────────────────
+
 export async function calculateBookingPrice(
   unitId: string,
   checkInDate: Date,
@@ -80,107 +98,95 @@ export async function calculateBookingPrice(
   guests: number,
   couponCode?: string,
 ) {
-  const { data: unit } = await supabase
-    .from('units')
-    .select('*')
-    .eq('id', unitId)
-    .single();
-
-  if (!unit) {
-    throw new NotFoundError("Unit not found");
-  }
-
-  if (guests > unit.max_guests) {
-    throw new ValidationError(`Maximum ${unit.max_guests} guests allowed`);
-  }
+  const { data: unit } = await supabase.from("units").select("*").eq("id", unitId).single();
+  if (!unit) throw new NotFoundError("Unit not found");
+  if (guests > unit.max_guests) throw new ValidationError(`Maximum ${unit.max_guests} guests allowed`);
 
   const nights = Math.ceil((checkOutDate.getTime() - checkInDate.getTime()) / (1000 * 60 * 60 * 24));
-  
-  if (nights < unit.min_stay_days) {
-    throw new ValidationError(`Minimum ${unit.min_stay_days} nights required`);
-  }
+  if (nights < unit.min_stay_days) throw new ValidationError(`Minimum ${unit.min_stay_days} nights required`);
 
-  let basePrice = unit.base_price;
-  let totalPrice = basePrice * nights;
-  let cleaningFee = unit.cleaning_fee || 0;
+  let basePrice = Number(unit.base_price);
+  const cleaningFee = Number(unit.cleaning_fee) || 0;
 
-  // Check for seasonal pricing
   const { data: seasonalPricing } = await supabase
-    .from('seasonal_pricing')
-    .select('*')
-    .eq('property_id', unit.property_id)
-    .or(`start_date.lte.${checkOutDate.toISOString()},end_date.gte.${checkInDate.toISOString()}`);
+    .from("seasonal_pricing")
+    .select("*")
+    .eq("property_id", unit.property_id)
+    .lte("start_date", checkOutDate.toISOString())
+    .gte("end_date", checkInDate.toISOString());
 
   if (seasonalPricing && seasonalPricing.length > 0) {
-    // Use seasonal pricing (simplified - in reality would need to calculate per night)
-    basePrice = seasonalPricing[0].price_per_night;
-    totalPrice = basePrice * nights;
+    basePrice = Number(seasonalPricing[0].price_per_night);
   }
 
+  const subtotalBeforeDiscount = basePrice * nights;
   let discountAmount = 0;
 
-  // Apply coupon if provided
   if (couponCode) {
     const { data: coupon } = await supabase
-      .from('coupons')
-      .select('*')
-      .eq('code', couponCode.toUpperCase())
-      .eq('is_active', true)
+      .from("coupons")
+      .select("*")
+      .eq("code", couponCode.toUpperCase())
+      .eq("is_active", true)
       .single();
 
     if (coupon) {
       const now = new Date();
-      if (new Date(coupon.valid_from) <= now && new Date(coupon.valid_until) >= now) {
-        if (!coupon.min_booking_amount || totalPrice >= coupon.min_booking_amount) {
-          if (!coupon.max_uses || coupon.used_count < coupon.max_uses) {
-            if (coupon.discount_type === "PERCENTAGE") {
-              discountAmount = totalPrice * (coupon.discount_value / 100);
-            } else {
-              discountAmount = coupon.discount_value;
-            }
-            discountAmount = Math.min(discountAmount, totalPrice);
-          }
-        }
+      if (
+        new Date(coupon.valid_from) <= now &&
+        new Date(coupon.valid_until) >= now &&
+        (!coupon.min_booking_amount || subtotalBeforeDiscount >= Number(coupon.min_booking_amount)) &&
+        (!coupon.max_uses || coupon.used_count < coupon.max_uses)
+      ) {
+        discountAmount =
+          coupon.discount_type === "PERCENTAGE"
+            ? subtotalBeforeDiscount * (Number(coupon.discount_value) / 100)
+            : Number(coupon.discount_value);
+        discountAmount = Math.min(discountAmount, subtotalBeforeDiscount);
       }
     }
   }
 
-  const subtotal = totalPrice - discountAmount;
-  
-  // FIXED: Get tax rate from database instead of hardcoded
-  let taxRate = 0.15; // Default 15%
-  try {
-    const { data: taxSettings } = await supabase
-      .from('tax_settings')
-      .select('tax_rate')
-      .eq('is_active', true)
-      .single();
-    
-    if (taxSettings) {
-      taxRate = parseFloat(taxSettings.tax_rate.toString());
-    }
-  } catch (error) {
-    console.log("⚠️ [TAX] Using default tax rate due to error:", error.message);
-  }
-  
-  const taxes = subtotal * taxRate;
-  const finalTotal = subtotal + taxes + cleaningFee;
+  const subtotal = subtotalBeforeDiscount - discountAmount;
+  const taxRate = await getActiveTaxRate();
+  const taxableAmount = subtotal + cleaningFee;
+  const taxes = Math.round(taxableAmount * taxRate * 100) / 100;
+  const finalTotal = Math.round((subtotal + cleaningFee + taxes) * 100) / 100;
+
+  const paymentSettings = await getPaymentSettings();
+  const daysToCheckIn = daysUntilDate(checkInDate);
+  const isFullPayment = daysToCheckIn <= paymentSettings.fullPaymentThresholdDays;
+
+  const depositAmount = isFullPayment
+    ? finalTotal
+    : Math.round(finalTotal * paymentSettings.depositPercentage * 100) / 100;
+  const balanceAmount = finalTotal - depositAmount;
 
   return {
     basePrice,
     nights,
-    totalPrice,
+    totalPrice: subtotalBeforeDiscount,
     cleaningFee,
     discountAmount,
     subtotal,
     taxes,
+    taxRate: Math.round(taxRate * 100),
     finalTotal,
+    depositAmount,
+    balanceAmount,
+    isFullPayment,
+    scheduledChargeDate: isFullPayment
+      ? null
+      : (() => {
+          const d = new Date(checkInDate);
+          d.setDate(d.getDate() - paymentSettings.balanceChargeDaysBefore);
+          return d.toISOString();
+        })(),
   };
 }
 
-/**
- * Create a booking
- */
+// ── Create Booking ─────────────────────────────────────────────────
+
 export async function createBooking(
   unitId: string,
   userId: string | null,
@@ -190,22 +196,20 @@ export async function createBooking(
   guestName: string,
   guestEmail: string,
   guestPhone?: string,
+  _specialRequests?: string,
   couponCode?: string,
 ) {
-  // Check availability first
   const availability = await checkAvailability(unitId, checkInDate, checkOutDate);
-  if (!availability.isAvailable) {
-    throw new ConflictError(availability.reason || "Dates not available");
-  }
+  if (!availability.isAvailable) throw new ConflictError(availability.reason || "Dates not available");
 
-  // Calculate price
   const pricing = await calculateBookingPrice(unitId, checkInDate, checkOutDate, guests, couponCode);
-
   const bookingNumber = `BK${nanoid(8).toUpperCase()}`;
   const nights = Math.ceil((checkOutDate.getTime() - checkInDate.getTime()) / (1000 * 60 * 60 * 24));
 
+  const paymentType = pricing.isFullPayment ? "FULL" : "DEPOSIT";
+
   const { data: booking } = await supabase
-    .from('bookings')
+    .from("bookings")
     .insert({
       booking_number: bookingNumber,
       unit_id: unitId,
@@ -219,115 +223,141 @@ export async function createBooking(
       cleaning_fee: pricing.cleaningFee,
       taxes: pricing.taxes,
       discount_amount: pricing.discountAmount,
-      deposit_amount: pricing.finalTotal * 0.25,
-      balance_amount: pricing.finalTotal * 0.75,
+      deposit_amount: pricing.depositAmount,
+      balance_amount: pricing.balanceAmount,
+      remaining_amount: pricing.balanceAmount,
       total_price: pricing.finalTotal,
       guests,
       guest_name: guestName,
       guest_email: guestEmail,
       guest_phone: guestPhone,
       payment_status: "PENDING",
+      payment_type: paymentType,
       deposit_paid: false,
       balance_paid: false,
       status: "PENDING",
+      scheduled_charge_date: pricing.scheduledChargeDate,
     })
     .select()
     .single();
 
-  if (!booking) {
-    throw new AppError(500, "Failed to create booking");
-  }
+  if (!booking) throw new AppError(500, "Failed to create booking");
 
-  // Update coupon usage if applicable
   if (couponCode && pricing.discountAmount > 0) {
     const { data: coupon } = await supabase
-      .from('coupons')
-      .select('used_count')
-      .eq('code', couponCode.toUpperCase())
+      .from("coupons")
+      .select("used_count")
+      .eq("code", couponCode.toUpperCase())
       .single();
-    
     if (coupon) {
       await supabase
-        .from('coupons')
+        .from("coupons")
         .update({ used_count: coupon.used_count + 1 })
-        .eq('code', couponCode.toUpperCase());
+        .eq("code", couponCode.toUpperCase());
     }
   }
 
   return booking;
 }
 
-/**
- * Get booking by ID
- */
-export async function getBookingById(bookingId: string) {
+// ── Get Booking by ID ──────────────────────────────────────────────
+
+export async function getBookingById(
+  bookingId: string,
+  opts?: { userId?: string; guestEmail?: string },
+) {
   const { data: booking } = await supabase
-    .from('bookings')
-    .select(`
-      *,
-      unit:units(
-        *,
-        property:properties(*)
-      )
-    `)
-    .eq('id', bookingId)
+    .from("bookings")
+    .select("*, unit:units(*, property:properties(*))")
+    .eq("id", bookingId)
     .single();
 
-  if (!booking) {
-    throw new NotFoundError("Booking not found");
+  if (!booking) throw new NotFoundError("Booking not found");
+
+  if (opts) {
+    if (opts.userId && booking.user_id !== opts.userId) {
+      throw new AppError(403, "Unauthorized access to this booking");
+    }
+    if (opts.guestEmail && booking.guest_email.toLowerCase() !== opts.guestEmail.toLowerCase()) {
+      throw new AppError(403, "Email does not match booking");
+    }
   }
 
   return booking;
 }
 
-/**
- * Get user bookings
- */
-export async function getUserBookings(userId: string) {
-  const { data: bookings } = await supabase
-    .from('bookings')
-    .select(`
-      *,
-      unit:units(
-        *,
-        property:properties(*)
-      )
-    `)
-    .eq('user_id', userId)
-    .order('created_at', { ascending: false });
+// ── Get User Bookings ──────────────────────────────────────────────
 
-  return bookings || [];
+export async function getUserBookings(userId: string, page = 1, pageSize = 20) {
+  const from = (page - 1) * pageSize;
+  const to = from + pageSize - 1;
+
+  const { data, count } = await supabase
+    .from("bookings")
+    .select("*, unit:units(*, property:properties(*))", { count: "exact" })
+    .eq("user_id", userId)
+    .order("created_at", { ascending: false })
+    .range(from, to);
+
+  return {
+    bookings: data || [],
+    total: count || 0,
+    page,
+    pageSize,
+  };
 }
 
-/**
- * Update booking status
- */
-export async function updateBookingStatus(
-  bookingId: string,
-  status: string,
-  reason?: string,
-) {
-  const updateData: any = { status };
+// ── Update Booking Status ──────────────────────────────────────────
+
+export async function updateBookingStatus(bookingId: string, status: string, reason?: string) {
+  const updateData: Record<string, any> = { status };
   if (reason) updateData.cancellation_reason = reason;
   if (status === "CANCELLED") updateData.cancelled_at = new Date().toISOString();
 
-  const { data: booking } = await supabase
-    .from('bookings')
+  const { data } = await supabase
+    .from("bookings")
     .update(updateData)
-    .eq('id', bookingId)
+    .eq("id", bookingId)
     .select()
     .single();
 
-  if (!booking) {
-    throw new NotFoundError("Booking not found");
-  }
-
-  return booking;
+  if (!data) throw new NotFoundError("Booking not found");
+  return data;
 }
 
-/**
- * Get all bookings (admin)
- */
+// ── Cancel Booking ─────────────────────────────────────────────────
+
+export async function cancelBooking(
+  bookingId: string,
+  opts?: { userId?: string; guestEmail?: string },
+  reason?: string,
+) {
+  const { data: booking } = await supabase
+    .from("bookings")
+    .select("*")
+    .eq("id", bookingId)
+    .single();
+
+  if (!booking) throw new NotFoundError("Booking not found");
+
+  if (opts) {
+    if (opts.userId && booking.user_id !== opts.userId) {
+      throw new AppError(403, "Unauthorized");
+    }
+    if (opts.guestEmail && booking.guest_email.toLowerCase() !== opts.guestEmail.toLowerCase()) {
+      throw new AppError(403, "Email does not match booking");
+    }
+  }
+
+  if (booking.status === "CANCELLED") {
+    throw new ValidationError("Booking is already cancelled");
+  }
+
+  return await updateBookingStatus(bookingId, "CANCELLED", reason);
+}
+
+// ── Admin: Get All Bookings ────────────────────────────────────────
+
 export async function getAllBookings(filters?: {
   status?: string;
   propertyId?: string;
@@ -335,129 +365,69 @@ export async function getAllBookings(filters?: {
   endDate?: Date;
 }) {
   let query = supabase
-    .from('bookings')
-    .select(`
-      *,
-      unit:units(
-        *,
-        property:properties(*)
-      ),
-      user:users(
-        id,
-        email,
-        first_name,
-        last_name
-      )
-    `);
+    .from("bookings")
+    .select("*, unit:units(*, property:properties(*)), user:users(id, email, first_name, last_name)");
 
-  if (filters?.status) {
-    query = query.eq('status', filters.status);
-  }
-  if (filters?.propertyId) {
-    query = query.eq('unit.property_id', filters.propertyId);
-  }
-  if (filters?.startDate) {
-    query = query.gte('check_in_date', filters.startDate.toISOString());
-  }
-  if (filters?.endDate) {
-    query = query.lte('check_out_date', filters.endDate.toISOString());
-  }
+  if (filters?.status) query = query.eq("status", filters.status);
+  if (filters?.startDate) query = query.gte("check_in_date", filters.startDate.toISOString());
+  if (filters?.endDate) query = query.lte("check_out_date", filters.endDate.toISOString());
 
-  const { data: bookings } = await query.order('created_at', { ascending: false });
-
-  return bookings || [];
+  const { data } = await query.order("created_at", { ascending: false });
+  return data || [];
 }
 
-/**
- * Get booking statistics
- */
-export async function getBookingStats(propertyId?: string) {
-  let query = supabase.from('bookings').select('*');
+// ── Booking Stats ──────────────────────────────────────────────────
 
-  if (propertyId) {
-    query = query.eq('unit.property_id', propertyId);
-  }
+export async function getBookingStats() {
+  const { data: bookings } = await supabase.from("bookings").select("*");
+  if (!bookings) return { total: 0, pending: 0, confirmed: 0, cancelled: 0, completed: 0, revenue: 0 };
 
-  const { data: bookings } = await query;
-
-  if (!bookings) {
-    return {
-      total: 0,
-      pending: 0,
-      confirmed: 0,
-      cancelled: 0,
-      completed: 0,
-      revenue: 0,
-    };
-  }
-
-  const stats = {
+  return {
     total: bookings.length,
-    pending: bookings.filter(b => b.status === 'PENDING').length,
-    confirmed: bookings.filter(b => b.status === 'CONFIRMED').length,
-    cancelled: bookings.filter(b => b.status === 'CANCELLED').length,
-    completed: bookings.filter(b => b.status === 'COMPLETED').length,
-    revenue: bookings
-      .filter(b => b.status === 'COMPLETED')
-      .reduce((sum, b) => sum + (b.total_price || 0), 0),
+    pending: bookings.filter((b) => b.status === "PENDING").length,
+    confirmed: bookings.filter((b) => b.status === "CONFIRMED").length,
+    cancelled: bookings.filter((b) => b.status === "CANCELLED").length,
+    completed: bookings.filter((b) => b.status === "COMPLETED").length,
+    revenue: bookings.filter((b) => ["CONFIRMED", "COMPLETED"].includes(b.status)).reduce((s, b) => s + Number(b.total_price || 0), 0),
   };
-
-  return stats;
 }
 
-/**
- * Get occupied date ranges for a unit
- */
+// ── Occupied Date Ranges ───────────────────────────────────────────
+
 export async function getOccupiedDateRanges(unitId: string) {
-  const { data: bookings } = await supabase
-    .from('bookings')
-    .select('check_in_date, check_out_date')
-    .eq('unit_id', unitId)
-    .neq('status', 'CANCELLED')
-    .order('check_in_date', { ascending: true });
-
-  return bookings || [];
+  const { data } = await supabase
+    .from("bookings")
+    .select("check_in_date, check_out_date")
+    .eq("unit_id", unitId)
+    .neq("status", "CANCELLED")
+    .order("check_in_date", { ascending: true });
+  return data || [];
 }
 
-/**
- * Get available units for a date range
- */
-export async function getAvailableUnits(
-  checkInDate: string,
-  checkOutDate: string,
-  guests?: number,
-) {
-  let query = supabase
-    .from('units')
-    .select(`
-      *,
-      property:properties(*)
-    `)
-    .eq('is_active', true);
+// ── Get Available Units ────────────────────────────────────────────
 
-  if (guests) {
-    query = query.gte('max_guests', guests);
-  }
+export async function getAvailableUnits(
+  checkInDate: Date | string,
+  checkOutDate: Date | string,
+  guests?: number,
+  _propertyId?: string,
+) {
+  const checkIn = typeof checkInDate === "string" ? checkInDate : checkInDate.toISOString();
+  const checkOut = typeof checkOutDate === "string" ? checkOutDate : checkOutDate.toISOString();
+
+  let query = supabase.from("units").select("*, property:properties(*)").eq("is_active", true);
+  if (guests) query = query.gte("max_guests", guests);
 
   const { data: units } = await query;
-
   if (!units) return [];
 
-  // Filter out units with conflicting bookings
-  const availableUnits = units.filter(unit => {
-    // TODO: Check for conflicting bookings
-    return true; // Simplified for now
-  });
+  const { data: conflicting } = await supabase
+    .from("bookings")
+    .select("unit_id")
+    .neq("status", "CANCELLED")
+    .lt("check_in_date", checkOut)
+    .gt("check_out_date", checkIn);
 
-  return availableUnits;
-}
-
-/**
- * Cancel booking
- */
-export async function cancelBooking(
-  bookingId: string,
-  reason?: string,
-) {
-  return await updateBookingStatus(bookingId, 'CANCELLED', reason);
+  const bookedUnitIds = new Set((conflicting || []).map((b) => b.unit_id));
+  return units.filter((u) => !bookedUnitIds.has(u.id));
 }

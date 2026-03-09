@@ -28,6 +28,8 @@
     "migration:phase8": "tsx scripts/phase8-netlify-deployment.ts"
   },
   "dependencies": {
+    "@stripe/react-stripe-js": "^5.6.1",
+    "@stripe/stripe-js": "^8.9.0",
     "@supabase/supabase-js": "^2.98.0",
     "@types/bcryptjs": "^3.0.0",
     "@types/jsonwebtoken": "^9.0.10",

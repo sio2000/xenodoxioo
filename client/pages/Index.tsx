@@ -14,8 +14,14 @@ import {
   Camera,
   Heart,
   Clock,
+  ArrowRight,
+  MessageSquare,
+  CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
+  X,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useLanguage } from "@/hooks/useLanguage";
 import formatCurrency from "@/lib/currency";
 
@@ -30,6 +36,177 @@ type PropertySummary = {
   unitsCount: number;
   startingFrom: number | null;
 };
+
+function BeachLightbox({ images, initialIndex, onClose }: { images: string[]; initialIndex: number; onClose: () => void }) {
+  const [currentIndex, setCurrentIndex] = useState(initialIndex);
+
+  const goNext = useCallback(() => {
+    setCurrentIndex((i) => (i + 1) % images.length);
+  }, [images.length]);
+
+  const goPrev = useCallback(() => {
+    setCurrentIndex((i) => (i - 1 + images.length) % images.length);
+  }, [images.length]);
+
+  useEffect(() => {
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+      if (e.key === "ArrowRight") goNext();
+      if (e.key === "ArrowLeft") goPrev();
+    };
+    window.addEventListener("keydown", handleKey);
+    document.body.style.overflow = "hidden";
+    return () => {
+      window.removeEventListener("keydown", handleKey);
+      document.body.style.overflow = "";
+    };
+  }, [onClose, goNext, goPrev]);
+
+  return (
+    <div className="fixed inset-0 z-[100] bg-black/95 flex items-center justify-center" onClick={onClose}>
+      <button
+        onClick={onClose}
+        className="absolute top-4 right-4 z-10 p-2 rounded-full bg-white/10 hover:bg-white/20 text-white transition-colors"
+      >
+        <X size={24} />
+      </button>
+      <button
+        onClick={(e) => { e.stopPropagation(); goPrev(); }}
+        className="absolute left-2 sm:left-6 z-10 p-2 sm:p-3 rounded-full bg-white/10 hover:bg-white/20 text-white transition-colors"
+      >
+        <ChevronLeft size={28} />
+      </button>
+      <button
+        onClick={(e) => { e.stopPropagation(); goNext(); }}
+        className="absolute right-2 sm:right-6 z-10 p-2 sm:p-3 rounded-full bg-white/10 hover:bg-white/20 text-white transition-colors"
+      >
+        <ChevronRight size={28} />
+      </button>
+      <img
+        src={images[currentIndex]}
+        alt=""
+        className="max-h-[90vh] max-w-[95vw] object-contain rounded-lg select-none"
+        onClick={(e) => e.stopPropagation()}
+        draggable={false}
+      />
+      <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex gap-2">
+        {images.map((_, i) => (
+          <button
+            key={i}
+            onClick={(e) => { e.stopPropagation(); setCurrentIndex(i); }}
+            className={`w-2.5 h-2.5 rounded-full transition-colors ${i === currentIndex ? "bg-white" : "bg-white/40"}`}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function PrivateBeachesSection() {
+  const { t } = useLanguage();
+  const [lightbox, setLightbox] = useState<{ images: string[]; index: number } | null>(null);
+
+  const bigBeachImages = ["/bigbeach1.jpg", "/bigbeach2.jpg", "/bigbeach3.jpg", "/bigbeach4.jpg"];
+  const smallBeachImages = ["/smallbeach1.jpg", "/smallbeach2.jpg", "/smallbeach3.jpg", "/smallbeach4.jpg"];
+
+  const openLightbox = (images: string[], index: number) => {
+    setLightbox({ images, index });
+  };
+
+  return (
+    <>
+      <section className="section-padding bg-background">
+        <div className="container-max">
+          <div className="text-center mb-12">
+            <span className="inline-block px-4 py-1.5 bg-primary/10 text-primary rounded-full text-sm font-medium mb-4">
+              {t("home.beaches.badge")}
+            </span>
+            <h2 className="text-3xl md:text-4xl font-bold text-foreground mb-4">
+              {t("home.beaches.title")}
+            </h2>
+            <p className="text-muted-foreground text-lg max-w-2xl mx-auto">
+              {t("home.beaches.subtitle")}
+            </p>
+          </div>
+
+          <div className="grid md:grid-cols-2 gap-8 lg:gap-12">
+            {/* Big Beach */}
+            <div className="group">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+                  <Waves size={20} className="text-primary" />
+                </div>
+                <div>
+                  <h3 className="text-xl font-bold text-foreground">{t("home.beaches.bigBeach.title")}</h3>
+                  <p className="text-sm text-muted-foreground">{t("home.beaches.bigBeach.subtitle")}</p>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                {bigBeachImages.map((img, i) => (
+                  <div
+                    key={i}
+                    className={`relative overflow-hidden rounded-xl cursor-pointer group/img ${i === 0 ? "col-span-2 aspect-[16/9]" : "aspect-[4/3]"}`}
+                    onClick={() => openLightbox(bigBeachImages, i)}
+                  >
+                    <img
+                      src={img}
+                      alt={`${t("home.beaches.bigBeach.title")} ${i + 1}`}
+                      className="w-full h-full object-cover transition-transform duration-500 group-hover/img:scale-110"
+                      loading="lazy"
+                    />
+                    <div className="absolute inset-0 bg-black/0 group-hover/img:bg-black/20 transition-colors duration-300 flex items-center justify-center">
+                      <Search size={24} className="text-white opacity-0 group-hover/img:opacity-100 transition-opacity duration-300" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Small Beach */}
+            <div className="group">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+                  <Compass size={20} className="text-primary" />
+                </div>
+                <div>
+                  <h3 className="text-xl font-bold text-foreground">{t("home.beaches.smallBeach.title")}</h3>
+                  <p className="text-sm text-muted-foreground">{t("home.beaches.smallBeach.subtitle")}</p>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                {smallBeachImages.map((img, i) => (
+                  <div
+                    key={i}
+                    className={`relative overflow-hidden rounded-xl cursor-pointer group/img ${i === 0 ? "col-span-2 aspect-[16/9]" : "aspect-[4/3]"}`}
+                    onClick={() => openLightbox(smallBeachImages, i)}
+                  >
+                    <img
+                      src={img}
+                      alt={`${t("home.beaches.smallBeach.title")} ${i + 1}`}
+                      className="w-full h-full object-cover transition-transform duration-500 group-hover/img:scale-110"
+                      loading="lazy"
+                    />
+                    <div className="absolute inset-0 bg-black/0 group-hover/img:bg-black/20 transition-colors duration-300 flex items-center justify-center">
+                      <Search size={24} className="text-white opacity-0 group-hover/img:opacity-100 transition-opacity duration-300" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {lightbox && (
+        <BeachLightbox
+          images={lightbox.images}
+          initialIndex={lightbox.index}
+          onClose={() => setLightbox(null)}
+        />
+      )}
+    </>
+  );
+}
 
 export default function Index() {
   const [checkIn, setCheckIn] = useState("");
@@ -103,11 +280,20 @@ export default function Index() {
   return (
     <Layout>
       {/* Hero Section */}
-      <div className="relative bg-gradient-to-br from-primary via-primary/80 to-primary/60 text-white overflow-hidden">
-        {/* Background pattern */}
-        <div className="absolute inset-0 opacity-10">
-          <div className="absolute inset-0 bg-[url('data:image/svg+xml,%3Csvg width=%2260%27 height=%2760%27 viewBox=%270 0 60 60%27 xmlns=%27http://www.w3.org/2000/svg%27%3E%3Cg fill=%27none%27 fill-rule=%27evenodd%27%3E%3Cg fill=%27%23ffffff%27 fill-opacity=%270.1%27%3E%3Cpath d=%27M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z%27/%3E%3C/g%3E%3C/g%3E%3C/svg%3E')]" />
-        </div>
+      <div className="relative text-white overflow-hidden">
+        {/* Video Background */}
+        <video
+          autoPlay
+          muted
+          loop
+          playsInline
+          className="absolute inset-0 w-full h-full object-cover"
+          poster=""
+        >
+          <source src="/viewvideos/herosectionbackground.mp4" type="video/mp4" />
+        </video>
+        {/* Dark overlay for text readability */}
+        <div className="absolute inset-0 bg-black/50" />
 
         <div className="relative container-max py-20 md:py-32">
           <div className="max-w-3xl">
@@ -415,6 +601,55 @@ export default function Index() {
                   </div>
       </section>
 
+      {/* Better Price Inquiry CTA Section */}
+      <section className="py-16 bg-gradient-to-r from-accent/5 via-primary/10 to-accent/5">
+        <div className="container-max">
+          <div className="rounded-3xl border border-primary/15 bg-card shadow-xl overflow-hidden">
+            <div className="grid md:grid-cols-2 gap-0">
+              <div className="p-8 md:p-12 flex flex-col justify-center">
+                <div className="w-14 h-14 bg-primary/15 rounded-2xl flex items-center justify-center mb-6">
+                  <MessageSquare size={28} className="text-primary" />
+                </div>
+                <h2 className="text-2xl md:text-3xl font-bold text-foreground mb-4">
+                  {t("home.inquiry.title")}
+                </h2>
+                <p className="text-muted-foreground text-lg leading-relaxed mb-6">
+                  {t("home.inquiry.description")}
+                </p>
+                <ul className="space-y-3 mb-8">
+                  {["home.inquiry.benefit1", "home.inquiry.benefit2", "home.inquiry.benefit3"].map((key) => (
+                    <li key={key} className="flex items-center gap-3 text-foreground">
+                      <CheckCircle2 size={18} className="text-primary flex-shrink-0" />
+                      <span>{t(key)}</span>
+                    </li>
+                  ))}
+                </ul>
+                <Link to="/properties" className="btn-primary w-fit gap-2">
+                  {t("home.inquiry.cta")}
+                  <ArrowRight size={18} />
+                </Link>
+              </div>
+              <div className="hidden md:flex items-center justify-center p-12 bg-gradient-to-br from-primary/5 to-accent/10">
+                <div className="text-center space-y-6">
+                  <div className="text-6xl font-bold text-primary">-15%</div>
+                  <p className="text-lg text-muted-foreground max-w-xs">{t("home.inquiry.discountNote")}</p>
+                  <div className="flex items-center justify-center gap-4">
+                    <div className="flex items-center gap-2 px-4 py-2 bg-white/80 rounded-full border border-primary/10">
+                      <Calendar size={16} className="text-primary" />
+                      <span className="text-sm font-medium">7+ {t("common.nights")}</span>
+                    </div>
+                    <div className="flex items-center gap-2 px-4 py-2 bg-white/80 rounded-full border border-primary/10">
+                      <Users size={16} className="text-primary" />
+                      <span className="text-sm font-medium">4+ {t("common.guests")}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* Trust Section */}
       <section className="bg-gradient-to-r from-primary/10 via-accent/5 to-primary/10 section-padding">
         <div className="container-max text-center">
@@ -440,6 +675,9 @@ export default function Index() {
           </div>
         </div>
       </section>
+
+      {/* Private Beaches Section */}
+      <PrivateBeachesSection />
 
       {/* CTA Section */}
       <section className="bg-primary text-white section-padding">

@@ -33,6 +33,244 @@ const defaultCouponForm = {
   isActive: true,
 };
 
+// ── Payment Settings Panel ─────────────────────────────────────────
+
+function PaymentSettingsPanel() {
+  const { t } = useLanguage();
+  const [settings, setSettings] = useState({
+    depositPercentage: 25,
+    balanceChargeDaysBefore: 21,
+    fullPaymentThresholdDays: 21,
+    refundDepositOnCancel: false,
+  });
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await fetch(apiUrl("/api/admin/settings/payment"));
+        if (res.ok) {
+          const data = await res.json();
+          const d = data.data;
+          setSettings({
+            depositPercentage: d.deposit_percentage ?? 25,
+            balanceChargeDaysBefore: d.balance_charge_days_before ?? 21,
+            fullPaymentThresholdDays: d.full_payment_threshold_days ?? 21,
+            refundDepositOnCancel: d.refund_deposit_on_cancel ?? false,
+          });
+        }
+      } catch {}
+      finally { setLoading(false); }
+    })();
+  }, []);
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      const res = await fetch(apiUrl("/api/admin/settings/payment"), {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(settings),
+      });
+      if (res.ok) alert(t("admin.paymentSettingsSaved"));
+      else alert(t("admin.paymentSettingsSaveError"));
+    } catch { alert(t("admin.paymentSettingsError")); }
+    finally { setSaving(false); }
+  };
+
+  if (loading) return <div className="bg-card border border-border rounded-lg p-6"><p>{t("common.loading")}</p></div>;
+
+  return (
+    <div className="bg-card border border-border rounded-lg p-6">
+      <h3 className="font-bold text-foreground mb-4">{t("admin.paymentPolicy")}</h3>
+      <p className="text-muted-foreground text-sm mb-4">{t("admin.paymentPolicyDesc")}</p>
+      <div className="space-y-4">
+        <div>
+          <label className="block text-sm font-medium text-foreground mb-2">{t("admin.depositPercentage")}</label>
+          <input type="number" value={settings.depositPercentage}
+            onChange={(e) => setSettings({...settings, depositPercentage: parseInt(e.target.value) || 25})}
+            min="5" max="100" step="5"
+            className="w-full p-2 border border-border rounded-md bg-background text-foreground" />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-foreground mb-2">{t("admin.fullPaymentThreshold")}</label>
+          <input type="number" value={settings.fullPaymentThresholdDays}
+            onChange={(e) => setSettings({...settings, fullPaymentThresholdDays: parseInt(e.target.value) || 21})}
+            min="1" max="90"
+            className="w-full p-2 border border-border rounded-md bg-background text-foreground" />
+          <p className="text-xs text-muted-foreground mt-1">{t("admin.fullPaymentThresholdDesc")}</p>
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-foreground mb-2">{t("admin.balanceChargeDays")}</label>
+          <input type="number" value={settings.balanceChargeDaysBefore}
+            onChange={(e) => setSettings({...settings, balanceChargeDaysBefore: parseInt(e.target.value) || 21})}
+            min="1" max="90"
+            className="w-full p-2 border border-border rounded-md bg-background text-foreground" />
+        </div>
+        <div className="flex items-center gap-3">
+          <input type="checkbox" id="refundDeposit" checked={settings.refundDepositOnCancel}
+            onChange={(e) => setSettings({...settings, refundDepositOnCancel: e.target.checked})} />
+          <label htmlFor="refundDeposit" className="text-sm font-medium text-foreground">
+            {t("admin.allowDepositRefund")}
+          </label>
+        </div>
+        <button onClick={handleSave} disabled={saving} className="btn-primary">
+          {saving ? t("admin.savingPaymentSettings") : t("admin.savePaymentSettings")}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ── Inquiries Management ───────────────────────────────────────────
+
+function InquiriesManagement() {
+  const { t } = useLanguage();
+  const [inquiries, setInquiries] = useState<any[]>([]);
+  const [selectedInquiry, setSelectedInquiry] = useState<any>(null);
+  const [messages, setMessages] = useState<any[]>([]);
+  const [replyText, setReplyText] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [sending, setSending] = useState(false);
+  const [statusFilter, setStatusFilter] = useState("ALL");
+
+  const fetchInquiries = async () => {
+    try {
+      const admin = localStorage.getItem("admin");
+      const token = admin ? JSON.parse(admin).accessToken : "";
+      const res = await fetch(apiUrl(`/api/inquiries/admin/list?status=${statusFilter}`), {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setInquiries(data.data?.inquiries || []);
+      }
+    } catch {}
+    finally { setLoading(false); }
+  };
+
+  useEffect(() => { fetchInquiries(); }, [statusFilter]);
+
+  const viewInquiry = async (inquiry: any) => {
+    setSelectedInquiry(inquiry);
+    try {
+      const admin = localStorage.getItem("admin");
+      const token = admin ? JSON.parse(admin).accessToken : "";
+      const res = await fetch(apiUrl(`/api/inquiries/admin/${inquiry.id}`), {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setMessages(data.data?.messages || []);
+      }
+    } catch {}
+  };
+
+  const handleReply = async () => {
+    if (!replyText.trim() || !selectedInquiry) return;
+    setSending(true);
+    try {
+      const admin = localStorage.getItem("admin");
+      const token = admin ? JSON.parse(admin).accessToken : "";
+      const res = await fetch(apiUrl(`/api/inquiries/admin/${selectedInquiry.id}/reply`), {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ message: replyText.trim() }),
+      });
+      if (res.ok) {
+        setReplyText("");
+        viewInquiry(selectedInquiry);
+        fetchInquiries();
+      }
+    } catch {}
+    finally { setSending(false); }
+  };
+
+  if (selectedInquiry) {
+    return (
+      <div>
+        <button onClick={() => { setSelectedInquiry(null); setMessages([]); }}
+          className="text-primary hover:underline mb-4 inline-block">&larr; {t("admin.backToList")}</button>
+        <div className="bg-card border border-border rounded-lg p-6 mb-4">
+          <h3 className="font-bold text-foreground mb-2">{t("admin.inquiryFrom")} {selectedInquiry.guest_name}</h3>
+          <p className="text-sm text-muted-foreground">{selectedInquiry.guest_email}</p>
+          <p className="text-sm text-muted-foreground">
+            {new Date(selectedInquiry.checkin_date).toLocaleDateString()} - {new Date(selectedInquiry.checkout_date).toLocaleDateString()} | {selectedInquiry.guests} {t("common.guests").toLowerCase()}
+          </p>
+          <p className="text-sm mt-1">{t("admin.propertyLabel")} <strong>{selectedInquiry.property?.name || "—"}</strong></p>
+          <p className="text-sm">{t("admin.statusLabel")} <span className="font-semibold capitalize">{selectedInquiry.status?.toLowerCase().replace("_", " ")}</span></p>
+        </div>
+
+        <div className="space-y-3 mb-6 max-h-96 overflow-y-auto">
+          {messages.map((msg: any) => (
+            <div key={msg.id} className={`p-4 rounded-lg ${msg.sender_type === "host" ? "bg-primary/10 ml-8" : "bg-muted mr-8"}`}>
+              <div className="flex justify-between text-xs text-muted-foreground mb-1">
+                <span className="font-semibold">{msg.sender_type === "host" ? t("admin.youHost") : t("admin.guestSender")}</span>
+                <span>{new Date(msg.created_at).toLocaleString()}</span>
+              </div>
+              <p className="whitespace-pre-wrap">{msg.message}</p>
+            </div>
+          ))}
+        </div>
+
+        <div className="flex gap-3">
+          <input type="text" value={replyText} onChange={(e) => setReplyText(e.target.value)}
+            placeholder={t("admin.typeYourReply")}
+            className="flex-1 px-4 py-2 border border-border rounded-lg text-foreground" />
+          <button onClick={handleReply} disabled={sending || !replyText.trim()} className="btn-primary px-6">
+            {sending ? t("admin.sending") : t("admin.reply")}
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-6">
+        <h2 className="text-2xl font-bold text-foreground">{t("admin.guestInquiries")}</h2>
+        <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}
+          className="px-3 py-2 border border-border rounded-lg text-foreground bg-background">
+          <option value="ALL">{t("admin.all")}</option>
+          <option value="NEW">{t("admin.newStatus")}</option>
+          <option value="ANSWERED">{t("admin.answered")}</option>
+          <option value="GUEST_REPLIED">{t("admin.guestReplied")}</option>
+        </select>
+      </div>
+
+      {loading ? (
+        <p className="text-muted-foreground">{t("common.loading")}</p>
+      ) : inquiries.length === 0 ? (
+        <p className="text-muted-foreground">{t("admin.noInquiriesFound")}</p>
+      ) : (
+        <div className="space-y-3">
+          {inquiries.map((inq: any) => (
+            <div key={inq.id} className="bg-card border border-border rounded-lg p-4 flex items-center justify-between cursor-pointer hover:border-primary/50 transition-colors"
+              onClick={() => viewInquiry(inq)}>
+              <div>
+                <p className="font-semibold text-foreground">{inq.guest_name}</p>
+                <p className="text-sm text-muted-foreground">{inq.guest_email}</p>
+                <p className="text-xs text-muted-foreground">
+                  {new Date(inq.checkin_date).toLocaleDateString()} - {new Date(inq.checkout_date).toLocaleDateString()} | {inq.property?.name || "—"}
+                </p>
+              </div>
+              <div className="text-right">
+                <span className={`text-xs px-2 py-1 rounded-full ${
+                  inq.status === "NEW" ? "bg-blue-100 text-blue-700" :
+                  inq.status === "ANSWERED" ? "bg-green-100 text-green-700" :
+                  "bg-yellow-100 text-yellow-700"
+                }`}>{inq.status}</span>
+                <p className="text-xs text-muted-foreground mt-1">{new Date(inq.created_at).toLocaleDateString()}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function PricingAndDiscounts() {
   const { language, t } = useLanguage();
   const [seasonalPricing, setSeasonalPricing] = useState<any[]>([]);
@@ -512,6 +750,7 @@ export default function Admin() {
     { id: "pricing", label: t("admin.pricing"), icon: DollarSign },
     { id: "properties", label: t("admin.properties"), icon: Calendar },
     { id: "users", label: t("admin.users"), icon: Users },
+    { id: "inquiries", label: t("admin.inquiries"), icon: Tag },
     { id: "settings", label: t("admin.settings"), icon: Settings },
   ];
 
@@ -661,6 +900,11 @@ export default function Admin() {
             <UserManagement />
           )}
 
+          {/* Inquiries Tab */}
+          {activeTab === "inquiries" && (
+            <InquiriesManagement />
+          )}
+
           {/* Settings Tab */}
           {activeTab === "settings" && (
             <div>
@@ -678,7 +922,7 @@ export default function Admin() {
                   <div className="space-y-4">
                     <div>
                       <label className="block text-sm font-medium text-foreground mb-2">
-                        Tax Rate (%)
+                        {t("admin.taxRate")}
                       </label>
                       <input
                         type="number"
@@ -692,7 +936,7 @@ export default function Admin() {
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-foreground mb-2">
-                        Additional Fees (%)
+                        {t("admin.additionalFees")}
                       </label>
                       <input
                         type="number"
@@ -713,6 +957,9 @@ export default function Admin() {
                     </button>
                   </div>
                 </div>
+
+                {/* Payment Policy Settings */}
+                <PaymentSettingsPanel />
               </div>
             </div>
           )}

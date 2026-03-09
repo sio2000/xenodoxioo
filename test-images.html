@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Image Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        .image-test { margin: 20px 0; border: 2px solid #ccc; padding: 10px; }
+        img { max-width: 300px; height: auto; display: block; margin: 10px 0; }
+        .debug { background: #f0f0f0; padding: 10px; margin: 10px 0; font-family: monospace; }
+    </style>
+</head>
+<body>
+    <h1>Image Loading Test</h1>
+    
+    <div class="image-test">
+        <h2>Direct Image Test</h2>
+        <div class="debug">Testing: http://localhost:8081/uploads/file-1772498557556-662001371.jpg</div>
+        <img src="http://localhost:8081/uploads/file-1772498557556-662001371.jpg" 
+             onload="console.log('✅ Direct image loaded successfully')" 
+             onerror="console.error('❌ Direct image failed to load')" />
+    </div>
+
+    <div class="image-test">
+        <h2>API Data Test</h2>
+        <div id="api-result">Loading API data...</div>
+        <div id="image-container"></div>
+    </div>
+
+    <script>
+        // Test API call
+        fetch('http://localhost:8081/api/properties')
+            .then(response => response.json())
+            .then(data => {
+                console.log('🔍 API Response:', data);
+                const firstUnit = data.data[0]?.units[0];
+                if (firstUnit) {
+                    const apiResult = document.getElementById('api-result');
+                    apiResult.innerHTML = `
+                        <div class="debug">
+                            Unit Name: ${firstUnit.name}<br>
+                            Unit Images: ${JSON.stringify(firstUnit.images)}<br>
+                            Property Main Image: ${firstUnit.property?.mainImage || 'N/A'}<br>
+                            First Image Path: ${firstUnit.images?.[0] || 'None'}<br>
+                            Property Image: ${firstUnit.property?.mainImage || 'None'}
+                        </div>
+                    `;
+                    
+                    const imageContainer = document.getElementById('image-container');
+                    
+                    // Test unit image
+                    if (firstUnit.images && firstUnit.images.length > 0) {
+                        const unitImg = document.createElement('img');
+                        unitImg.src = firstUnit.images[0].startsWith('/uploads/') 
+                            ? `http://localhost:8081${firstUnit.images[0]}`
+                            : firstUnit.images[0];
+                        unitImg.onload = () => console.log('✅ Unit image loaded');
+                        unitImg.onerror = () => console.error('❌ Unit image failed');
+                        imageContainer.appendChild(unitImg);
+                    }
+                    
+                    // Test property image
+                    if (firstUnit.property?.mainImage) {
+                        const propImg = document.createElement('img');
+                        propImg.src = firstUnit.property.mainImage.startsWith('/uploads/')
+                            ? `http://localhost:8081${firstUnit.property.mainImage}`
+                            : firstUnit.property.mainImage;
+                        propImg.onload = () => console.log('✅ Property image loaded');
+                        propImg.onerror = () => console.error('❌ Property image failed');
+                        imageContainer.appendChild(propImg);
+                    }
+                }
+            })
+            .catch(error => {
+                console.error('❌ API call failed:', error);
+                document.getElementById('api-result').innerHTML = `<div class="debug">API Error: ${error.message}</div>`;
+            });
+    </script>
+</body>
+</html>

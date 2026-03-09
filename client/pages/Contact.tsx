@@ -199,7 +199,7 @@ export default function Contact() {
                 >
                   <iframe
                     title="Leonidion location"
-                    src="https://www.openstreetmap.org/export/embed.html?bbox=22.8482%2C37.1557%2C22.8982%2C37.1857&layer=mapnik&marker=37.17%2C22.87"
+                    src="https://www.openstreetmap.org/export/embed.html?bbox=22.865%2C37.207%2C22.906%2C37.247&layer=mapnik&marker=37.22692%2C22.88575"
                     className="w-full h-full"
                     allowFullScreen
                     loading="lazy"

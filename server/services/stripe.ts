@@ -8,9 +8,8 @@ if (!stripeSecretKey) {
 }
 
 const stripe = stripeSecretKey ? new Stripe(stripeSecretKey, {
-  apiVersion: '2024-01-01' as any,
   typescript: true,
-}) : null;
+} as any) : null;
 
 export class StripeService {
   static async createCustomer(email: string, name: string, phone?: string) {

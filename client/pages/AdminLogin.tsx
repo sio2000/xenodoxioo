@@ -7,8 +7,10 @@ import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import Layout from "@/components/Layout";
 import { apiUrl } from "@/lib/api";
+import { useLanguage } from "@/hooks/useLanguage";
 
 export default function AdminLogin() {
+  const { t } = useLanguage();
   const [email, setEmail] = useState("admin@booking.com");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -56,9 +58,9 @@ export default function AdminLogin() {
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <Card className="w-full max-w-md">
           <CardHeader>
-            <CardTitle>Admin Login</CardTitle>
+            <CardTitle>{t("admin.login.title")}</CardTitle>
             <CardDescription>
-              Enter your credentials to access the admin panel.
+              {t("admin.login.description")}
               <br />
               <span className="text-xs text-muted-foreground mt-2 block">
                 Demo: admin@booking.com / admin123
@@ -68,7 +70,7 @@ export default function AdminLogin() {
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
+                <Label htmlFor="email">{t("admin.login.email")}</Label>
                 <Input
                   id="email"
                   type="email"
@@ -78,7 +80,7 @@ export default function AdminLogin() {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="password">Password</Label>
+                <Label htmlFor="password">{t("admin.login.password")}</Label>
                 <Input
                   id="password"
                   type="password"
@@ -93,7 +95,7 @@ export default function AdminLogin() {
                 </Alert>
               )}
               <Button type="submit" className="w-full" disabled={loading}>
-                {loading ? "Logging in..." : "Login"}
+                {loading ? t("admin.login.loggingIn") : t("admin.login.button")}
               </Button>
             </form>
           </CardContent>

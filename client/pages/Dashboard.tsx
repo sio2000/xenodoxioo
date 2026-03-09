@@ -12,6 +12,7 @@ type DashboardBooking = {
   checkIn: string;
   checkOut: string;
   status: string;
+  paymentStatus?: string;
   total: number;
 };
 
@@ -78,14 +79,15 @@ export default function Dashboard() {
             (b: any) => ({
               id: b.id,
               propertyName: b.unit?.property?.name ?? "Property",
-              checkIn: b.checkInDate
-                ? new Date(b.checkInDate).toISOString().split("T")[0]
+              checkIn: (b.check_in_date || b.checkInDate)
+                ? new Date(b.check_in_date || b.checkInDate).toISOString().split("T")[0]
                 : "",
-              checkOut: b.checkOutDate
-                ? new Date(b.checkOutDate).toISOString().split("T")[0]
+              checkOut: (b.check_out_date || b.checkOutDate)
+                ? new Date(b.check_out_date || b.checkOutDate).toISOString().split("T")[0]
                 : "",
               status: (b.status || "PENDING").toLowerCase(),
-              total: b.totalPrice ?? 0,
+              paymentStatus: (b.payment_status || b.paymentStatus || "PENDING").toLowerCase(),
+              total: Number(b.total_price ?? b.totalPrice ?? 0),
             }),
           );
 
@@ -142,7 +144,7 @@ export default function Dashboard() {
   };
 
   const canCancelBooking = (status: string) =>
-    ["pending", "confirmed", "deposit_paid"].includes(status);
+    ["pending", "confirmed"].includes(status);
 
   return (
     <Layout>
@@ -247,16 +249,31 @@ export default function Dashboard() {
                               {t("dashboard.bookingId")} : #{booking.id}
                             </p>
                           </div>
-                          <div className="text-right">
+                          <div className="text-right space-y-1">
                             <span
                               className={`inline-block px-3 py-1 rounded-full text-xs font-semibold ${
                                 booking.status === "confirmed"
                                   ? "bg-green-100 text-green-700"
-                                  : "bg-yellow-100 text-yellow-700"
+                                  : booking.status === "cancelled"
+                                    ? "bg-red-100 text-red-700"
+                                    : "bg-yellow-100 text-yellow-700"
                               }`}
                             >
-                              {t(`dashboard.${booking.status}`)}
+                              {t(`dashboard.${booking.status}`) || booking.status}
                             </span>
+                            {booking.paymentStatus && booking.paymentStatus !== "pending" && (
+                              <span
+                                className={`inline-block px-3 py-1 rounded-full text-xs font-semibold ${
+                                  booking.paymentStatus === "paid_full"
+                                    ? "bg-green-100 text-green-700"
+                                    : booking.paymentStatus === "deposit_paid"
+                                      ? "bg-blue-100 text-blue-700"
+                                      : "bg-gray-100 text-gray-700"
+                                }`}
+                              >
+                                {t(`dashboard.${booking.paymentStatus}`) || booking.paymentStatus}
+                              </span>
+                            )}
                             <p className="text-2xl font-bold text-primary mt-2">
                               {formatCurrency(booking.total, language)}
                             </p>
