@@ -16,6 +16,8 @@ type UnitWithProperty = {
   maxGuests: number;
   basePrice: number;
   images: string[];
+  closedForCurrentPeriod?: boolean;
+  reopenDate?: string | null;
   property: {
     id: string;
     name: string;
@@ -61,7 +63,6 @@ export default function Properties() {
   useEffect(() => {
     const loadUnits = async () => {
       try {
-        console.log("🔍 [CLIENT] Fetching properties for properties page...");
         const response = await fetch(apiUrl("/api/properties"));
 
         if (!response.ok) {
@@ -71,35 +72,11 @@ export default function Properties() {
         const json = await response.json();
         const data = (json.data ?? []) as any[];
 
-        // Flatten units from properties
         const mapped: UnitWithProperty[] = [];
-        console.log("🔍 [PROPERTIES] Raw data from API:", data);
-        
-        (data || []).forEach((property, index) => {
-          console.log(`🔍 [PROPERTIES] Processing property ${index}:`, {
-            id: property.id,
-            name: property.name,
-            hasUnits: !!property.units,
-            unitsType: typeof property.units,
-            unitsLength: property.units?.length || 0,
-            unitsData: property.units
-          });
-          
-          // Check if property has units and if units array has data
+        (data || []).forEach((property) => {
           if (property.units && Array.isArray(property.units) && property.units.length > 0) {
-            // Convert units object to array if needed
             const unitsArray = Array.isArray(property.units) ? property.units : [property.units];
-            
             unitsArray.forEach((unit: any) => {
-              console.log(`🔍 [PROPERTIES] Processing unit:`, {
-                id: unit.id,
-                name: unit.name,
-                images: unit.images,
-                imagesType: typeof unit.images,
-                imagesLength: unit.images?.length || 0,
-                propertyMainImage: unit.property?.main_image
-              });
-              
               mapped.push({
                 id: unit.id,
                 propertyId: unit.propertyId || property.id,
@@ -110,6 +87,8 @@ export default function Properties() {
                 maxGuests: unit.maxGuests,
                 basePrice: unit.basePrice,
                 images: Array.isArray(unit.images) ? unit.images : (unit.images ? Object.keys(unit.images).map(key => unit.images[key]) : []),
+                closedForCurrentPeriod: !!unit.closedForCurrentPeriod,
+                reopenDate: unit.reopenDate ?? null,
                 property: {
                   id: property.id,
                   name: property.name,
@@ -122,8 +101,6 @@ export default function Properties() {
             });
           }
         });
-
-        console.log("🔍 [PROPERTIES] Mapped units:", mapped.length, "from properties:", data.length);
         setUnits(mapped);
       } catch (error) {
         console.error("❌ [CLIENT] Error loading properties", error);
@@ -242,10 +219,22 @@ export default function Properties() {
           {/* Properties Grid */}
           <div className="lg:col-span-3">
             {loadingUnits ? (
-              <div className="text-center py-16">
-                <p className="text-lg text-muted-foreground">
-                  Loading properties...
-                </p>
+              <div className="space-y-6 animate-pulse">
+                {[1, 2, 3, 4].map((i) => (
+                  <div key={i} className="grid md:grid-cols-3 gap-6 p-4 md:p-6 rounded-lg border border-border">
+                    <div className="md:col-span-1 h-64 md:h-48 rounded-lg bg-muted" />
+                    <div className="md:col-span-2 space-y-3">
+                      <div className="h-5 w-1/3 bg-muted rounded" />
+                      <div className="h-6 w-2/3 bg-muted rounded" />
+                      <div className="h-4 w-full bg-muted rounded" />
+                      <div className="flex gap-4 mt-4">
+                        <div className="h-4 w-16 bg-muted rounded" />
+                        <div className="h-4 w-16 bg-muted rounded" />
+                        <div className="h-4 w-16 bg-muted rounded" />
+                      </div>
+                    </div>
+                  </div>
+                ))}
               </div>
             ) : unitsError ? (
               <div className="text-center py-16">
@@ -268,11 +257,12 @@ export default function Properties() {
               </div>
             ) : (
               <div className="space-y-6">
-                {filtered.map((unit) => (
+                {filtered.map((unit, idx) => (
                   <Link
                     key={unit.id}
                     to={`/properties/${unit.property?.id ?? unit.propertyId}`}
                     className="grid md:grid-cols-3 gap-6 card-hover p-4 md:p-6"
+                    onMouseEnter={() => fetch(apiUrl(`/api/properties/id/${unit.property?.id ?? unit.propertyId}`))}
                   >
                     {/* Image */}
                     <div className="md:col-span-1">
@@ -287,49 +277,16 @@ export default function Properties() {
                           }
                           alt={unit.name}
                           className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
-                          onLoad={(e) => {
-                            console.log("🖼️ [PROPERTIES] Image loaded successfully:", {
-                              unitName: unit.name,
-                              unitId: unit.id,
-                              imageSrc: e.currentTarget.src,
-                              hasUnitImages: !!unit.images?.length,
-                              firstUnitImage: unit.images?.[0],
-                              hasPropertyImage: !!unit.property?.main_image,
-                              propertyImage: unit.property?.main_image,
-                              timestamp: new Date().toISOString()
-                            });
-                          }}
+                          loading={idx < 3 ? "eager" : "lazy"}
+                          decoding="async"
                           onError={(e) => {
-                            console.error("❌ [PROPERTIES] Image failed to load:", {
-                              unitName: unit.name,
-                              unitId: unit.id,
-                              attemptedSrc: e.currentTarget.src,
-                              originalSrc: e.currentTarget.src,
-                              hasUnitImages: !!unit.images?.length,
-                              firstUnitImage: unit.images?.[0],
-                              hasPropertyImage: !!unit.property?.main_image,
-                              propertyImage: unit.property?.main_image,
-                              eventType: e.type,
-                              timestamp: new Date().toISOString()
-                            });
-                            
-                            // Try fallback to property image if unit image failed
-                            if (unit.images?.length && unit.images[0] && unit.property?.main_image) {
-                              console.log("🔄 [PROPERTIES] Trying fallback to property image:", unit.property.main_image);
+                            if (unit.property?.main_image) {
                               e.currentTarget.src = imageUrl(unit.property.main_image);
                             } else {
-                              console.log("🔄 [PROPERTIES] Using placeholder image");
                               e.currentTarget.src = placeholderImage();
                             }
                           }}
                         />
-                        {/* Debug overlay - remove in production */}
-                        {process.env.NODE_ENV === 'development' && (
-                          <div className="absolute bottom-0 left-0 right-0 bg-black/50 text-white text-xs p-1">
-                            <div>Debug: {unit.images?.length ? `Unit: ${unit.images[0]}` : 'No unit images'}</div>
-                            <div>Property: {unit.property?.main_image || 'No property image'}</div>
-                          </div>
-                        )}
                       </div>
                     </div>
 
@@ -355,6 +312,23 @@ export default function Properties() {
                             </h3>
                           </div>
                           <div className="text-right">
+                            {unit.closedForCurrentPeriod && (
+                              <div className="mb-2 rounded-md bg-amber-100 px-2 py-1 text-xs font-medium text-amber-800">
+                                {t("property.roomClosed")}
+                                {unit.reopenDate && (
+                                  <span className="block mt-0.5">
+                                    {t("property.roomReopensOn").replace(
+                                      "{date}",
+                                      new Date(unit.reopenDate).toLocaleDateString(undefined, {
+                                        day: "numeric",
+                                        month: "short",
+                                        year: "numeric",
+                                      }),
+                                    )}
+                                  </span>
+                                )}
+                              </div>
+                            )}
                             <div className="text-2xl font-bold text-primary">
                               {formatCurrency(unit.basePrice, language)}
                             </div>

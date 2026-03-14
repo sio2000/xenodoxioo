@@ -12,6 +12,7 @@ import {
   Plus,
   Pencil,
   Trash2,
+  Euro,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useLanguage } from "@/hooks/useLanguage";
@@ -134,23 +135,29 @@ function InquiriesManagement() {
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [statusFilter, setStatusFilter] = useState("ALL");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const pageSize = 10;
 
   const fetchInquiries = async () => {
+    setLoading(true);
     try {
       const admin = localStorage.getItem("admin");
       const token = admin ? JSON.parse(admin).accessToken : "";
-      const res = await fetch(apiUrl(`/api/inquiries/admin/list?status=${statusFilter}`), {
+      const res = await fetch(apiUrl(`/api/inquiries/admin/list?status=${statusFilter}&page=${currentPage}&pageSize=${pageSize}`), {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (res.ok) {
         const data = await res.json();
         setInquiries(data.data?.inquiries || []);
+        const total = data.data?.total ?? 0;
+        setTotalPages(Math.max(1, Math.ceil(total / pageSize)));
       }
     } catch {}
     finally { setLoading(false); }
   };
 
-  useEffect(() => { fetchInquiries(); }, [statusFilter]);
+  useEffect(() => { fetchInquiries(); }, [statusFilter, currentPage]);
 
   const viewInquiry = async (inquiry: any) => {
     setSelectedInquiry(inquiry);
@@ -230,7 +237,7 @@ function InquiriesManagement() {
     <div>
       <div className="flex items-center justify-between mb-6">
         <h2 className="text-2xl font-bold text-foreground">{t("admin.guestInquiries")}</h2>
-        <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}
+        <select value={statusFilter} onChange={(e) => { setStatusFilter(e.target.value); setCurrentPage(1); }}
           className="px-3 py-2 border border-border rounded-lg text-foreground bg-background">
           <option value="ALL">{t("admin.all")}</option>
           <option value="NEW">{t("admin.newStatus")}</option>
@@ -244,29 +251,141 @@ function InquiriesManagement() {
       ) : inquiries.length === 0 ? (
         <p className="text-muted-foreground">{t("admin.noInquiriesFound")}</p>
       ) : (
-        <div className="space-y-3">
-          {inquiries.map((inq: any) => (
-            <div key={inq.id} className="bg-card border border-border rounded-lg p-4 flex items-center justify-between cursor-pointer hover:border-primary/50 transition-colors"
-              onClick={() => viewInquiry(inq)}>
-              <div>
-                <p className="font-semibold text-foreground">{inq.guest_name}</p>
-                <p className="text-sm text-muted-foreground">{inq.guest_email}</p>
-                <p className="text-xs text-muted-foreground">
-                  {new Date(inq.checkin_date).toLocaleDateString()} - {new Date(inq.checkout_date).toLocaleDateString()} | {inq.property?.name || "—"}
-                </p>
+        <>
+          <div className="space-y-3">
+            {inquiries.map((inq: any) => (
+              <div key={inq.id} className="bg-card border border-border rounded-lg p-4 flex items-center justify-between cursor-pointer hover:border-primary/50 transition-colors"
+                onClick={() => viewInquiry(inq)}>
+                <div>
+                  <p className="font-semibold text-foreground">{inq.guest_name}</p>
+                  <p className="text-sm text-muted-foreground">{inq.guest_email}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {new Date(inq.checkin_date).toLocaleDateString()} - {new Date(inq.checkout_date).toLocaleDateString()} | {inq.property?.name || "—"}
+                  </p>
+                </div>
+                <div className="text-right">
+                  <span className={`text-xs px-2 py-1 rounded-full ${
+                    inq.status === "NEW" ? "bg-blue-100 text-blue-700" :
+                    inq.status === "ANSWERED" ? "bg-green-100 text-green-700" :
+                    "bg-yellow-100 text-yellow-700"
+                  }`}>{inq.status}</span>
+                  <p className="text-xs text-muted-foreground mt-1">{new Date(inq.created_at).toLocaleDateString()}</p>
+                </div>
               </div>
-              <div className="text-right">
-                <span className={`text-xs px-2 py-1 rounded-full ${
-                  inq.status === "NEW" ? "bg-blue-100 text-blue-700" :
-                  inq.status === "ANSWERED" ? "bg-green-100 text-green-700" :
-                  "bg-yellow-100 text-yellow-700"
-                }`}>{inq.status}</span>
-                <p className="text-xs text-muted-foreground mt-1">{new Date(inq.created_at).toLocaleDateString()}</p>
-              </div>
+            ))}
+          </div>
+          {totalPages > 1 && (
+            <div className="flex justify-center items-center gap-2 mt-6">
+              <button
+                onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+                disabled={currentPage === 1}
+                className="btn-secondary-sm"
+              >
+                {t("admin.previous")}
+              </button>
+              <span className="text-sm text-muted-foreground">
+                {t("admin.pageOf").replace("{current}", String(currentPage)).replace("{total}", String(totalPages))}
+              </span>
+              <button
+                onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
+                disabled={currentPage === totalPages}
+                className="btn-secondary-sm"
+              >
+                {t("admin.next")}
+              </button>
             </div>
-          ))}
-        </div>
+          )}
+        </>
       )}
+    </div>
+  );
+}
+
+// ── Τιμές & Περίοδος (Prices & Period) ─────────────────────────────────
+
+function PricesAndPeriodPanel() {
+  const { t } = useLanguage();
+  const [data, setData] = useState<{
+    currentPeriod: { label: string; roomPrices: Array<{ roomName: string; closed: boolean; price?: number; price6?: number; price10?: number }> } | null;
+    upcomingPeriods: Array<{ label: string }>;
+  } | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await fetch(apiUrl("/api/admin/prices-and-period"));
+        if (res.ok) {
+          const json = await res.json();
+          setData(json.data);
+        }
+      } catch {}
+      finally { setLoading(false); }
+    })();
+  }, []);
+
+  if (loading) return <div className="bg-card border border-border rounded-lg p-6"><p>{t("common.loading")}</p></div>;
+
+  return (
+    <div>
+      <h2 className="text-2xl font-bold text-foreground mb-6">
+        {t("admin.pricesAndPeriod")}
+      </h2>
+      <p className="text-muted-foreground mb-6">
+        Οι τιμές προέρχονται αυτόματα από τον Πίνακα Τιμών Δωματίων. Δεν απαιτείται χειροκίνητη επεξεργασία.
+      </p>
+
+      <div className="space-y-8">
+        <div className="bg-card border border-border rounded-lg p-6">
+          <h3 className="font-bold text-foreground mb-4 flex items-center gap-2">
+            <CalendarRange size={20} />
+            {t("admin.currentPeriod")}
+          </h3>
+          {data?.currentPeriod ? (
+            <>
+              <p className="text-lg font-semibold text-primary mb-6">
+                {data.currentPeriod.label}
+              </p>
+              <h4 className="text-sm font-medium text-muted-foreground mb-3">{t("admin.currentPrices")}</h4>
+              <div className="space-y-4">
+                {data.currentPeriod.roomPrices.map((rp) => (
+                  <div key={rp.roomName} className="flex items-center justify-between py-2 border-b border-border last:border-0">
+                    <span className="font-semibold text-foreground">{rp.roomName}</span>
+                    {rp.closed ? (
+                      <span className="text-muted-foreground italic">{t("admin.roomClosed")}</span>
+                    ) : rp.price !== undefined ? (
+                      <span className="font-bold text-primary">{rp.price}€</span>
+                    ) : (
+                      <div className="flex gap-4">
+                        <span>{t("admin.guests10")} → <strong>{rp.price10}€</strong></span>
+                        <span>{t("admin.guests6")} → <strong>{rp.price6}€</strong></span>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </>
+          ) : (
+            <p className="text-muted-foreground">Δεν βρέθηκε τρέχουσα περίοδος.</p>
+          )}
+        </div>
+
+        <div className="bg-card border border-border rounded-lg p-6">
+          <h3 className="font-bold text-foreground mb-4">{t("admin.upcomingPeriods")}</h3>
+          {data?.upcomingPeriods && data.upcomingPeriods.length > 0 ? (
+            <ul className="space-y-2">
+              {data.upcomingPeriods.map((p) => (
+                <li key={p.label} className="flex items-center gap-2">
+                  <span className="text-muted-foreground">→</span>
+                  <span className="font-medium text-foreground">{p.label}</span>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="text-muted-foreground">Δεν υπάρχουν επόμενες περίοδοι.</p>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
@@ -747,6 +866,7 @@ export default function Admin() {
   const adminMenuItems = [
     { id: "dashboard", label: t("admin.dashboard"), icon: BarChart3 },
     { id: "bookings", label: t("admin.bookings"), icon: BookOpen },
+    { id: "pricesAndPeriod", label: t("admin.pricesAndPeriod"), icon: Euro },
     { id: "pricing", label: t("admin.pricing"), icon: DollarSign },
     { id: "properties", label: t("admin.properties"), icon: Calendar },
     { id: "users", label: t("admin.users"), icon: Users },
@@ -843,9 +963,15 @@ export default function Admin() {
                 </div>
 
                 <div className="bg-card border border-border rounded-lg p-6">
-                  <h3 className="text-lg font-bold text-foreground mb-4">
+                  <h3 className="text-lg font-bold text-foreground mb-1">
                     {t("admin.occupancyByProperty")}
                   </h3>
+                  <p className="text-sm text-muted-foreground mb-4">
+                    {new Date().toLocaleDateString(
+                      language === "el" ? "el-GR" : language === "fr" ? "fr-FR" : language === "de" ? "de-DE" : "en-US",
+                      { month: "long", year: "numeric" }
+                    )}
+                  </p>
                   <div className="space-y-4">
                     {loading ? (
                       <p className="text-muted-foreground">{t("admin.loadingOccupancy")}</p>
@@ -860,14 +986,16 @@ export default function Admin() {
                               {property.occupancyPercentage}%
                             </span>
                           </div>
-                          <div className="w-full bg-muted rounded-full h-2">
+                          <div className="w-full bg-muted rounded-full h-2 min-w-0 overflow-hidden">
                             <div
-                              className="bg-blue-600 h-2 rounded-full transition-all duration-300"
-                              style={{ width: `${property.occupancyPercentage}%` }}
+                              className="bg-primary h-2 rounded-full transition-all duration-300 min-w-0 shrink-0"
+                              style={{ width: `${Math.min(property.occupancyPercentage, 100)}%` }}
                             />
                           </div>
                           <p className="text-xs text-muted-foreground mt-1">
-                            {t("admin.unitsCount").replace("{count}", String(property.units))}
+                            {property.bookedDays != null && property.daysInMonth != null
+                              ? `${property.bookedDays} / ${property.daysInMonth} ${t("admin.daysOccupied")}`
+                              : t("admin.unitsCount").replace("{count}", String(property.units))}
                           </p>
                         </div>
                       ))
@@ -883,6 +1011,11 @@ export default function Admin() {
           {/* Bookings Tab */}
           {activeTab === "bookings" && (
             <BookingManagement />
+          )}
+
+          {/* Τιμές & Περίοδος Tab */}
+          {activeTab === "pricesAndPeriod" && (
+            <PricesAndPeriodPanel />
           )}
 
           {/* Pricing Tab */}

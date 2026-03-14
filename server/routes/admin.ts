@@ -3,6 +3,7 @@ import { supabase } from "../lib/db";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
+import { getCurrentPeriod, getUpcomingPeriods } from "../services/price-table.service";
 
 const router = Router();
 
@@ -72,24 +73,52 @@ router.get("/stats", async (req, res) => {
     const totalUsers = users?.length || 0;
     const propertiesCount = properties?.length || 0;
     
-    // Calculate occupancy by property
+    // Monthly occupancy by property — current month: booked days / total days in month
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = now.getMonth();
+    const monthStart = new Date(year, month, 1);
+    const monthEnd = new Date(year, month + 1, 0);
+    const daysInMonth = monthEnd.getDate();
+
+    const toDateKey = (d: Date) => d.toISOString().slice(0, 10);
+
     const occupancyByProperty = properties?.map(property => {
-      const totalUnits = property.units?.length || 0;
-      const bookedUnits = new Set();
-      
-      bookings?.forEach(booking => {
-        if (booking.status === 'CONFIRMED') {
-          bookedUnits.add(booking.unit_id);
+      const units = property.units || [];
+      const totalUnits = units.length;
+      const bookedDatesByUnit = new Map<string, Set<string>>();
+
+      units.forEach((u: { id: string }) => {
+        bookedDatesByUnit.set(u.id, new Set());
+      });
+
+      const confirmedBookings = bookings?.filter((b: { status: string }) => b.status === 'CONFIRMED') || [];
+      confirmedBookings.forEach((booking: { unit_id: string; check_in_date: string; check_out_date: string }) => {
+        const unitSet = bookedDatesByUnit.get(booking.unit_id);
+        if (!unitSet) return;
+
+        const checkIn = new Date(booking.check_in_date);
+        const checkOut = new Date(booking.check_out_date);
+        const start = new Date(Math.max(checkIn.getTime(), monthStart.getTime()));
+        const end = new Date(Math.min(checkOut.getTime(), monthEnd.getTime() + 86400000));
+
+        for (let d = new Date(start); d < end; d.setDate(d.getDate() + 1)) {
+          unitSet.add(toDateKey(d));
         }
       });
-      
-      const occupancyPercentage = totalUnits > 0 ? Math.round((bookedUnits.size / totalUnits) * 100) : 0;
-      
+
+      let totalBookedDays = 0;
+      bookedDatesByUnit.forEach(set => { totalBookedDays += set.size; });
+      const totalUnitDays = totalUnits * daysInMonth;
+      const occupancyPercentage = totalUnitDays > 0 ? Math.round((totalBookedDays / totalUnitDays) * 100) : 0;
+
       return {
         id: property.id,
         name: property.name,
         units: totalUnits,
-        occupancyPercentage
+        occupancyPercentage,
+        bookedDays: totalBookedDays,
+        daysInMonth
       };
     }) || [];
     
@@ -120,6 +149,30 @@ router.get("/stats", async (req, res) => {
       occupancyByProperty: [],
       activeUsers: 0
     });
+  }
+});
+
+// ── Τιμές & Περίοδος (Prices & Period) ───────────────────────────────
+// Returns current period, room prices, and upcoming periods from price table
+
+router.get("/prices-and-period", async (_req, res, next) => {
+  try {
+    const current = getCurrentPeriod();
+    const upcoming = getUpcomingPeriods();
+    res.json({
+      success: true,
+      data: {
+        currentPeriod: current
+          ? {
+              label: current.period.label,
+              roomPrices: current.roomPrices,
+            }
+          : null,
+        upcomingPeriods: upcoming,
+      },
+    });
+  } catch (error) {
+    next(error);
   }
 });
 
@@ -796,12 +849,50 @@ router.put("/bookings/:id/status", async (req, res) => {
 
 router.get("/users", async (req, res) => {
   try {
-    const { data: users } = await supabase
+    const { page = 1, pageSize = 10, status, search } = req.query;
+    const pageNum = parseInt(page as string) || 1;
+    const pageSizeNum = parseInt(pageSize as string) || 10;
+
+    let query = supabase
       .from('users')
-      .select('*')
+      .select('*', { count: 'exact' });
+
+    if (status && status !== 'ALL') {
+      query = query.eq('status', status);
+    }
+    if (search && typeof search === 'string' && search.trim()) {
+      const term = search.trim().replace(/'/g, "''");
+      const pattern = `%${term}%`;
+      query = query.or(`email.ilike.'${pattern}',first_name.ilike.'${pattern}',last_name.ilike.'${pattern}'`);
+    }
+
+    const { data: allUsers, count: totalCount, error } = await query
       .order('created_at', { ascending: false });
 
-    res.json({ success: true, data: users || [] });
+    if (error) throw error;
+
+    const users = allUsers || [];
+    const totalItems = totalCount ?? users.length;
+    const totalPages = Math.max(1, Math.ceil(totalItems / pageSizeNum));
+    const startIndex = (pageNum - 1) * pageSizeNum;
+    const paginatedUsers = users.slice(startIndex, startIndex + pageSizeNum).map((u: any) => ({
+      id: u.id,
+      email: u.email,
+      firstName: u.first_name ?? u.firstName,
+      lastName: u.last_name ?? u.lastName,
+      status: u.status,
+      isEmailVerified: u.is_email_verified ?? u.isEmailVerified ?? false,
+      createdAt: u.created_at ?? u.createdAt,
+      _count: { bookings: u._count?.bookings ?? 0 },
+    }));
+
+    res.json({
+      success: true,
+      data: paginatedUsers,
+      totalPages,
+      currentPage: pageNum,
+      totalItems,
+    });
   } catch (error) {
     res.status(500).json({ success: false, message: "Failed to fetch users" });
   }

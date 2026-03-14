@@ -113,7 +113,7 @@ export async function sendBookingConfirmationEmail(
     </ul>
     <h2>Total Amount: €${booking.totalPrice?.toFixed(2) || '0.00'}</h2>
     <p><strong>Deposit (25%):</strong> €${((booking.totalPrice || 0) * 0.25).toFixed(2)} (Due immediately)</p>
-    <p><strong>Balance (75%):</strong> €${((booking.totalPrice || 0) * 0.75).toFixed(2)} (Due 30 days before arrival)</p>
+    <p><strong>Balance (75%):</strong> €${((booking.totalPrice || 0) * 0.75).toFixed(2)} (Due 21 days before arrival)</p>
     <a href="${process.env.FRONTEND_URL}/dashboard" style="background-color: #0677A1; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">View Booking</a>
     <p>Best regards,<br/>The LEONIDIONHOUSES Team</p>
   `;

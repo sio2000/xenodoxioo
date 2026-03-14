@@ -117,6 +117,7 @@ export default function UnitForm({ unit, propertyId, properties, onSubmit, onClo
                 onChange={(e) => setFormData({ ...formData, maxGuests: parseInt(e.target.value) })}
                 className="w-full p-2 border border-border rounded-md bg-background text-foreground"
                 min="1"
+                max="10"
                 required
               />
             </div>
@@ -167,19 +168,8 @@ export default function UnitForm({ unit, propertyId, properties, onSubmit, onClo
           </div>
 
           <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-foreground mb-1">
-                {t("admin.basePrice")}
-              </label>
-              <input
-                type="number"
-                value={formData.basePrice}
-                onChange={(e) => setFormData({ ...formData, basePrice: parseFloat(e.target.value) })}
-                className="w-full p-2 border border-border rounded-md bg-background text-foreground"
-                min="0"
-                step="0.01"
-                required
-              />
+            <div className="col-span-2 p-3 bg-primary/5 border border-primary/20 rounded-md text-sm text-muted-foreground">
+              Τιμές ορίζονται αυτόματα από τον Πίνακα Τιμών Δωματίων (κατάστημα Τιμές & Περίοδος).
             </div>
 
             <div>

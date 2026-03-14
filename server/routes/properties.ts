@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { supabase } from "../lib/db";
+import { getMinimumPriceForRoom, getRoomClosedStatusAndReopenDate } from "../services/price-table.service";
 
 const router = Router();
 
@@ -25,12 +26,14 @@ router.get("/", async (_req, res, next) => {
       .eq('is_active', true)
       .in('property_id', propertyIds);
 
-    // Aggregate units per property
+    // Aggregate units per property (use price table for basePrice when available)
     const aggregatedProperties = properties.map((property) => {
       const propertyUnits = units?.filter((u) => u.property_id === property.id) || [];
-      const minPrice = propertyUnits.length > 0
-        ? Math.min(...propertyUnits.map((u) => Number(u.base_price) || 0))
-        : 0;
+      const unitPrices = propertyUnits.map((u) => {
+        const fromTable = getMinimumPriceForRoom(u.name);
+        return fromTable ?? (Number(u.base_price) || 0);
+      });
+      const minPrice = unitPrices.length > 0 ? Math.min(...unitPrices) : 0;
 
       // Parse unit images
       const parsedUnits = propertyUnits.map(unit => {
@@ -42,12 +45,13 @@ router.get("/", async (_req, res, next) => {
             } else if (Array.isArray(unit.images)) {
               parsedImages = unit.images;
             }
-          } catch (error) {
-            console.log("⚠️ [PROPERTIES] Failed to parse images for unit:", unit.id, error);
+          } catch {
             parsedImages = [];
           }
         }
 
+        const basePrice = getMinimumPriceForRoom(unit.name) ?? (Number(unit.base_price) || 0);
+        const { closed: closedForCurrentPeriod, reopenDate } = getRoomClosedStatusAndReopenDate(unit.name);
         return {
           ...unit,
           images: parsedImages,
@@ -55,10 +59,12 @@ router.get("/", async (_req, res, next) => {
           maxGuests: unit.max_guests,
           bedrooms: unit.bedrooms,
           bathrooms: unit.bathrooms,
-          basePrice: Number(unit.base_price) || 0,
+          basePrice,
           cleaningFee: Number(unit.cleaning_fee) || 0,
           minStayDays: unit.min_stay_days,
-          isActive: unit.is_active
+          isActive: unit.is_active,
+          closedForCurrentPeriod,
+          reopenDate,
         };
       });
 
@@ -124,9 +130,8 @@ router.get("/:slug", async (req, res, next) => {
       .select('*')
       .eq('property_id', property.id);
 
-    // Transform units to match frontend expectations
+    // Transform units to match frontend expectations (use price table for basePrice)
     const transformedUnits = (units || []).map(unit => {
-      // Parse images JSON string to array
       let parsedImages = [];
       if (unit.images) {
         try {
@@ -140,7 +145,7 @@ router.get("/:slug", async (req, res, next) => {
           parsedImages = [];
         }
       }
-
+      const basePrice = getMinimumPriceForRoom(unit.name) ?? (Number(unit.base_price) || 0);
       return {
         ...unit,
         images: parsedImages,
@@ -148,7 +153,7 @@ router.get("/:slug", async (req, res, next) => {
         maxGuests: unit.max_guests,
         bedrooms: unit.bedrooms,
         bathrooms: unit.bathrooms,
-        basePrice: Number(unit.base_price) || 0,
+        basePrice,
         cleaningFee: Number(unit.cleaning_fee) || 0,
         minStayDays: unit.min_stay_days || 1,
         isActive: unit.is_active
@@ -213,7 +218,6 @@ router.get("/id/:id", async (req, res) => {
       gallery_images: property.gallery_images || [],
       // Transform units to match frontend expectations
       units: (units || []).map(unit => {
-        // Parse images JSON string to array
         let parsedImages = [];
         if (unit.images) {
           try {
@@ -222,12 +226,12 @@ router.get("/id/:id", async (req, res) => {
             } else if (Array.isArray(unit.images)) {
               parsedImages = unit.images;
             }
-          } catch (error) {
-            console.log("⚠️ [PROPERTIES] Failed to parse images for unit:", unit.id, error);
+          } catch {
             parsedImages = [];
           }
         }
-
+        const basePrice = getMinimumPriceForRoom(unit.name) ?? (Number(unit.base_price) || 0);
+        const { closed: closedForCurrentPeriod, reopenDate } = getRoomClosedStatusAndReopenDate(unit.name);
         return {
           ...unit,
           images: parsedImages,
@@ -235,10 +239,12 @@ router.get("/id/:id", async (req, res) => {
           maxGuests: unit.max_guests,
           bedrooms: unit.bedrooms,
           bathrooms: unit.bathrooms,
-          basePrice: Number(unit.base_price) || 0,
+          basePrice,
           cleaningFee: Number(unit.cleaning_fee) || 0,
           minStayDays: unit.min_stay_days || 1,
-          isActive: unit.is_active
+          isActive: unit.is_active,
+          closedForCurrentPeriod,
+          reopenDate,
         };
       }),
       amenities: amenities || [],
@@ -248,19 +254,11 @@ router.get("/id/:id", async (req, res) => {
       }))
     };
     
-    console.log("✅ [PROPERTIES] Property detail fetched:", {
-      id: property.id,
-      name: property.name,
-      unitsCount: units?.length || 0,
-      amenitiesCount: amenities?.length || 0
-    });
-    
     res.json({ 
       success: true, 
       data: transformedProperty
     });
-  } catch (error) {
-    console.error("❌ [PROPERTIES] Error fetching property detail:", error);
+  } catch {
     res.status(500).json({ success: false, message: "Failed to fetch property" });
   }
 });

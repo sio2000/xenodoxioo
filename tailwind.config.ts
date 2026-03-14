@@ -16,6 +16,7 @@ export default {
       fontFamily: {
         serif: ["Playfair Display", "Georgia", "serif"],
         luxury: ["Cormorant Garamond", "Georgia", "serif"],
+        cavolini: ["Cavolini", "Georgia", "serif"],
       },
       boxShadow: {
         "luxury-sm": "0 1px 3px 0 rgb(0 0 0 / 0.04)",

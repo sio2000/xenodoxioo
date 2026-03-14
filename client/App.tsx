@@ -17,6 +17,7 @@ import Admin from "./pages/Admin";
 import AdminLogin from "./pages/AdminLogin";
 import AboutPage from "./pages/AboutPage";
 import FAQ from "./pages/FAQ";
+import LegalDetails from "./pages/LegalDetails";
 import Contact from "./pages/Contact";
 import NotFound from "./pages/NotFound";
 import InquiryConversation from "./pages/InquiryConversation";
@@ -44,6 +45,7 @@ const App = () => (
             <Route path="/admin" element={<Admin />} />
             <Route path="/about" element={<AboutPage />} />
             <Route path="/faq" element={<FAQ />} />
+            <Route path="/legal" element={<LegalDetails />} />
             <Route path="/contact" element={<Contact />} />
             <Route path="/inquiry/:id" element={<InquiryConversation />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}

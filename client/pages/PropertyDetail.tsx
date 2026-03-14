@@ -18,6 +18,12 @@ import {
   Mountain,
   Shield,
   CheckCircle2,
+  Car,
+  PawPrint,
+  Ban,
+  Flame,
+  ThermometerSun,
+  LayoutGrid,
 } from "lucide-react";
 import { useEffect, useState, useRef } from "react";
 import {
@@ -29,6 +35,7 @@ import {
 import { useLanguage } from "@/hooks/useLanguage";
 import { apiUrl, imageUrl, placeholderImage } from "@/lib/api";
 import formatCurrency from "@/lib/currency";
+import { getTieredPricePerNight } from "@/lib/price-tiers";
 import { Send, MessageSquare } from "lucide-react";
 
 // ── Inquiry Form Component ─────────────────────────────────────────
@@ -152,6 +159,8 @@ type ApiUnit = {
   basePrice: number;
   cleaningFee: number;
   images: string[];
+  closedForCurrentPeriod?: boolean;
+  reopenDate?: string | null;
 };
 
 type ApiPropertyDetail = {
@@ -204,6 +213,37 @@ function getViewVideoPath(propertyName: string, unitName: string): string | null
   return raw ? raw.replace(/[^/]+$/, (filename) => encodeURIComponent(filename)) : null;
 }
 
+// License info per property group (EOT/AA + KAEK). Returns null if no match.
+type LicenseInfo = { labelKey: string; licenseNumber: string; kaek: string };
+function getPropertyLicenseInfo(propertyName: string, unitName: string): LicenseInfo | null {
+  const n = (s: string) => s.toLowerCase().trim().replace(/\s+/g, " ");
+  const p = n(propertyName);
+  const u = n(unitName);
+  const check = (key: string) => p.includes(key) || u.includes(key);
+
+  if (check("lykoskufi")) return { labelKey: "property.license.eot", licenseNumber: "1365294", kaek: "031751707103" };
+  if (check("ogra")) return { labelKey: "property.license.aa", licenseNumber: "1246K91000329401", kaek: "031751707112" };
+  if (check("bungalow")) return { labelKey: "property.license.aa", licenseNumber: "1283732", kaek: "031751707110" };
+  return null;
+}
+
+// Unit description translation key (descriptions come from system, not admin panel)
+function getUnitDescriptionKey(propertyName: string, unitName: string): string | null {
+  const n = (s: string) => s.toLowerCase().trim().replace(/\s+/g, " ");
+  const p = n(propertyName);
+  const u = n(unitName);
+  const check = (key: string) => p.includes(key) || u.includes(key);
+
+  if (check("ogra")) return "property.unitDesc.ograHouse";
+  if (check("small") && check("bungalow")) return "property.unitDesc.smallBungalow";
+  if ((check("big") || check("large") || check("μεγάλο") || check("megalo")) && check("bungalow")) return "property.unitDesc.bigBungalow";
+  if (check("lykoskufi 5") || (check("lykoskufi") && u.includes("5"))) return "property.unitDesc.lykoskufi5";
+  if (check("lykoskufi 2") || (check("lykoskufi") && (u.includes("2") || u.includes("ii")))) return "property.unitDesc.lykoskufi2";
+  if (check("lykoskufi 1") || (check("lykoskufi") && (u.includes("1") || u.includes("i")))) return "property.unitDesc.lykoskufi1";
+  if (check("lykoskufi")) return "property.unitDesc.lykoskufi1"; // fallback
+  return null;
+}
+
 export default function PropertyDetail() {
   const { id } = useParams<{ id: string }>();
   const [isFavorite, setIsFavorite] = useState(false);
@@ -213,6 +253,9 @@ export default function PropertyDetail() {
     checkIn: Date;
     checkOut: Date;
   } | null>(null);
+  const [selectedGuests, setSelectedGuests] = useState(2);
+  const [quotePricing, setQuotePricing] = useState<{ basePrice: number; subtotal: number; cleaningFee: number; totalPrice: number } | null>(null);
+  const [quoteLoading, setQuoteLoading] = useState(false);
   const [data, setData] = useState<ApiPropertyDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -226,7 +269,6 @@ export default function PropertyDetail() {
     const load = async () => {
       if (!id) return;
       try {
-        console.log("🔍 [CLIENT] Fetching property detail...", id);
         const response = await fetch(apiUrl(`/api/properties/id/${id}`));
         if (!response.ok) {
           throw new Error(`Failed to load property: ${response.status}`);
@@ -266,6 +308,8 @@ export default function PropertyDetail() {
             basePrice: u.basePrice,
             cleaningFee: u.cleaningFee ?? 0,
             images,
+            closedForCurrentPeriod: !!u.closedForCurrentPeriod,
+            reopenDate: u.reopenDate ?? null,
           };
         });
         setData(payload);
@@ -281,6 +325,17 @@ export default function PropertyDetail() {
   }, [id]);
 
   const currentUnit = data?.units[selectedUnitIndex] ?? null;
+
+  // All rooms: guest options up to 10. Only Lykoskufi 5 & Ogra House change price with guests.
+  const isTieredPricingUnit = currentUnit?.name && /lykoskufi\s*5|ogra\s*house/i.test(currentUnit.name);
+  const effectiveMaxGuests = 10;
+
+  // Clamp selectedGuests when switching units
+  useEffect(() => {
+    if (selectedGuests > effectiveMaxGuests) {
+      setSelectedGuests(effectiveMaxGuests);
+    }
+  }, [effectiveMaxGuests, selectedGuests]);
   const rawImages =
     currentUnit?.images?.length
       ? currentUnit.images
@@ -292,6 +347,119 @@ export default function PropertyDetail() {
         ? [data.main_image]
         : [];
 
+  // Fetch quote when unit + guests change (and optionally dates)
+  useEffect(() => {
+    if (!currentUnit?.id) {
+      setQuotePricing(null);
+      return;
+    }
+    const formatDate = (d: Date) =>
+      `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    let checkIn: Date;
+    let checkOut: Date;
+    if (selectedDates) {
+      checkIn = selectedDates.checkIn;
+      checkOut = selectedDates.checkOut;
+    } else {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      checkIn = new Date(today);
+      checkIn.setDate(checkIn.getDate() + 7);
+      checkOut = new Date(checkIn);
+      checkOut.setDate(checkOut.getDate() + 7);
+    }
+    let cancelled = false;
+    setQuoteLoading(true);
+    setQuotePricing(null);
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 8000);
+    fetch(apiUrl("/api/bookings/quote"), {
+      signal: controller.signal,
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        unitId: currentUnit.id,
+        checkInDate: formatDate(checkIn),
+        checkOutDate: formatDate(checkOut),
+        guests: selectedGuests,
+      }),
+    })
+      .then((r) => {
+        if (cancelled) return null;
+        if (!r.ok) return null;
+        return r.json();
+      })
+      .then((json) => {
+        if (cancelled) return;
+        if (!json) {
+          const fb = getTieredPricePerNight(currentUnit!.name, checkIn, selectedGuests);
+          if (fb != null) {
+            const nights = Math.ceil((checkOut.getTime() - checkIn.getTime()) / (1000 * 60 * 60 * 24));
+            const cleaningFee = currentUnit!.cleaningFee ?? 0;
+            setQuotePricing({
+              basePrice: fb,
+              subtotal: fb * nights,
+              cleaningFee,
+              totalPrice: fb * nights + cleaningFee,
+            });
+          } else {
+            setQuotePricing(null);
+          }
+          return;
+        }
+        const payload = json.data ?? json;
+        if (payload?.pricing) {
+          const p = payload.pricing;
+          setQuotePricing({
+            basePrice: p.basePrice ?? 0,
+            subtotal: p.subtotal ?? 0,
+            cleaningFee: p.cleaningFee ?? 0,
+            totalPrice: p.totalPrice ?? p.finalTotal ?? 0,
+          });
+        } else {
+          const fb = getTieredPricePerNight(currentUnit!.name, checkIn, selectedGuests);
+          if (fb != null) {
+            const nights = Math.ceil((checkOut.getTime() - checkIn.getTime()) / (1000 * 60 * 60 * 24));
+            const cleaningFee = currentUnit!.cleaningFee ?? 0;
+            setQuotePricing({
+              basePrice: fb,
+              subtotal: fb * nights,
+              cleaningFee,
+              totalPrice: fb * nights + cleaningFee,
+            });
+          } else {
+            setQuotePricing(null);
+          }
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          const fb = getTieredPricePerNight(currentUnit!.name, checkIn, selectedGuests);
+          if (fb != null) {
+            const nights = Math.ceil((checkOut.getTime() - checkIn.getTime()) / (1000 * 60 * 60 * 24));
+            const cleaningFee = currentUnit!.cleaningFee ?? 0;
+            setQuotePricing({
+              basePrice: fb,
+              subtotal: fb * nights,
+              cleaningFee,
+              totalPrice: fb * nights + cleaningFee,
+            });
+          } else {
+            setQuotePricing(null);
+          }
+        }
+      })
+      .finally(() => {
+        clearTimeout(timeoutId);
+        if (!cancelled) setQuoteLoading(false);
+      });
+    return () => {
+      cancelled = true;
+      controller.abort();
+      clearTimeout(timeoutId);
+    };
+  }, [currentUnit?.id, currentUnit?.name, currentUnit?.cleaningFee, selectedDates, selectedGuests]);
+
   // Scroll selected thumbnail into view when changing image
   useEffect(() => {
     const el = thumbScrollRef.current;
@@ -300,15 +468,20 @@ export default function PropertyDetail() {
     thumb?.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" });
   }, [selectedImage, images.length]);
 
-  const canBook = !!(data && currentUnit && selectedDates);
+  const isUnitClosed = !!currentUnit?.closedForCurrentPeriod;
+  const canBook = !!(data && currentUnit && selectedDates) && !isUnitClosed;
+  const formatDateForApi = (d: Date) =>
+    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+
   const handleBooking = () => {
     if (!canBook) return;
     const params = new URLSearchParams({
       unit: currentUnit!.id,
       property: data!.id,
-      checkIn: selectedDates!.checkIn.toISOString(),
-      checkOut: selectedDates!.checkOut.toISOString(),
+      checkIn: formatDateForApi(selectedDates!.checkIn),
+      checkOut: formatDateForApi(selectedDates!.checkOut),
     });
+    params.set("guests", String(selectedGuests));
     window.location.href = `/checkout?${params.toString()}`;
   };
   return (
@@ -317,8 +490,13 @@ export default function PropertyDetail() {
       <div className="bg-black relative">
         <div className="container-max">
           {loading ? (
-            <div className="py-16 text-center text-white/80">
-              {t("common.loading")}
+            <div className="grid md:grid-cols-4 gap-2 py-6 animate-pulse">
+              <div className="md:col-span-2 h-96 md:h-[500px] rounded-lg bg-muted" />
+              <div className="md:col-span-2 grid grid-cols-3 gap-2 h-96 md:h-[500px]">
+                {[1, 2, 3, 4, 5, 6].map((i) => (
+                  <div key={i} className="rounded-lg bg-muted" />
+                ))}
+              </div>
             </div>
           ) : error || !data ? (
             <div className="py-16 text-center text-red-300">
@@ -461,7 +639,7 @@ export default function PropertyDetail() {
             <div className="flex flex-wrap items-center gap-6 py-4 md:py-5 text-sm md:text-base">
               <div className="flex items-center gap-2 text-foreground font-medium">
                 <Users size={20} className="text-primary shrink-0" />
-                <span>{t("property.quickInfo.guests").replace("{n}", String(currentUnit.maxGuests))}</span>
+                <span>{t("property.quickInfo.guests").replace("{n}", String(effectiveMaxGuests))}</span>
               </div>
               <div className="flex items-center gap-2 text-foreground font-medium">
                 <Bed size={20} className="text-primary shrink-0" />
@@ -510,16 +688,33 @@ export default function PropertyDetail() {
                     {currentUnit.name}
                   </h1>
 
-                  {/* Description — lead paragraph + body */}
+                  {/* Description — from system translations (not admin panel) */}
                   <div className="space-y-5">
-                    <p className="text-lg md:text-xl text-foreground leading-relaxed font-medium">
-                      {data.description}
-                    </p>
-                    {currentUnit.description && (
-                      <p className="text-muted-foreground leading-relaxed">
-                        {currentUnit.description}
-                      </p>
-                    )}
+                    {(() => {
+                      const descKey = getUnitDescriptionKey(data.name, currentUnit.name);
+                      const descText = descKey ? t(descKey) : null;
+                      if (descText && descKey && !descText.startsWith("property.")) {
+                        return (
+                          <div className="text-muted-foreground leading-relaxed space-y-4">
+                            {descText.split(/\n\n+/).map((para, i) => (
+                              <p key={i}>{para.trim()}</p>
+                            ))}
+                          </div>
+                        );
+                      }
+                      return (
+                        <>
+                          <p className="text-lg md:text-xl text-foreground leading-relaxed font-medium">
+                            {data.description}
+                          </p>
+                          {currentUnit.description && (
+                            <p className="text-muted-foreground leading-relaxed">
+                              {currentUnit.description}
+                            </p>
+                          )}
+                        </>
+                      );
+                    })()}
                   </div>
                 </div>
 
@@ -610,74 +805,104 @@ export default function PropertyDetail() {
                   </section>
                 )}
 
-                {/* Amenities — grouped */}
+                {/* Amenities — grouped, aligned with Booking.com per unit (Lykoskufi 1,2,5 vs Ogra House) */}
                 <div className="mb-10">
                   <h2 className="text-2xl font-bold text-foreground mb-6">
                     {t("property.amenities")}
                   </h2>
-                  <div className="space-y-8">
-                    <div>
-                      <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-4">
-                        {t("property.amenities.essentials")}
-                      </h3>
-                      <div className="grid md:grid-cols-2 gap-4">
-                        {[
-                          { icon: Wifi, labelKey: "amenities.fastWifi", descKey: "amenities.fastWifiDesc" },
-                          { icon: Wind, labelKey: "amenities.ac", descKey: "amenities.acDesc" },
-                          { icon: Utensils, labelKey: "amenities.fullKitchen", descKey: "amenities.fullKitchenDesc" },
-                          { icon: Tv, labelKey: "amenities.smartTV", descKey: "amenities.smartTVDesc" },
-                        ].map((amenity, idx) => {
-                          const Icon = amenity.icon;
-                          return (
-                            <div key={idx} className="flex gap-4 p-4 rounded-xl bg-muted/30 border border-border/50">
-                              <div className="flex-shrink-0">
-                                <Icon size={28} className="text-primary" />
-                              </div>
-                              <div>
-                                <h4 className="font-semibold text-foreground">
-                                  {t(amenity.labelKey)}
-                                </h4>
-                                <p className="text-muted-foreground text-sm mt-0.5">
-                                  {t(amenity.descKey)}
-                                </p>
-                              </div>
-                            </div>
-                          );
-                        })}
+                  {(() => {
+                    const isOgraHouse = currentUnit?.name && /ogra\s*house/i.test(currentUnit.name);
+                    const essentialsOgra = [
+                      { icon: Wifi, labelKey: "amenities.fastWifi", descKey: "amenities.fastWifiDesc" },
+                      { icon: Wind, labelKey: "amenities.ac", descKey: "amenities.acDesc" },
+                      { icon: Utensils, labelKey: "amenities.fullKitchen", descKey: "amenities.fullKitchenDesc" },
+                      { icon: Tv, labelKey: "amenities.smartTV", descKey: "amenities.smartTVDesc" },
+                      { icon: Bath, labelKey: "amenities.privateBathroom", descKey: "amenities.privateBathroomDesc" },
+                      { icon: Car, labelKey: "amenities.freeParking", descKey: "amenities.freeParkingDesc" },
+                      { icon: Ban, labelKey: "amenities.nonSmoking", descKey: "amenities.nonSmokingDesc" },
+                      { icon: ThermometerSun, labelKey: "amenities.heating", descKey: "amenities.heatingDesc" },
+                      { icon: Shield, labelKey: "amenities.safe", descKey: "amenities.safeDesc" },
+                    ];
+                    const essentialsLykoskufi = [
+                      { icon: Wifi, labelKey: "amenities.fastWifi", descKey: "amenities.fastWifiDesc" },
+                      { icon: Wind, labelKey: "amenities.ac", descKey: "amenities.acDesc" },
+                      { icon: Utensils, labelKey: "amenities.fullKitchen", descKey: "amenities.fullKitchenDesc" },
+                      { icon: Tv, labelKey: "amenities.smartTV", descKey: "amenities.smartTVDesc" },
+                      { icon: Bath, labelKey: "amenities.privateBathroom", descKey: "amenities.privateBathroomDesc" },
+                      { icon: Car, labelKey: "amenities.freeParking", descKey: "amenities.freeParkingDesc" },
+                      { icon: Ban, labelKey: "amenities.nonSmoking", descKey: "amenities.nonSmokingDesc" },
+                      { icon: PawPrint, labelKey: "amenities.petsAllowed", descKey: "amenities.petsAllowedDesc" },
+                    ];
+                    const outdoorOgra = [
+                      { icon: Waves, labelKey: "amenities.beachfront", descKey: "amenities.beachfrontDesc" },
+                      { icon: Mountain, labelKey: "amenities.seaView", descKey: "amenities.seaViewDesc" },
+                      { icon: Flame, labelKey: "amenities.bbqFacilities", descKey: "amenities.bbqFacilitiesDesc" },
+                      { icon: LayoutGrid, labelKey: "amenities.terrace", descKey: "amenities.terraceDesc" },
+                    ];
+                    const outdoorLykoskufi = [
+                      { icon: MapPin, labelKey: "amenities.beachAccess", descKey: "amenities.beachAccessDesc" },
+                      { icon: Mountain, labelKey: "amenities.seaView", descKey: "amenities.seaViewDesc" },
+                    ];
+                    const essentials = isOgraHouse ? essentialsOgra : essentialsLykoskufi;
+                    const outdoor = isOgraHouse ? outdoorOgra : outdoorLykoskufi;
+                    return (
+                      <div className="space-y-8">
+                        <div>
+                          <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-4">
+                            {t("property.amenities.essentials")}
+                          </h3>
+                          <div className="grid md:grid-cols-2 gap-4">
+                            {essentials.map((amenity, idx) => {
+                              const Icon = amenity.icon;
+                              return (
+                                <div key={idx} className="flex gap-4 p-4 rounded-xl bg-muted/30 border border-border/50">
+                                  <div className="flex-shrink-0">
+                                    <Icon size={28} className="text-primary" />
+                                  </div>
+                                  <div>
+                                    <h4 className="font-semibold text-foreground">
+                                      {t(amenity.labelKey)}
+                                    </h4>
+                                    <p className="text-muted-foreground text-sm mt-0.5">
+                                      {t(amenity.descKey)}
+                                    </p>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                        <div>
+                          <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-4">
+                            {t("property.amenities.outdoor")}
+                          </h3>
+                          <div className="grid md:grid-cols-2 gap-4">
+                            {outdoor.map((amenity, idx) => {
+                              const Icon = amenity.icon;
+                              return (
+                                <div key={idx} className="flex gap-4 p-4 rounded-xl bg-muted/30 border border-border/50">
+                                  <div className="flex-shrink-0">
+                                    <Icon size={28} className="text-primary" />
+                                  </div>
+                                  <div>
+                                    <h4 className="font-semibold text-foreground">
+                                      {t(amenity.labelKey)}
+                                    </h4>
+                                    <p className="text-muted-foreground text-sm mt-0.5">
+                                      {t(amenity.descKey)}
+                                    </p>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
                       </div>
-                    </div>
-                    <div>
-                      <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-4">
-                        {t("property.amenities.outdoor")}
-                      </h3>
-                      <div className="grid md:grid-cols-2 gap-4">
-                        {[
-                          { icon: Waves, labelKey: "amenities.privatePool", descKey: "amenities.privatePoolDesc" },
-                          { icon: MapPin, labelKey: "amenities.beachAccess", descKey: "amenities.beachAccessDesc" },
-                        ].map((amenity, idx) => {
-                          const Icon = amenity.icon;
-                          return (
-                            <div key={idx} className="flex gap-4 p-4 rounded-xl bg-muted/30 border border-border/50">
-                              <div className="flex-shrink-0">
-                                <Icon size={28} className="text-primary" />
-                              </div>
-                              <div>
-                                <h4 className="font-semibold text-foreground">
-                                  {t(amenity.labelKey)}
-                                </h4>
-                                <p className="text-muted-foreground text-sm mt-0.5">
-                                  {t(amenity.descKey)}
-                                </p>
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  </div>
+                    );
+                  })()}
                 </div>
 
-                {/* Highlights */}
+                {/* Highlights — aligned with Booking.com */}
                 <div className="mb-10">
                   <h2 className="text-2xl font-bold text-foreground mb-4">
                     {t("property.whyLove")}
@@ -689,7 +914,6 @@ export default function PropertyDetail() {
                       "property.highlights.spaciousLiving",
                       "property.highlights.privateTerrace",
                       "property.highlights.parking",
-                      "property.highlights.cleaning",
                     ].map((highlightKey, idx) => (
                       <li key={idx} className="flex items-start gap-3">
                         <div className="w-2 h-2 rounded-full bg-primary mt-2 flex-shrink-0" />
@@ -831,6 +1055,31 @@ export default function PropertyDetail() {
                   </div>
                 </section>
 
+                {/* Property License Details */}
+                {(() => {
+                  const license = data && currentUnit ? getPropertyLicenseInfo(data.name, currentUnit.name) : null;
+                  if (!license) return null;
+                  return (
+                    <section className="mb-8" aria-labelledby="license-heading">
+                      <div className="rounded-xl border border-border bg-muted/20 px-5 py-4">
+                        <h3 id="license-heading" className="text-sm font-semibold text-foreground uppercase tracking-wide mb-3">
+                          {t("property.licenseTitle")}
+                        </h3>
+                        <div className="space-y-1.5 text-sm text-muted-foreground">
+                          <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0">
+                            <span className="font-medium text-foreground">{t(license.labelKey)}</span>
+                            <span>{license.licenseNumber}</span>
+                          </div>
+                          <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0">
+                            <span className="font-medium text-foreground">ΚΑΕΚ</span>
+                            <span>{license.kaek}</span>
+                          </div>
+                        </div>
+                      </div>
+                    </section>
+                  );
+                })()}
+
                 {/* Inquiry Form */}
                 <InquiryForm propertyId={data?.id || ""} />
               </>
@@ -847,7 +1096,12 @@ export default function PropertyDetail() {
                   <div className="mb-6">
                     <div className="flex items-baseline gap-2 mb-1">
                       <span className="text-3xl font-bold text-primary">
-                        {formatCurrency(currentUnit.basePrice, language)}
+                        {quoteLoading
+                          ? "..."
+                          : formatCurrency(
+                              quotePricing?.basePrice ?? currentUnit.basePrice,
+                              language,
+                            )}
                       </span>
                       <span className="text-muted-foreground">{t("common.perNight")}</span>
                     </div>
@@ -856,44 +1110,115 @@ export default function PropertyDetail() {
                     </p>
                   </div>
 
+                  <div className="mb-4">
+                    <label className="block text-sm font-medium text-foreground mb-2">{t("common.guests")}</label>
+                    <select
+                      value={selectedGuests}
+                      onChange={(e) => setSelectedGuests(Number(e.target.value))}
+                      className="w-full px-3 py-2 border border-border rounded-lg bg-background text-foreground"
+                    >
+                      {Array.from({ length: effectiveMaxGuests }, (_, i) => i + 1).map((n) => (
+                        <option key={n} value={n}>{n}</option>
+                      ))}
+                    </select>
+                  </div>
+
                   <AvailabilityCalendar
                     unitId={currentUnit.id}
                     onSelectDates={(checkIn, checkOut) =>
                       setSelectedDates({ checkIn, checkOut })
                     }
+                    onInvalidSelection={() => setSelectedDates(null)}
                   />
 
                   <div className="mt-6 p-4 bg-muted/50 rounded-lg space-y-2 text-sm mb-6">
-                    <div className="flex justify-between text-foreground">
-                      <span>
-                        1 {t("common.night")} ×{" "}
-                        {formatCurrency(currentUnit.basePrice, language)}
-                      </span>
-                      <span>{formatCurrency(currentUnit.basePrice, language)}</span>
-                    </div>
-                    <div className="flex justify-between text-foreground">
-                      <span>{t("checkout.cleaningFee")}</span>
-                      <span>{formatCurrency(currentUnit.cleaningFee, language)}</span>
-                    </div>
-                    <div className="border-t border-border pt-2 flex justify-between font-bold text-foreground">
-                      <span>{t("property.totalPrice")}</span>
-                      <span>
-                        {formatCurrency(
-                          currentUnit.basePrice + currentUnit.cleaningFee,
-                          language,
-                        )}
-                      </span>
-                    </div>
+                    {selectedDates && (
+                      <>
+                        <div className="flex justify-between text-foreground">
+                          <span>
+                            {Math.ceil(
+                              (selectedDates.checkOut.getTime() - selectedDates.checkIn.getTime()) / (1000 * 60 * 60 * 24),
+                            )}{" "}
+                            {t("common.nights")} ×{" "}
+                            {quoteLoading
+                              ? "..."
+                              : formatCurrency(
+                                  quotePricing?.basePrice ?? currentUnit.basePrice,
+                                  language,
+                                )}
+                          </span>
+                          <span>
+                            {quoteLoading
+                              ? "..."
+                              : formatCurrency(
+                                  quotePricing?.subtotal ?? Math.ceil(
+                                    (selectedDates.checkOut.getTime() - selectedDates.checkIn.getTime()) / (1000 * 60 * 60 * 24),
+                                  ) * currentUnit.basePrice,
+                                  language,
+                                )}
+                          </span>
+                        </div>
+                        <div className="flex justify-between text-foreground">
+                          <span>{t("checkout.cleaningFee")}</span>
+                          <span>
+                            {quoteLoading
+                              ? "..."
+                              : formatCurrency(
+                                  quotePricing?.cleaningFee ?? currentUnit.cleaningFee,
+                                  language,
+                                )}
+                          </span>
+                        </div>
+                        <div className="border-t border-border pt-2 flex justify-between font-bold text-foreground">
+                          <span>{t("property.totalPrice")}</span>
+                          <span>
+                            {quoteLoading
+                              ? "..."
+                              : formatCurrency(
+                                  quotePricing?.totalPrice ??
+                                    Math.ceil(
+                                      (selectedDates.checkOut.getTime() - selectedDates.checkIn.getTime()) / (1000 * 60 * 60 * 24),
+                                    ) * currentUnit.basePrice + currentUnit.cleaningFee,
+                                  language,
+                                )}
+                          </span>
+                        </div>
+                      </>
+                    )}
+                    {!selectedDates && (
+                      <p className="text-muted-foreground text-sm">{t("property.booking.selectDates")}</p>
+                    )}
                   </div>
 
-                  {/* Book Button */}
-                  <button
-                    onClick={handleBooking}
-                    disabled={!canBook}
-                    className="btn-primary w-full justify-center mb-3"
-                  >
-                    {t("nav.bookNow")}
-                  </button>
+                  {/* Closed room notice or Book Button */}
+                  {isUnitClosed ? (
+                    <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 mb-3">
+                      <p className="font-semibold text-amber-800">{t("property.roomClosed")}</p>
+                      {currentUnit?.reopenDate && (
+                        <p className="text-sm text-amber-700 mt-1">
+                          {t("property.roomReopensOn").replace(
+                            "{date}",
+                            new Date(currentUnit.reopenDate).toLocaleDateString(undefined, {
+                              day: "numeric",
+                              month: "long",
+                              year: "numeric",
+                            }),
+                          )}
+                        </p>
+                      )}
+                      <button disabled className="btn-primary w-full justify-center mt-3 opacity-50 cursor-not-allowed">
+                        {t("nav.bookNow")}
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={handleBooking}
+                      disabled={!canBook}
+                      className="btn-primary w-full justify-center mb-3"
+                    >
+                      {t("nav.bookNow")}
+                    </button>
+                  )}
                 </>
               )}
 

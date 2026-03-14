@@ -3,20 +3,26 @@ import { apiUrl } from "@/lib/api";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useLanguage } from "@/hooks/useLanguage";
 
+const MIN_NIGHTS = 7;
+const MIN_DAYS_AHEAD_FOR_CHECKIN = 3;
+
 interface AvailabilityCalendarProps {
   unitId?: string;
   onSelectDates?: (checkIn: Date, checkOut: Date) => void;
+  onInvalidSelection?: () => void;
 }
 
 export default function AvailabilityCalendar({
   unitId,
   onSelectDates,
+  onInvalidSelection,
 }: AvailabilityCalendarProps) {
   const { t } = useLanguage();
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [checkIn, setCheckIn] = useState<Date | null>(null);
   const [checkOut, setCheckOut] = useState<Date | null>(null);
   const [occupiedRanges, setOccupiedRanges] = useState<{ start: string; end: string }[]>([]);
+  const [minNightsError, setMinNightsError] = useState(false);
 
   useEffect(() => {
     if (!unitId) {
@@ -45,6 +51,12 @@ export default function AvailabilityCalendar({
     return new Date(date.getFullYear(), date.getMonth(), 1).getDay();
   };
 
+  const getTodayStart = () => {
+    const d = new Date();
+    d.setHours(0, 0, 0, 0);
+    return d;
+  };
+
   const handleDateClick = (day: number) => {
     const selectedDate = new Date(
       currentMonth.getFullYear(),
@@ -55,12 +67,22 @@ export default function AvailabilityCalendar({
     if (!checkIn || (checkIn && checkOut)) {
       setCheckIn(selectedDate);
       setCheckOut(null);
+      setMinNightsError(false);
     } else if (selectedDate > checkIn) {
-      setCheckOut(selectedDate);
-      onSelectDates?.(checkIn, selectedDate);
+      const nights = Math.ceil((selectedDate.getTime() - checkIn.getTime()) / (1000 * 60 * 60 * 24));
+      if (nights < MIN_NIGHTS) {
+        setCheckOut(selectedDate);
+        setMinNightsError(true);
+        onInvalidSelection?.();
+      } else {
+        setCheckOut(selectedDate);
+        setMinNightsError(false);
+        onSelectDates?.(checkIn, selectedDate);
+      }
     } else {
       setCheckIn(selectedDate);
       setCheckOut(null);
+      setMinNightsError(false);
     }
   };
 
@@ -100,7 +122,17 @@ export default function AvailabilityCalendar({
   };
 
   const isBlocked = (day: number) => {
-    return false;
+    const date = new Date(
+      currentMonth.getFullYear(),
+      currentMonth.getMonth(),
+      day,
+    );
+    const today = getTodayStart();
+    const dateStart = new Date(date);
+    dateStart.setHours(0, 0, 0, 0);
+    const msPerDay = 1000 * 60 * 60 * 24;
+    const daysFromToday = Math.floor((dateStart.getTime() - today.getTime()) / msPerDay);
+    return daysFromToday < MIN_DAYS_AHEAD_FOR_CHECKIN;
   };
 
   const monthName = currentMonth.toLocaleString("default", {
@@ -189,6 +221,15 @@ export default function AvailabilityCalendar({
         </div>
       </div>
 
+      {/* Min nights error label */}
+      {minNightsError && checkIn && checkOut && (
+        <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+          <p className="text-sm font-medium text-amber-800">
+            {t("calendar.minNightsRequired")}
+          </p>
+        </div>
+      )}
+
       {/* Legend */}
       <div className="border-t border-border pt-4 space-y-2 text-xs">
         <div className="flex items-center gap-2">
@@ -205,6 +246,9 @@ export default function AvailabilityCalendar({
             <span className="text-muted-foreground">{t("calendar.bookedUnavailable")}</span>
           </div>
         )}
+        <div className="flex items-center gap-2">
+          <span className="text-muted-foreground">{t("calendar.checkInAdvanceDays")}</span>
+        </div>
       </div>
 
       {/* Selected Dates Display */}

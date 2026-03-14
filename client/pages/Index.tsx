@@ -253,7 +253,6 @@ export default function Index() {
   useEffect(() => {
     const loadProperties = async () => {
       try {
-        console.log("🔍 [CLIENT] Fetching featured properties...");
         const response = await fetch(apiUrl("/api/properties"));
 
         if (!response.ok) {
@@ -280,7 +279,7 @@ export default function Index() {
   return (
     <Layout>
       {/* Hero Section */}
-      <div className="relative text-white overflow-hidden">
+      <div className="relative text-white overflow-hidden min-h-[85vh] flex flex-col">
         {/* Video Background */}
         <video
           autoPlay
@@ -295,70 +294,73 @@ export default function Index() {
         {/* Dark overlay for text readability */}
         <div className="absolute inset-0 bg-black/50" />
 
-        <div className="relative container-max py-20 md:py-32">
-          <div className="max-w-3xl">
-            <h1 className="text-4xl md:text-6xl font-bold mb-6 leading-tight">
-              {t("home.hero.title")}
-              {" "}
-              <span className="text-accent">Greek Escape</span>
-            </h1>
-            <p className="text-lg md:text-xl text-white/90 mb-8">
-              {t("home.hero.subtitle")}
-            </p>
-          </div>
+        {/* Top-left title */}
+        <div className="absolute top-8 left-8 md:top-12 md:left-12 z-20">
+          <h1 className="text-2xl md:text-4xl font-bold text-white tracking-tight font-cavolini">
+            {t("home.hero.brandTitle")}
+          </h1>
+        </div>
 
-          {/* Search Bar */}
+        {/* Bottom-right tagline */}
+        <div className="absolute bottom-8 right-8 md:bottom-12 md:right-12 z-20">
+          <p className="text-lg md:text-xl text-white/95 font-medium tracking-wide font-cavolini">
+            {t("home.hero.tagline")}
+          </p>
+        </div>
+
+        <div className="relative container-max py-20 md:py-32 flex-1 flex flex-col justify-center">
+          {/* Search Bar - transparent */}
           <form
             onSubmit={handleSearch}
-            className="bg-white rounded-2xl shadow-2xl p-6 md:p-8 -mb-12 relative z-10"
+            className="p-6 md:p-8 -mb-12 relative z-10"
           >
             <div className="grid md:grid-cols-5 gap-4 md:gap-3">
               {/* Check-in */}
               <div className="space-y-2">
-                <label className="block text-sm font-semibold text-foreground">
+                <label className="block text-sm font-semibold text-white/95">
                   {t("home.search.checkIn")}
                 </label>
-                <div className="flex items-center gap-2 border border-border rounded-lg px-3 py-2">
-                  <Calendar size={18} className="text-primary" />
+                <div className="flex items-center gap-2 border border-white/30 rounded-lg px-3 py-2 bg-white/5 backdrop-blur-sm">
+                  <Calendar size={18} className="text-white/90" />
                   <input
                     type="date"
                     value={checkIn}
                     onChange={(e) => setCheckIn(e.target.value)}
-                    className="flex-1 outline-none text-foreground"
+                    className="flex-1 outline-none bg-transparent text-white placeholder:text-white/60 [color-scheme:dark]"
                   />
                 </div>
               </div>
 
               {/* Check-out */}
               <div className="space-y-2">
-                <label className="block text-sm font-semibold text-foreground">
+                <label className="block text-sm font-semibold text-white/95">
                   {t("home.search.checkOut")}
                 </label>
-                <div className="flex items-center gap-2 border border-border rounded-lg px-3 py-2">
-                  <Calendar size={18} className="text-primary" />
+                <div className="flex items-center gap-2 border border-white/30 rounded-lg px-3 py-2 bg-white/5 backdrop-blur-sm">
+                  <Calendar size={18} className="text-white/90" />
                   <input
                     type="date"
                     value={checkOut}
                     onChange={(e) => setCheckOut(e.target.value)}
-                    className="flex-1 outline-none text-foreground"
+                    className="flex-1 outline-none bg-transparent text-white placeholder:text-white/60 [color-scheme:dark]"
                   />
                 </div>
               </div>
 
               {/* Guests */}
               <div className="space-y-2">
-                <label className="block text-sm font-semibold text-foreground">
+                <label className="block text-sm font-semibold text-white/95">
                   {t("home.search.guests")}
                 </label>
-                <div className="flex items-center gap-2 border border-border rounded-lg px-3 py-2">
-                  <Users size={18} className="text-primary" />
+                <div className="flex items-center gap-2 border border-white/30 rounded-lg px-3 py-2 bg-white/5 backdrop-blur-sm">
+                  <Users size={18} className="text-white/90" />
                   <select
                     value={guests}
                     onChange={(e) => setGuests(e.target.value)}
-                    className="flex-1 outline-none text-foreground"
+                    className="flex-1 outline-none bg-transparent text-white"
                   >
-                    {[1, 2, 3, 4, 5, 6, 7, 8].map((n) => (
-                      <option key={n} value={n}>
+                    {Array.from({ length: 10 }, (_, i) => i + 1).map((n) => (
+                      <option key={n} value={n} className="bg-slate-800 text-white">
                         {n} {n === 1 ? t("common.guest") : t("common.guests")}
                       </option>
                     ))}
@@ -395,7 +397,17 @@ export default function Index() {
         </div>
 
         {propertiesLoading ? (
-          <p className="text-muted-foreground">Loading properties...</p>
+          <div className="grid md:grid-cols-3 gap-6 animate-pulse">
+            {[1, 2, 3, 4, 5, 6].map((i) => (
+              <div key={i} className="overflow-hidden rounded-xl border border-border">
+                <div className="h-64 bg-muted" />
+                <div className="p-6 space-y-2">
+                  <div className="h-6 w-3/4 bg-muted rounded" />
+                  <div className="h-4 w-1/2 bg-muted rounded" />
+                </div>
+              </div>
+            ))}
+          </div>
         ) : propertiesError ? (
           <p className="text-destructive text-sm">{propertiesError}</p>
         ) : featuredProperties.length === 0 ? (
@@ -403,17 +415,20 @@ export default function Index() {
         ) : (
           <>
             <div className="grid md:grid-cols-3 gap-6">
-              {featuredProperties.map((property) => (
+              {featuredProperties.map((property, idx) => (
                 <Link
                   key={property.id}
                   to={`/properties/${property.id}`}
                   className="card-hover overflow-hidden group"
+                  onMouseEnter={() => fetch(apiUrl(`/api/properties/id/${property.id}`))}
                 >
                   {/* Image */}
                   <div className="relative h-64 overflow-hidden bg-muted">
                     <img
                       src={imageUrl(property.mainImage ?? (property as { main_image?: string }).main_image)}
                       alt={property.name}
+                      loading={idx < 3 ? "eager" : "lazy"}
+                      decoding="async"
                       className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
                     />
                     {property.startingFrom != null && (
@@ -617,7 +632,7 @@ export default function Index() {
                   {t("home.inquiry.description")}
                 </p>
                 <ul className="space-y-3 mb-8">
-                  {["home.inquiry.benefit1", "home.inquiry.benefit2", "home.inquiry.benefit3"].map((key) => (
+                  {["home.inquiry.benefit1", "home.inquiry.benefit2"].map((key) => (
                     <li key={key} className="flex items-center gap-3 text-foreground">
                       <CheckCircle2 size={18} className="text-primary flex-shrink-0" />
                       <span>{t(key)}</span>
@@ -633,16 +648,6 @@ export default function Index() {
                 <div className="text-center space-y-6">
                   <div className="text-6xl font-bold text-primary">-15%</div>
                   <p className="text-lg text-muted-foreground max-w-xs">{t("home.inquiry.discountNote")}</p>
-                  <div className="flex items-center justify-center gap-4">
-                    <div className="flex items-center gap-2 px-4 py-2 bg-white/80 rounded-full border border-primary/10">
-                      <Calendar size={16} className="text-primary" />
-                      <span className="text-sm font-medium">7+ {t("common.nights")}</span>
-                    </div>
-                    <div className="flex items-center gap-2 px-4 py-2 bg-white/80 rounded-full border border-primary/10">
-                      <Users size={16} className="text-primary" />
-                      <span className="text-sm font-medium">4+ {t("common.guests")}</span>
-                    </div>
-                  </div>
                 </div>
               </div>
             </div>

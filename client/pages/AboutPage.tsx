@@ -149,6 +149,57 @@ export default function About() {
           </div>
         </section>
 
+        {/* Leonidionhouses — properties description */}
+        <section className="py-16 md:py-24 bg-white">
+          <div className="container-max max-w-4xl">
+            <motion.div
+              initial={{ opacity: 0, y: 24 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true, margin: "-80px" }}
+              transition={{ duration: 0.6 }}
+              className="space-y-12"
+            >
+              <h2 className="luxury-heading text-3xl md:text-4xl text-foreground">
+                Leonidionhouses
+              </h2>
+              <div className="luxury-divider" />
+              <div className="space-y-6 text-muted-foreground leading-relaxed text-base md:text-lg">
+                <p>{t("about.leonidionhouses.intro1")}</p>
+                <p>{t("about.leonidionhouses.intro2")}</p>
+              </div>
+
+              {[
+                { key: "ograHouse", paras: ["p1", "p2"] },
+                { key: "smallBungalow", paras: ["p1", "p2", "p3", "p4"] },
+                { key: "bigBungalow", paras: ["p1", "p2", "p3", "p4"] },
+                { key: "lykoskufi1", paras: ["p1", "p2"] },
+                { key: "lykoskufi2", paras: ["p1", "p2"] },
+                { key: "lykoskufi5", paras: ["p1", "p2", "p3"] },
+              ].map((prop, i) => {
+                const title = t(`about.${prop.key}.title`);
+                return (
+                  <motion.div
+                    key={prop.key}
+                    initial={{ opacity: 0, y: 16 }}
+                    whileInView={{ opacity: 1, y: 0 }}
+                    viewport={{ once: true }}
+                    transition={{ duration: 0.5, delay: i * 0.05 }}
+                    className="border-b border-border/50 pb-10 last:border-0 last:pb-0"
+                  >
+                    <h3 className="font-semibold text-foreground text-xl mb-4">{title}</h3>
+                    <div className="space-y-4 text-muted-foreground leading-relaxed text-base">
+                      {prop.paras.map((p) => {
+                        const text = t(`about.${prop.key}.${p}`);
+                        return text ? <p key={p}>{text}</p> : null;
+                      })}
+                    </div>
+                  </motion.div>
+                );
+              })}
+            </motion.div>
+          </div>
+        </section>
+
         {/* Features — minimal cards */}
         <section className="py-16 md:py-24 bg-white">
           <div className="container-max">

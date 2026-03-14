@@ -35,7 +35,7 @@ export default function UserManagement() {
     try {
       const params = new URLSearchParams({
         page: currentPage.toString(),
-        pageSize: "20",
+        pageSize: "10",
         ...(statusFilter !== "ALL" && { status: statusFilter }),
         ...(searchTerm && { search: searchTerm })
       });

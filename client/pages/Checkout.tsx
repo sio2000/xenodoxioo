@@ -1,7 +1,8 @@
 import Layout from "@/components/Layout";
 import { apiUrl } from "@/lib/api";
+import { COUNTRIES } from "@/lib/countries";
 import { useSearchParams, Link, useNavigate } from "react-router-dom";
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useLanguage } from "@/hooks/useLanguage";
 import formatCurrency from "@/lib/currency";
 import { CreditCard, Lock, User, AlertCircle, CheckCircle2 } from "lucide-react";
@@ -116,6 +117,7 @@ export default function Checkout() {
   const [applyingCoupon, setApplyingCoupon] = useState(false);
   const [couponError, setCouponError] = useState<string | null>(null);
   const [appliedCoupon, setAppliedCoupon] = useState<any>(null);
+  const [checkoutError, setCheckoutError] = useState<string | null>(null);
 
   // Payment state
   const [bookingId, setBookingId] = useState<string | null>(null);
@@ -126,8 +128,9 @@ export default function Checkout() {
 
   const unitId = searchParams.get("unit");
   const propertyId = searchParams.get("property");
-  const checkIn = searchParams.get("checkIn");
-  const checkOut = searchParams.get("checkOut");
+  // Support both checkIn/checkin and checkOut/checkout (URL params can vary)
+  const checkIn = searchParams.get("checkIn") ?? searchParams.get("checkin");
+  const checkOut = searchParams.get("checkOut") ?? searchParams.get("checkout");
   const guests = searchParams.get("guests") ?? "2";
 
   const { language, t } = useLanguage();
@@ -154,46 +157,74 @@ export default function Checkout() {
     country: "",
   });
 
-  // Load quote
-  useEffect(() => {
-    const loadQuote = async () => {
-      if (!unitId || !checkIn || !checkOut) {
-        setQuoteError("Missing booking details. Please start your booking again.");
-        setLoadingQuote(false);
+  const quoteAbortRef = useRef<AbortController | null>(null);
+
+  // Load quote (includes coupon when applied; re-runs when appliedCoupon changes)
+  // couponOverride: pass null to fetch without coupon (e.g. when removing coupon)
+  const loadQuote = useCallback(async (couponOverride?: string | null) => {
+    if (!unitId || !checkIn || !checkOut) {
+      setQuoteError("Missing booking details. Please start your booking again.");
+      setLoadingQuote(false);
+      return;
+    }
+    // Cancel any in-flight quote request to avoid race (e.g. old no-coupon overwriting discounted)
+    quoteAbortRef.current?.abort();
+    quoteAbortRef.current = new AbortController();
+    const signal = quoteAbortRef.current.signal;
+
+    const couponToUse = couponOverride === undefined ? appliedCoupon?.code : (couponOverride || undefined);
+
+    setLoadingQuote(true);
+    setQuoteError(null);
+    try {
+      const response = await fetch(apiUrl("/api/bookings/quote"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          unitId,
+          checkInDate: checkIn,
+          checkOutDate: checkOut,
+          guests: Number(guests) || 1,
+          ...(couponToUse && { couponCode: couponToUse }),
+        }),
+        signal,
+      });
+      if (!response.ok) {
+        const text = await response.text();
+        let errMsg = "Dates not available";
+        try {
+          const errJson = JSON.parse(text);
+          errMsg = errJson.error || errMsg;
+        } catch {
+          if (!text.includes("<!doctype")) errMsg = text || errMsg;
+        }
+        setQuoteError(errMsg);
         return;
       }
-      try {
-        const response = await fetch(apiUrl("/api/bookings/quote"), {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            unitId,
-            checkInDate: checkIn,
-            checkOutDate: checkOut,
-            guests: Number(guests) || 1,
-          }),
-        });
-        if (!response.ok) {
-          const text = await response.text();
-          setQuoteError(text.includes("<!doctype") ? "Server error" : text || "Dates not available");
-          return;
-        }
-        const json = await response.json();
-        setQuote(json.data as QuoteResponse);
-      } catch {
-        setQuoteError("Unable to load pricing. Please try again.");
-      } finally {
-        setLoadingQuote(false);
+      const json = await response.json();
+      const payload = json.data ?? json;
+      if (payload?.pricing) {
+        setQuote(payload as QuoteResponse);
+      } else {
+        setQuoteError(payload?.error || "Invalid quote response");
       }
-    };
+    } catch (err) {
+      if ((err as Error).name === "AbortError") return;
+      setQuoteError("Unable to load pricing. Please try again.");
+    } finally {
+      if (!signal.aborted) setLoadingQuote(false);
+    }
+  }, [unitId, checkIn, checkOut, guests, appliedCoupon?.code]);
+
+  useEffect(() => {
     loadQuote();
-  }, [unitId, checkIn, checkOut, guests]);
+  }, [loadQuote]);
 
   // Step 1: Create booking + payment intent
   const handleCreateBooking = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!unitId || !checkIn || !checkOut) {
-      alert("Missing booking details.");
+      setCheckoutError("Missing booking details.");
       return;
     }
 
@@ -207,6 +238,11 @@ export default function Checkout() {
     if (accessToken) headers.Authorization = `Bearer ${accessToken}`;
 
     setIsProcessing(true);
+    setCheckoutError(null);
+
+    const TIMEOUT_MS = 25000;
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), TIMEOUT_MS);
 
     try {
       // 1. Create booking
@@ -223,19 +259,18 @@ export default function Checkout() {
           guestPhone: formData.phone,
           couponCode: appliedCoupon?.code,
         }),
+        signal: controller.signal,
       });
 
       const bookingJson = await bookingRes.json().catch(() => ({}));
       if (!bookingRes.ok) {
-        alert(bookingJson.error || "Failed to create booking");
-        setIsProcessing(false);
+        setCheckoutError(bookingJson.error || "Failed to create booking");
         return;
       }
 
       const newBookingId = bookingJson.data?.id;
       if (!newBookingId) {
-        alert("Booking creation failed — no ID returned");
-        setIsProcessing(false);
+        setCheckoutError("Booking creation failed — no ID returned");
         return;
       }
       setBookingId(newBookingId);
@@ -249,12 +284,12 @@ export default function Checkout() {
         method: "POST",
         headers,
         body: JSON.stringify({ bookingId: newBookingId }),
+        signal: controller.signal,
       });
 
       const paymentJson = await paymentRes.json().catch(() => ({}));
       if (!paymentRes.ok || !paymentJson.data?.clientSecret) {
-        alert(paymentJson.error || "Failed to initialize payment");
-        setIsProcessing(false);
+        setCheckoutError(paymentJson.error || "Failed to initialize payment");
         return;
       }
 
@@ -263,8 +298,16 @@ export default function Checkout() {
       setStep("payment");
     } catch (err) {
       console.error("Checkout error:", err);
-      alert("Something went wrong. Please try again.");
+      const errMsg = (err as Error).message || "";
+      if ((err as Error).name === "AbortError") {
+        setCheckoutError("Request timed out. Please check your connection and try again.");
+      } else if (errMsg.includes("fetch") || errMsg.includes("network") || errMsg.includes("Failed") || errMsg.includes("HTTP")) {
+        setCheckoutError("Network error. Please check your connection and try again.");
+      } else {
+        setCheckoutError(errMsg || "Something went wrong. Please try again.");
+      }
     } finally {
+      clearTimeout(timeoutId);
       setIsProcessing(false);
     }
   };
@@ -325,18 +368,25 @@ export default function Checkout() {
       const data = await res.json();
       if (res.ok) {
         setAppliedCoupon(data.coupon);
-        // Refresh quote with coupon
-        const qRes = await fetch(apiUrl("/api/bookings/quote"), {
+        // Immediate quote fetch so discounted price shows without waiting for useEffect
+        const code = data.coupon?.code ?? couponCode.trim().toUpperCase();
+        const quoteRes = await fetch(apiUrl("/api/bookings/quote"), {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            unitId, checkInDate: checkIn, checkOutDate: checkOut,
-            guests: Number(guests) || 1, couponCode: couponCode.trim().toUpperCase(),
+            unitId,
+            checkInDate: checkIn,
+            checkOutDate: checkOut,
+            guests: Number(guests) || 1,
+            couponCode: code,
           }),
         });
-        if (qRes.ok) {
-          const qData = await qRes.json();
-          setQuote(qData.data);
+        if (quoteRes.ok) {
+          const quoteJson = await quoteRes.json();
+          const payload = quoteJson.data ?? quoteJson;
+          if (payload?.pricing) {
+            setQuote(payload as QuoteResponse);
+          }
         }
       } else {
         setCouponError(data.error || "Invalid coupon");
@@ -345,18 +395,11 @@ export default function Checkout() {
     finally { setApplyingCoupon(false); }
   };
 
-  const handleRemoveCoupon = async () => {
+  const handleRemoveCoupon = () => {
     setAppliedCoupon(null);
     setCouponCode("");
     setCouponError(null);
-    try {
-      const res = await fetch(apiUrl("/api/bookings/quote"), {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ unitId, checkInDate: checkIn, checkOutDate: checkOut, guests: Number(guests) || 1 }),
-      });
-      if (res.ok) { const d = await res.json(); setQuote(d.data); }
-    } catch {}
+    loadQuote(null);
   };
 
   // Derived pricing
@@ -489,18 +532,13 @@ export default function Checkout() {
                       </div>
                     </div>
                     <div>
-                      <label className="block text-sm font-semibold text-foreground mb-2">Country *</label>
+                      <label className="block text-sm font-semibold text-foreground mb-2">{t("checkout.country")} *</label>
                       <select name="country" value={formData.country} onChange={handleInputChange} required
                         className="w-full px-4 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary text-foreground">
-                        <option value="">Select a country</option>
-                        <option value="GR">Greece</option>
-                        <option value="US">United States</option>
-                        <option value="UK">United Kingdom</option>
-                        <option value="DE">Germany</option>
-                        <option value="FR">France</option>
-                        <option value="IT">Italy</option>
-                        <option value="ES">Spain</option>
-                        <option value="NL">Netherlands</option>
+                        <option value="">{language === "el" ? "Επιλέξτε χώρα" : "Select a country"}</option>
+                        {COUNTRIES.map((c) => (
+                          <option key={c.code} value={c.code}>{c.name}</option>
+                        ))}
                       </select>
                     </div>
                   </div>
@@ -548,6 +586,22 @@ export default function Checkout() {
                   </label>
                 </div>
 
+                {checkoutError && (
+                  <div className="p-4 bg-destructive/10 border border-destructive/30 rounded-lg flex items-start gap-2">
+                    <AlertCircle size={20} className="text-destructive flex-shrink-0 mt-0.5" />
+                    <div>
+                      <p className="text-sm font-medium text-destructive">{checkoutError}</p>
+                      <button
+                        type="button"
+                        onClick={() => setCheckoutError(null)}
+                        className="mt-2 text-sm font-medium text-primary hover:text-primary/80 underline"
+                      >
+                        Dismiss
+                      </button>
+                    </div>
+                  </div>
+                )}
+
                 <button type="submit" disabled={isProcessing}
                   className="btn-primary w-full justify-center text-lg py-3 disabled:opacity-50 disabled:cursor-not-allowed">
                   {isProcessing ? "Creating booking..." : "Continue to Payment"}
@@ -563,7 +617,7 @@ export default function Checkout() {
                 <p className="text-muted-foreground mb-6">
                   {isFullPayment
                     ? `Full payment: ${formatCurrency(total, language)}`
-                    : `Deposit (${Math.round((depositAmount / total) * 100)}%): ${formatCurrency(depositAmount, language)}`}
+                    : `Deposit (${total > 0 ? Math.round((depositAmount / total) * 100) : 0}%): ${formatCurrency(depositAmount, language)}`}
                 </p>
 
                 <div className="p-4 bg-primary/5 rounded-lg mb-6 flex items-center gap-2">
@@ -594,7 +648,7 @@ export default function Checkout() {
 
                 <button
                   type="button"
-                  onClick={() => setStep("info")}
+                  onClick={() => { setStep("info"); setCheckoutError(null); }}
                   className="mt-4 text-sm text-muted-foreground hover:text-foreground"
                 >
                   &larr; Back to details
@@ -677,7 +731,7 @@ export default function Checkout() {
                         </div>
                         <div className="text-right">
                           <p className="font-bold text-lg text-primary">{formatCurrency(depositAmount, language)}</p>
-                          <p className="text-xs text-muted-foreground">{Math.round((depositAmount / total) * 100)}%</p>
+                          <p className="text-xs text-muted-foreground">{total > 0 ? Math.round((depositAmount / total) * 100) : 0}%</p>
                         </div>
                       </div>
                       <div className="flex items-center justify-between p-3 bg-white/50 rounded-lg border border-primary/10">
@@ -687,7 +741,7 @@ export default function Checkout() {
                         </div>
                         <div className="text-right">
                           <p className="font-bold text-lg text-primary">{formatCurrency(balanceAmount, language)}</p>
-                          <p className="text-xs text-muted-foreground">{Math.round((balanceAmount / total) * 100)}%</p>
+                          <p className="text-xs text-muted-foreground">{total > 0 ? Math.round((balanceAmount / total) * 100) : 0}%</p>
                         </div>
                       </div>
                     </>
@@ -695,6 +749,21 @@ export default function Checkout() {
                 </div>
               </div>
 
+              {quoteError && (
+                <div className="mb-4 p-4 bg-destructive/10 border border-destructive/30 rounded-lg">
+                  <p className="text-sm font-medium text-destructive">{quoteError}</p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Ελέγξτε τις ημερομηνίες και τον αριθμό επισκεπτών. Η άφιξη πρέπει να είναι τουλάχιστον 3 ημέρες από σήμερα και η ελάχιστη διαμονή 7 νύχτες.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => loadQuote()}
+                    className="mt-3 text-sm font-medium text-primary hover:text-primary/80 underline"
+                  >
+                    Δοκιμάστε ξανά
+                  </button>
+                </div>
+              )}
               <div className="space-y-2 text-xs text-muted-foreground border-t border-border pt-4">
                 <p>&#10003; Secure payment via Stripe</p>
                 <p>&#10003; {isFullPayment ? "Full amount charged now" : "Only deposit charged now"}</p>

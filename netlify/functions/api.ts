@@ -304,6 +304,90 @@ export const handler = async (event: any, context: any) => {
       };
     }
 
+    // POST /api/bookings/quote - pricing quote for checkout
+    if ((path === '/api/bookings/quote' || path === '/bookings/quote') && method === 'POST') {
+      try {
+        const body = JSON.parse(event.body || '{}');
+        const { unitId, checkInDate, checkOutDate, guests = 1, couponCode } = body;
+        if (!unitId || !checkInDate || !checkOutDate) {
+          return {
+            statusCode: 400,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ success: false, error: 'Missing unitId, checkInDate, or checkOutDate' })
+          };
+        }
+        const checkIn = new Date(checkInDate);
+        const checkOut = new Date(checkOutDate);
+        if (isNaN(checkIn.getTime()) || isNaN(checkOut.getTime()) || checkIn >= checkOut) {
+          return {
+            statusCode: 400,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ success: false, error: 'Invalid dates' })
+          };
+        }
+        const nights = Math.ceil((checkOut.getTime() - checkIn.getTime()) / (1000 * 60 * 60 * 24));
+        const { data: unit, error: unitError } = await supabase.from('units').select('*').eq('id', unitId).single();
+        if (unitError || !unit) {
+          return {
+            statusCode: 404,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ success: false, error: 'Unit not found' })
+          };
+        }
+        const basePrice = Number(unit.base_price) || 0;
+        const cleaningFee = Number(unit.cleaning_fee) || 0;
+        let subtotal = basePrice * nights;
+        let discountAmount = 0;
+        if (couponCode) {
+          const { data: coupon } = await supabase.from('coupons').select('*').eq('code', String(couponCode).toUpperCase()).eq('is_active', true).single();
+          if (coupon) {
+            discountAmount = coupon.discount_type === 'PERCENTAGE' ? subtotal * (Number(coupon.discount_value) / 100) : Number(coupon.discount_value);
+            discountAmount = Math.min(discountAmount, subtotal);
+          }
+        }
+        subtotal -= discountAmount;
+        const taxRate = 0.15;
+        const taxes = Math.round((subtotal + cleaningFee) * taxRate * 100) / 100;
+        const finalTotal = Math.round((subtotal + cleaningFee + taxes) * 100) / 100;
+        const daysToCheckIn = Math.ceil((checkIn.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+        const isFullPayment = daysToCheckIn <= 21;
+        const depositPct = 0.25;
+        const depositAmount = isFullPayment ? finalTotal : Math.round(finalTotal * depositPct * 100) / 100;
+        const balanceAmount = finalTotal - depositAmount;
+        return {
+          statusCode: 200,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            success: true,
+            data: {
+              unit: { id: unitId },
+              pricing: {
+                nights,
+                basePrice,
+                subtotal: basePrice * nights,
+                cleaningFee,
+                discountAmount,
+                taxes,
+                taxRate: 15,
+                totalPrice: finalTotal,
+                depositAmount,
+                balanceAmount,
+                isFullPayment,
+                scheduledChargeDate: null
+              }
+            }
+          })
+        };
+      } catch (err) {
+        console.error('Quote error:', err);
+        return {
+          statusCode: 500,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ success: false, error: 'Failed to calculate quote' })
+        };
+      }
+    }
+
     // POST /api/bookings
     if (path === '/api/bookings' && method === 'POST') {
       console.log(`🔍 [${requestId}] Creating booking...`);

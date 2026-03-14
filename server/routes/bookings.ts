@@ -83,12 +83,29 @@ router.post("/search", validate(getAvailableUnitsSchema), async (req, res, next)
   }
 });
 
+// Parse date string as YYYY-MM-DD or M/D/YYYY (date-only) to avoid timezone shifts
+function parseDateOnly(str: string): Date {
+  const s = String(str).trim();
+  const iso = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (iso) {
+    return new Date(Date.UTC(parseInt(iso[1], 10), parseInt(iso[2], 10) - 1, parseInt(iso[3], 10), 12, 0, 0));
+  }
+  const us = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (us) {
+    const month = parseInt(us[1], 10) - 1;
+    const day = parseInt(us[2], 10);
+    const year = parseInt(us[3], 10);
+    return new Date(Date.UTC(year, month, day, 12, 0, 0));
+  }
+  return new Date(s);
+}
+
 // Quote endpoint — uses dynamic tax and payment settings
 router.post("/quote", validate(quoteSchema), async (req, res, next) => {
   try {
     const { unitId, checkInDate, checkOutDate, guests, couponCode } = req.body;
-    const checkIn = new Date(checkInDate);
-    const checkOut = new Date(checkOutDate);
+    const checkIn = parseDateOnly(checkInDate);
+    const checkOut = parseDateOnly(checkOutDate);
 
     if (isNaN(checkIn.getTime()) || isNaN(checkOut.getTime())) {
       return res.status(400).json({ success: false, error: "Invalid dates" });
@@ -135,7 +152,7 @@ router.post("/", optionalAuthenticate, validate(createBookingSchema), async (req
     const userId = req.user?.userId ?? null;
     const booking = await bookingService.createBooking(
       unitId, userId,
-      new Date(checkInDate), new Date(checkOutDate),
+      parseDateOnly(checkInDate), parseDateOnly(checkOutDate),
       guests, guestName, guestEmail, guestPhone, specialRequests, couponCode,
     );
 

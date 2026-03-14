@@ -7,6 +7,7 @@ export default defineConfig(({ mode }) => ({
   server: {
     host: "::",
     port: 8080,
+    strictPort: true,
     fs: {
       allow: ["./client", "./shared", "."],
       deny: [".env", ".env.*", "*.{crt,pem}", "**/.git/**", "server/**"],
@@ -23,7 +24,6 @@ export default defineConfig(({ mode }) => ({
     },
   },
 }));
-
 function expressPlugin(): Plugin {
   return {
     name: "express-plugin",
@@ -36,3 +36,4 @@ function expressPlugin(): Plugin {
     },
   };
 }
+

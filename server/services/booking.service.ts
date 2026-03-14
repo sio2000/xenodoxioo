@@ -5,7 +5,15 @@ import {
   ConflictError,
   AppError,
 } from "../lib/errors";
+
 import { nanoid } from "nanoid";
+
+// Only these statuses block dates (payment succeeded); PENDING = unpaid, does not reserve
+const BLOCKING_STATUSES = ["CONFIRMED", "COMPLETED", "CHECKED_IN", "CHECKED_OUT", "NO_SHOW"];
+import {
+  calculateTotalForDateRange,
+  isRoomClosedForDateRange,
+} from "./price-table.service";
 
 // ── Helpers ────────────────────────────────────────────────────────
 
@@ -51,6 +59,12 @@ function daysUntilDate(dateStr: string | Date): number {
 
 // ── Check Availability ─────────────────────────────────────────────
 
+function getTodayStart(): Date {
+  const d = new Date();
+  d.setHours(0, 0, 0, 0);
+  return d;
+}
+
 export async function checkAvailability(
   unitId: string,
   checkInDate: Date,
@@ -60,14 +74,29 @@ export async function checkAvailability(
     return { isAvailable: false, reason: "Check-out date must be after check-in date" };
   }
 
-  const { data: unit } = await supabase.from("units").select("*").eq("id", unitId).single();
+  const today = getTodayStart();
+  const checkInStart = new Date(checkInDate);
+  checkInStart.setHours(0, 0, 0, 0);
+  const msPerDay = 1000 * 60 * 60 * 24;
+  const daysFromToday = Math.floor((checkInStart.getTime() - today.getTime()) / msPerDay);
+  if (daysFromToday < 3) {
+    return { isAvailable: false, reason: "Check-in must be at least 3 days from today" };
+  }
+
+  let resolvedId = unitId;
+  try {
+    resolvedId = await resolveUnitId(unitId);
+  } catch {
+    return { isAvailable: false, reason: "Unit not found" };
+  }
+  const { data: unit } = await supabase.from("units").select("*").eq("id", resolvedId).single();
   if (!unit) return { isAvailable: false, reason: "Unit not found" };
 
   const { data: conflicting } = await supabase
     .from("bookings")
     .select("id")
-    .eq("unit_id", unitId)
-    .neq("status", "CANCELLED")
+    .eq("unit_id", resolvedId)
+    .in("status", BLOCKING_STATUSES)
     .lt("check_in_date", checkOutDate.toISOString())
     .gt("check_out_date", checkInDate.toISOString());
 
@@ -86,10 +115,33 @@ export async function checkAvailability(
     return { isAvailable: false, reason: "Dates are blocked" };
   }
 
+  try {
+    if (isRoomClosedForDateRange(unit.name, checkInDate, checkOutDate)) {
+      return { isAvailable: false, reason: "Room is closed for this period" };
+    }
+  } catch (e: any) {
+    if (e?.message?.includes("not found")) {
+      return { isAvailable: false, reason: "Room not configured in price table" };
+    }
+    throw e;
+  }
+
   return { isAvailable: true };
 }
 
 // ── Calculate Booking Price ────────────────────────────────────────
+
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+async function resolveUnitId(unitIdOrSlug: string): Promise<string> {
+  if (UUID_REGEX.test(unitIdOrSlug)) {
+    const { data } = await supabase.from("units").select("id").eq("id", unitIdOrSlug).single();
+    if (data) return data.id;
+  }
+  const { data } = await supabase.from("units").select("id").eq("slug", unitIdOrSlug).single();
+  if (data) return data.id;
+  throw new NotFoundError("Unit not found");
+}
 
 export async function calculateBookingPrice(
   unitId: string,
@@ -98,28 +150,46 @@ export async function calculateBookingPrice(
   guests: number,
   couponCode?: string,
 ) {
-  const { data: unit } = await supabase.from("units").select("*").eq("id", unitId).single();
+  const resolvedId = await resolveUnitId(unitId);
+  const { data: unit } = await supabase.from("units").select("*").eq("id", resolvedId).single();
   if (!unit) throw new NotFoundError("Unit not found");
-  if (guests > unit.max_guests) throw new ValidationError(`Maximum ${unit.max_guests} guests allowed`);
+  // All rooms allow up to 10 guests (Lykoskufi 5 & Ogra House have tiered pricing; others use base price)
+  const effectiveMaxGuests = 10;
+  if (guests > effectiveMaxGuests) throw new ValidationError(`Maximum ${effectiveMaxGuests} guests allowed`);
 
-  const nights = Math.ceil((checkOutDate.getTime() - checkInDate.getTime()) / (1000 * 60 * 60 * 24));
-  if (nights < unit.min_stay_days) throw new ValidationError(`Minimum ${unit.min_stay_days} nights required`);
-
-  let basePrice = Number(unit.base_price);
-  const cleaningFee = Number(unit.cleaning_fee) || 0;
-
-  const { data: seasonalPricing } = await supabase
-    .from("seasonal_pricing")
-    .select("*")
-    .eq("property_id", unit.property_id)
-    .lte("start_date", checkOutDate.toISOString())
-    .gte("end_date", checkInDate.toISOString());
-
-  if (seasonalPricing && seasonalPricing.length > 0) {
-    basePrice = Number(seasonalPricing[0].price_per_night);
+  const today = getTodayStart();
+  const checkInStart = new Date(checkInDate);
+  checkInStart.setHours(0, 0, 0, 0);
+  const msPerDay = 1000 * 60 * 60 * 24;
+  const daysFromToday = Math.floor((checkInStart.getTime() - today.getTime()) / msPerDay);
+  if (daysFromToday < 3) {
+    throw new ValidationError("Check-in must be at least 3 days from today");
   }
 
-  const subtotalBeforeDiscount = basePrice * nights;
+  const nights = Math.ceil((checkOutDate.getTime() - checkInDate.getTime()) / (1000 * 60 * 60 * 24));
+  const effectiveMinNights = Math.max(7, unit.min_stay_days || 1);
+  if (nights < effectiveMinNights) throw new ValidationError(`Minimum ${effectiveMinNights} nights required`);
+
+  const cleaningFee = Number(unit.cleaning_fee) || 0;
+
+  let subtotalBeforeDiscount: number;
+  let basePrice: number;
+  try {
+    const { totalPrice } = calculateTotalForDateRange(unit.name, checkInDate, checkOutDate, guests);
+    subtotalBeforeDiscount = totalPrice;
+    basePrice = Math.round((totalPrice / nights) * 100) / 100;
+  } catch (e: any) {
+    if (e?.message?.includes("closed")) {
+      throw new ValidationError("Room is closed for this period");
+    }
+    if (e?.message?.includes("not found")) {
+      basePrice = Number(unit.base_price) || 0;
+      if (basePrice <= 0) throw new ValidationError("Room not configured in price table");
+      subtotalBeforeDiscount = basePrice * nights;
+    } else {
+      throw e;
+    }
+  }
   let discountAmount = 0;
 
   if (couponCode) {
@@ -199,10 +269,11 @@ export async function createBooking(
   _specialRequests?: string,
   couponCode?: string,
 ) {
-  const availability = await checkAvailability(unitId, checkInDate, checkOutDate);
+  const resolvedId = await resolveUnitId(unitId);
+  const availability = await checkAvailability(resolvedId, checkInDate, checkOutDate);
   if (!availability.isAvailable) throw new ConflictError(availability.reason || "Dates not available");
 
-  const pricing = await calculateBookingPrice(unitId, checkInDate, checkOutDate, guests, couponCode);
+  const pricing = await calculateBookingPrice(resolvedId, checkInDate, checkOutDate, guests, couponCode);
   const bookingNumber = `BK${nanoid(8).toUpperCase()}`;
   const nights = Math.ceil((checkOutDate.getTime() - checkInDate.getTime()) / (1000 * 60 * 60 * 24));
 
@@ -212,7 +283,7 @@ export async function createBooking(
     .from("bookings")
     .insert({
       booking_number: bookingNumber,
-      unit_id: unitId,
+      unit_id: resolvedId,
       user_id: userId,
       check_in_date: checkInDate.toISOString(),
       check_out_date: checkOutDate.toISOString(),
@@ -399,7 +470,7 @@ export async function getOccupiedDateRanges(unitId: string) {
     .from("bookings")
     .select("check_in_date, check_out_date")
     .eq("unit_id", unitId)
-    .neq("status", "CANCELLED")
+    .in("status", BLOCKING_STATUSES)
     .order("check_in_date", { ascending: true });
   return data || [];
 }
@@ -424,7 +495,7 @@ export async function getAvailableUnits(
   const { data: conflicting } = await supabase
     .from("bookings")
     .select("unit_id")
-    .neq("status", "CANCELLED")
+    .in("status", BLOCKING_STATUSES)
     .lt("check_in_date", checkOut)
     .gt("check_out_date", checkIn);
 

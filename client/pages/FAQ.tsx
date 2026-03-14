@@ -15,10 +15,6 @@ export default function FAQ() {
       answer: t("faq.q2.answer")
     },
     {
-      question: t("faq.q3.question"),
-      answer: t("faq.q3.answer")
-    },
-    {
       question: t("faq.q4.question"),
       answer: t("faq.q4.answer")
     },

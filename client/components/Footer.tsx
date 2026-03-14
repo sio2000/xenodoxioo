@@ -38,20 +38,12 @@ export default function Footer() {
                 </Link>
               </li>
               <li>
-                <a
-                  href="#"
+                <Link
+                  to="/properties"
                   className="text-muted-foreground hover:text-primary transition-colors text-sm"
                 >
                   {t("footer.featured")}
-                </a>
-              </li>
-              <li>
-                <a
-                  href="#"
-                  className="text-muted-foreground hover:text-primary transition-colors text-sm"
-                >
-                  {t("footer.newListings")}
-                </a>
+                </Link>
               </li>
             </ul>
           </div>
@@ -69,12 +61,12 @@ export default function Footer() {
                 </Link>
               </li>
               <li>
-                <a
-                  href="#"
+                <Link
+                  to="/legal"
                   className="text-muted-foreground hover:text-primary transition-colors text-sm"
                 >
-                  {t("footer.blog")}
-                </a>
+                  {t("footer.legalDetails")}
+                </Link>
               </li>
               <li>
                 <Link
@@ -118,21 +110,30 @@ export default function Footer() {
         </div>
 
         {/* Bottom */}
-        <div className="border-t border-border pt-8 flex flex-col md:flex-row justify-between items-center gap-4 text-sm text-muted-foreground">
-          <p>
-            &copy; {currentYear} LEONIDIONHOUSES. {t("footer.brandSubtitle")}
-          </p>
-          <div className="flex gap-6">
-            <a href="#" className="hover:text-primary transition-colors">
-              {t("footer.privacy")}
-            </a>
-            <a href="#" className="hover:text-primary transition-colors">
-              {t("footer.terms")}
-            </a>
-            <a href="#" className="hover:text-primary transition-colors">
-              {t("footer.cookies")}
-            </a>
+        <div className="border-t border-border pt-8 space-y-4">
+          <div className="flex flex-col md:flex-row justify-between items-center gap-4 text-sm text-muted-foreground">
+            <p>
+              &copy; {currentYear} LEONIDIONHOUSES. {t("footer.brandSubtitle")}
+            </p>
+            <div className="flex gap-6">
+              <Link to="/legal" className="hover:text-primary transition-colors">
+                {t("footer.privacy")}
+              </Link>
+              <Link to="/legal" className="hover:text-primary transition-colors">
+                {t("footer.terms")}
+              </Link>
+              <Link to="/legal" className="hover:text-primary transition-colors">
+                {t("footer.cookies")}
+              </Link>
+            </div>
           </div>
+          {/* License microformat */}
+          <Link
+            to="/legal"
+            className="block text-[10px] md:text-xs text-muted-foreground/80 hover:text-muted-foreground transition-colors text-center md:text-left leading-relaxed"
+          >
+            ALTIN COTA · ΑΦΜ 116379920 · ΓΕΜΗ 148929614000 · ΕΟΤ 1365294 · ΑΑ 1246K91000329401 · ΑΑ 1283732
+          </Link>
         </div>
       </div>
     </footer>
