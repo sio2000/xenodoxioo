@@ -609,22 +609,73 @@ async function handleAdminRoutes(path: string, method: string, supabase: any, ev
     // GET /api/admin/stats
     if (path === '/api/admin/stats' && method === 'GET') {
       const [bookingsResult, usersResult, propertiesResult] = await Promise.all([
-        supabase.from('bookings').select('status'),
-        supabase.from('users').select('id', { count: 'exact' }),
-        supabase.from('properties').select('id', { count: 'exact' })
+        supabase.from('bookings').select('status, unit_id, check_in_date, check_out_date, total_paid'),
+        supabase.from('users').select('id, status', { count: 'exact' }),
+        supabase.from('properties').select(`
+          id,
+          name,
+          units:units(id)
+        `)
       ]);
 
       const bookings = bookingsResult.data || [];
+      const users = usersResult.data || [];
+      const properties = propertiesResult.data || [];
+      const totalUsers = usersResult.count ?? users.length;
+
+      const confirmedBookings = bookings.filter((b: any) => b.status === 'CONFIRMED');
+      const totalRevenue = bookings.reduce((sum: any, b: any) => sum + (parseFloat(b.total_paid) || parseFloat(b.total_price) || 0), 0);
+
+      const now = new Date();
+      const year = now.getFullYear();
+      const month = now.getMonth();
+      const monthStart = new Date(year, month, 1);
+      const monthEnd = new Date(year, month + 1, 0);
+      const daysInMonth = monthEnd.getDate();
+      const toDateKey = (d: Date) => d.toISOString().slice(0, 10);
+
+      const occupancyByProperty = properties.map((property: any) => {
+        const units = property.units || [];
+        const totalUnits = units.length;
+        const bookedDatesByUnit = new Map<string, Set<string>>();
+        units.forEach((u: any) => bookedDatesByUnit.set(u.id, new Set()));
+
+        confirmedBookings.forEach((booking: any) => {
+          const unitSet = bookedDatesByUnit.get(booking.unit_id);
+          if (!unitSet) return;
+          const checkIn = new Date(booking.check_in_date);
+          const checkOut = new Date(booking.check_out_date);
+          const start = new Date(Math.max(checkIn.getTime(), monthStart.getTime()));
+          const end = new Date(Math.min(checkOut.getTime(), monthEnd.getTime() + 86400000));
+          for (let d = new Date(start); d < end; d.setDate(d.getDate() + 1)) {
+            unitSet.add(toDateKey(d));
+          }
+        });
+
+        let totalBookedDays = 0;
+        bookedDatesByUnit.forEach(set => { totalBookedDays += set.size; });
+        const totalUnitDays = totalUnits * daysInMonth;
+        const occupancyPercentage = totalUnitDays > 0 ? Math.round((totalBookedDays / totalUnitDays) * 100) : 0;
+        return {
+          id: property.id,
+          name: property.name,
+          units: totalUnits,
+          occupancyPercentage,
+          bookedDays: totalBookedDays,
+          daysInMonth
+        };
+      });
+
       const stats = {
         totalBookings: bookings.length,
-        confirmedBookings: bookings.filter((b: any) => b.status === 'CONFIRMED').length,
+        confirmedBookings: confirmedBookings.length,
         pendingBookings: bookings.filter((b: any) => b.status === 'PENDING').length,
         cancelledBookings: bookings.filter((b: any) => b.status === 'CANCELLED').length,
-        totalRevenue: bookings.reduce((sum: any, b: any) => sum + (b.total_price || 0), 0),
-        totalUsers: usersResult.count || 0,
-        propertiesCount: propertiesResult.count || 0,
-        occupancyByProperty: [],
-        activeUsers: usersResult.count || 0
+        totalRevenue,
+        totalUsers,
+        propertiesCount: properties.length,
+        occupancyByProperty,
+        activeUsers: (users as any[]).filter((u: any) => u?.status === 'ACTIVE').length || totalUsers
       };
 
       return {
@@ -635,6 +686,36 @@ async function handleAdminRoutes(path: string, method: string, supabase: any, ev
           data: stats
         })
       };
+    }
+
+    // GET /api/admin/prices-and-period
+    if (path === '/api/admin/prices-and-period' && method === 'GET') {
+      try {
+        const { getCurrentPeriod, getUpcomingPeriods } = await import('../../server/services/price-table.service');
+        const current = getCurrentPeriod();
+        const upcoming = getUpcomingPeriods();
+        return {
+          statusCode: 200,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            success: true,
+            data: {
+              currentPeriod: current ? { label: current.period.label, roomPrices: current.roomPrices } : null,
+              upcomingPeriods: upcoming || []
+            }
+          })
+        };
+      } catch (err: any) {
+        console.warn(`⚠️ [${requestId}] prices-and-period:`, err?.message || err);
+        return {
+          statusCode: 200,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            success: true,
+            data: { currentPeriod: null, upcomingPeriods: [] }
+          })
+        };
+      }
     }
 
     // GET /api/admin/users
@@ -861,17 +942,32 @@ async function handleAdminRoutes(path: string, method: string, supabase: any, ev
 
     // GET /api/admin/pricing
     if (path === '/api/admin/pricing' && method === 'GET') {
+      const [couponsRes, seasonalRes] = await Promise.all([
+        supabase.from('coupons').select('*').order('created_at', { ascending: false }),
+        supabase.from('seasonal_pricing').select('*').order('created_at', { ascending: false })
+      ]);
+      const coupons = (couponsRes.data || []).map((c: any) => ({
+        ...c,
+        discountValue: c.discount_value ?? 0,
+        discountType: c.discount_type,
+        validFrom: c.valid_from,
+        validUntil: c.valid_until,
+        minBookingAmount: c.min_booking_amount,
+        maxUses: c.max_uses,
+        usedCount: c.used_count ?? 0,
+        isActive: c.is_active
+      }));
+      const seasonalPricing = (seasonalRes.data || []).map((p: any) => ({
+        ...p,
+        pricePerNight: p.price_per_night ?? 0,
+        startDate: p.start_date,
+        endDate: p.end_date,
+        minStayDays: p.min_stay_days
+      }));
       return {
         statusCode: 200,
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          success: true,
-          data: {
-            currency: 'EUR',
-            taxRate: 0.24,
-            depositPercentage: 25
-          }
-        })
+        body: JSON.stringify({ coupons, seasonalPricing })
       };
     }
 
