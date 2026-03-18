@@ -20,12 +20,21 @@ https://www.leonidion-houses.com/api/payments/webhook
 
 (Όχι πλέον το Render URL.)
 
+## ⚠️ Σημαντικό: VITE_API_URL
+
+**Αφαιρέστε** το `VITE_API_URL` από τα Netlify env vars. Όταν είναι ορισμένο (π.χ. Render URL), το frontend στέλνει αιτήματα εκεί και εμφανίζεται CORS error. Το API τρέχει πλέον στο Netlify (same origin), οπότε το `VITE_API_URL` δεν χρειάζεται.
+
+Μετά την αλλαγή: **Trigger deploy → Clear cache and deploy site**.
+
+---
+
 ## Environment Variables στο Netlify
 
 Πρόσθεσε/έλεγξε στο **Netlify → Site settings → Environment variables**:
 
 | Variable | Value |
 |----------|-------|
+| ~~`VITE_API_URL`~~ | **ΜΗΝ ορίζετε** — αφαιρέστε αν υπάρχει (CORS fix) |
 | `STRIPE_SECRET_KEY` | `sk_test_...` |
 | `STRIPE_WEBHOOK_SECRET` | `whsec_...` |
 | `STRIPE_PUBLISHABLE_KEY` | `pk_test_...` |

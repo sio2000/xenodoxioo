@@ -266,7 +266,7 @@ export default function Index() {
       } catch (error) {
         console.error("❌ [CLIENT] Error loading properties", error);
         setPropertiesError(
-          "Δεν φόρτωσαν τα δωμάτια. Ελέγξτε VITE_API_URL (Render URL) στο Netlify και κάντε redeploy."
+          "Δεν φόρτωσαν τα δωμάτια. Αφαιρέστε το VITE_API_URL από τα Netlify env vars (αν υπάρχει) και κάντε redeploy."
         );
       } finally {
         setPropertiesLoading(false);
