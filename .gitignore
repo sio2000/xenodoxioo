@@ -32,3 +32,6 @@ dist-ssr
 
 # Generated migration verification artifacts
 supabase-phase7-pricing-compare.sql
+
+# User uploads (served from Supabase Storage in production)
+uploads/

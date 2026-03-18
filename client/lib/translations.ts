@@ -10,8 +10,8 @@ export const translations: Record<Language, Record<string, string>> = {
     "nav.bookNow": "Book Now",
 
     // Homepage
-    "home.hero.brandTitle": "Leonidion Houses",
-    "home.hero.tagline": "Privacy-Serenity-Comfort",
+    "home.hero.brandTitle": "leonidionhouses",
+    "home.hero.tagline": "Comfort - Privacy - Serenity",
     "home.hero.title": "Discover Your Perfect",
     "home.hero.subtitle":
       "Luxury villa rentals in Leonidion. Book your dream vacation today and experience authentic Greek hospitality.",
@@ -790,8 +790,8 @@ export const translations: Record<Language, Record<string, string>> = {
     "nav.signIn": "Se connecter",
     "nav.bookNow": "Réserver maintenant",
 
-    "home.hero.brandTitle": "Leonidion Houses",
-    "home.hero.tagline": "Intimité-Sérénité-Confort",
+    "home.hero.brandTitle": "leonidionhouses",
+    "home.hero.tagline": "Confort - Intimité - Sérénité",
     "home.hero.title": "Découvrez votre escapade grecque parfaite",
     "home.hero.subtitle":
       "Location de villas de luxe à Léonidion. Réservez vos vacances de rêve dès aujourd'hui et vivez l'hospitalité grecque authentique.",
@@ -1508,8 +1508,8 @@ export const translations: Record<Language, Record<string, string>> = {
     "nav.signIn": "Anmelden",
     "nav.bookNow": "Jetzt buchen",
 
-    "home.hero.brandTitle": "Leonidion Houses",
-    "home.hero.tagline": "Privatsphäre-Ruhe-Komfort",
+    "home.hero.brandTitle": "leonidionhouses",
+    "home.hero.tagline": "Komfort - Privatsphäre - Gelassenheit",
     "home.hero.title": "Entdecke deinen perfekten griechischen Rückzugsort",
     "home.hero.subtitle":
       "Luxusvilla-Mietungen in Leonidion. Buche deinen Traumurlaub heute und erlebe authentische griechische Gastfreundschaft.",
@@ -2212,8 +2212,8 @@ export const translations: Record<Language, Record<string, string>> = {
     "nav.signIn": "Σύνδεση",
     "nav.bookNow": "Κάντε κράτηση τώρα",
 
-    "home.hero.brandTitle": "Leonidion Houses",
-    "home.hero.tagline": "Ιδιωτικότητα-Ηρεμία-Άνεση",
+    "home.hero.brandTitle": "leonidionhouses",
+    "home.hero.tagline": "Άνεση - Ιδιωτικότητα - Γαλήνη",
     "home.hero.title": "Ανακαλύψτε την τέλεια ελληνική σας διαφυγή",
     "home.hero.subtitle":
       "Ενοικίαση πολυτελών βιλών στο Λεωνίδιο. Κάντε κράτηση για τις διακοπές των ονείρων σας σήμερα και απολαύστε την αυθεντική ελληνική φιλοξενία.",

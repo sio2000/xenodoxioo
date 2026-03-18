@@ -294,25 +294,21 @@ export default function Index() {
         {/* Dark overlay for text readability */}
         <div className="absolute inset-0 bg-black/50" />
 
-        {/* Top-left title */}
+        {/* Top-left title + tagline */}
         <div className="absolute top-8 left-8 md:top-12 md:left-12 z-20">
-          <h1 className="text-2xl md:text-4xl font-bold text-white tracking-tight font-cavolini">
+          <h1 className="text-2xl md:text-4xl font-bold text-white tracking-tight font-cavolini lowercase">
             {t("home.hero.brandTitle")}
           </h1>
-        </div>
-
-        {/* Bottom-right tagline */}
-        <div className="absolute bottom-8 right-8 md:bottom-12 md:right-12 z-20">
-          <p className="text-lg md:text-xl text-white/95 font-medium tracking-wide font-cavolini">
+          <p className="text-lg md:text-xl text-white/95 font-medium tracking-wide font-cavolini mt-1">
             {t("home.hero.tagline")}
           </p>
         </div>
 
-        <div className="relative container-max py-20 md:py-32 flex-1 flex flex-col justify-center">
-          {/* Search Bar - transparent */}
+        {/* Search Bar - bottom of hero, centered */}
+        <div className="absolute bottom-8 left-0 right-0 z-20">
           <form
             onSubmit={handleSearch}
-            className="p-6 md:p-8 -mb-12 relative z-10"
+            className="container-max px-4 md:px-6"
           >
             <div className="grid md:grid-cols-5 gap-4 md:gap-3">
               {/* Check-in */}
@@ -381,8 +377,6 @@ export default function Index() {
             </div>
           </form>
         </div>
-
-        <div className="h-12 md:h-20" />
       </div>
 
       {/* Featured Properties */}

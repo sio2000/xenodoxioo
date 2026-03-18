@@ -46,15 +46,10 @@ export default function Navigation() {
     <nav className="sticky top-0 z-50 bg-background border-b border-border">
       <div className="container-max">
         <div className="flex items-center justify-between h-16 gap-4">
-          {/* Logo */}
-          <Link to="/" className="flex items-center gap-2 flex-shrink-0">
-            <img 
-              src="/logoleo.png" 
-              alt="LEONIDIONHOUSES" 
-              className="w-12 h-12 rounded-lg"
-            />
-            <span className="text-xl font-bold text-primary hidden sm:inline">
-              LEONIDION<span className="text-accent">HOUSES</span>
+          {/* Brand title */}
+          <Link to="/" className="flex items-center flex-shrink-0 font-cavolini">
+            <span className="text-lg sm:text-xl font-bold text-primary lowercase">
+              leonidion<span className="text-accent">houses</span>
             </span>
           </Link>
 

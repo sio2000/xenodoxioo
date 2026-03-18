@@ -8,7 +8,26 @@
   external_node_modules = ["express", "serverless-http"]
   node_bundler = "esbuild"
 
-# API: rewrite /api/* to serverless function (must come first)
+# Payment routes → dedicated functions (must come before generic /api/*)
+[[redirects]]
+  force = true
+  from = "/api/payments/webhook"
+  status = 200
+  to = "/.netlify/functions/stripe-webhook"
+
+[[redirects]]
+  force = true
+  from = "/api/payments/create-guest-intent"
+  status = 200
+  to = "/.netlify/functions/create-guest-payment-intent"
+
+[[redirects]]
+  force = true
+  from = "/api/payments/confirm-status/*"
+  status = 200
+  to = "/.netlify/functions/confirm-payment-status"
+
+# API: rewrite remaining /api/* to main api function
 [[redirects]]
   force = true
   from = "/api/*"

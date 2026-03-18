@@ -46,8 +46,8 @@ function validateStripeConfig() {
     console.log("║   signature verification.                    ║");
     console.log("║                                              ║");
     console.log("║   To enable verification:                    ║");
-    console.log("║   1. Run: stripe listen --forward-to         ║");
-    console.log("║      localhost:8080/api/payments/webhook      ║");
+    console.log("║   Dev: stripe listen --forward-to localhost  ║");
+    console.log("║   Prod: add endpoint in Stripe Dashboard     ║");
     console.log("║   2. Copy the whsec_... secret               ║");
     console.log("║   3. Set STRIPE_WEBHOOK_SECRET in .env       ║");
     console.log("║   4. Restart the server                      ║");
@@ -93,7 +93,15 @@ export function createServer() {
   app.locals.upload = upload;
   app.locals.uploadAny = uploadAny;
 
-  app.use(cors());
+  app.use(
+    cors({
+      origin:
+        process.env.NODE_ENV === "production" && process.env.FRONTEND_URL
+          ? [process.env.FRONTEND_URL, "https://www.leonidion-houses.com", "https://leonidion-houses.com"]
+          : true,
+      credentials: true,
+    }),
+  );
 
   // Stripe webhook needs raw body — register BEFORE express.json()
   app.use(

@@ -2,6 +2,7 @@ import { Router } from "express";
 import { z } from "zod";
 import { validate } from "../middleware/validation";
 import { supabase } from "../lib/db";
+import { sendInquiryNotificationEmail, sendInquiryReplyEmail } from "../services/email.service";
 
 const router = Router();
 
@@ -57,14 +58,25 @@ router.post("/", validate(createInquirySchema), async (req, res, next) => {
       message,
     });
 
-    // Log email (email service logs to DB)
-    await supabase.from("email_logs").insert({
-      to_email: process.env.ADMIN_EMAIL || "admin@leonidionhouses.com",
-      subject: `New inquiry from ${guestName}`,
-      type: "INQUIRY_NEW",
-      status: "SENT",
-      sent_at: new Date().toISOString(),
-    });
+    // Send email notification to admin
+    const adminEmail = process.env.ADMIN_EMAIL || "admin@leonidion-houses.com";
+    const { data: property } = await supabase
+      .from("properties")
+      .select("name")
+      .eq("id", propertyId)
+      .single();
+
+    sendInquiryNotificationEmail(
+      adminEmail,
+      {
+        guest_name: guestName,
+        guest_email: guestEmail,
+        checkin_date: checkinDate,
+        checkout_date: checkoutDate,
+        guests,
+      },
+      property?.name || "Property",
+    ).catch((err) => console.error("[INQUIRY] Email notification failed:", err));
 
     res.status(201).json({ success: true, data: { inquiryId: inquiry.id } });
   } catch (error) {
@@ -243,15 +255,20 @@ router.post("/admin/:id/reply", validate(replySchema), async (req, res, next) =>
       .update({ status: "ANSWERED" })
       .eq("id", id);
 
-    // Log email notification to guest
-    const frontendUrl = process.env.FRONTEND_URL || "http://localhost:8080";
-    await supabase.from("email_logs").insert({
-      to_email: inquiry.guest_email,
-      subject: `Reply to your inquiry`,
-      type: "INQUIRY_REPLY",
-      status: "SENT",
-      sent_at: new Date().toISOString(),
-    });
+    // Send reply email to guest
+    const { data: property } = await supabase
+      .from("properties")
+      .select("name")
+      .eq("id", inquiry.property_id)
+      .single();
+
+    sendInquiryReplyEmail(
+      inquiry.guest_email,
+      inquiry.guest_name,
+      message,
+      property?.name || "Property",
+      id,
+    ).catch((err) => console.error("[INQUIRY] Reply email failed:", err));
 
     res.json({ success: true });
   } catch (error) {

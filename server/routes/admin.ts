@@ -298,24 +298,42 @@ router.post("/properties", async (req, res) => {
   }
 });
 
-router.put("/properties/:id", async (req, res) => {
+router.put("/properties/:id", upload.any(), async (req, res) => {
   try {
     const { id } = req.params;
-    const updateData = req.body;
-    
-    const { data: property } = await supabase
+    const body = req.body as Record<string, string>;
+    const files = (req.files || []) as Express.Multer.File[];
+
+    const updateData: Record<string, unknown> = {};
+    if (body.name != null) updateData.name = body.name;
+    if (body.description != null) updateData.description = body.description;
+    if (body.location != null) updateData.location = body.location;
+    if (body.city != null) updateData.city = body.city;
+    if (body.country != null) updateData.country = body.country;
+
+    const mainImageFile = files.find((f) => f.fieldname === "mainImage");
+    if (mainImageFile) {
+      updateData.main_image = "/uploads/" + mainImageFile.filename;
+    }
+
+    const { data: property, error } = await supabase
       .from('properties')
       .update(updateData)
       .eq('id', id)
       .select()
       .single();
 
+    if (error) {
+      console.error("❌ [PROPERTIES] Update error:", error);
+      return res.status(500).json({ success: false, message: error.message });
+    }
     if (!property) {
       return res.status(404).json({ success: false, message: "Property not found" });
     }
 
     res.json({ success: true, data: property });
   } catch (error) {
+    console.error("❌ [PROPERTIES] Failed to update property:", error);
     res.status(500).json({ success: false, message: "Failed to update property" });
   }
 });

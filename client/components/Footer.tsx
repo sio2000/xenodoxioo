@@ -12,14 +12,9 @@ export default function Footer() {
         <div className="grid md:grid-cols-4 gap-8 mb-12">
           {/* Brand */}
           <div>
-            <div className="flex items-center gap-2 mb-4">
-              <img 
-                src="/logoleo.png" 
-                alt="LEONIDIONHOUSES" 
-                className="w-12 h-12 rounded-lg"
-              />
-              <span className="text-lg font-bold text-primary">
-                LEONIDION<span className="text-accent">HOUSES</span>
+            <div className="flex items-center mb-4 font-cavolini">
+              <span className="text-lg font-bold text-primary lowercase">
+                leonidion<span className="text-accent">houses</span>
               </span>
             </div>
             <p className="text-muted-foreground text-sm">{t("footer.brandSubtitle")}</p>
@@ -113,7 +108,7 @@ export default function Footer() {
         <div className="border-t border-border pt-8 space-y-4">
           <div className="flex flex-col md:flex-row justify-between items-center gap-4 text-sm text-muted-foreground">
             <p>
-              &copy; {currentYear} LEONIDIONHOUSES. {t("footer.brandSubtitle")}
+              &copy; {currentYear} leonidionhouses. {t("footer.brandSubtitle")}
             </p>
             <div className="flex gap-6">
               <Link to="/legal" className="hover:text-primary transition-colors">

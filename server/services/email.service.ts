@@ -1,8 +1,18 @@
+import { Resend } from "resend";
 import { supabase } from "../lib/db";
 
 const FROM_EMAIL =
-  process.env.FROM_EMAIL || "noreply@leonidionhouses.com";
+  process.env.FROM_EMAIL || "noreply@leonidion-houses.com";
 const FROM_NAME = process.env.FROM_NAME || "LEONIDIONHOUSES";
+
+function getFrontendUrl(): string {
+  return (
+    process.env.FRONTEND_URL ||
+    (process.env.NODE_ENV === "production"
+      ? "https://www.leonidion-houses.com"
+      : "http://localhost:8080")
+  );
+}
 
 interface EmailOptions {
   to: string;
@@ -17,23 +27,25 @@ interface EmailOptions {
     | "PASSWORD_RESET"
     | "ARRIVAL_REMINDER"
     | "REVIEW_REQUEST"
-    | "ADMIN_ALERT";
+    | "ADMIN_ALERT"
+    | "INQUIRY_NEW"
+    | "INQUIRY_REPLY";
   userId?: string;
   bookingId?: string;
 }
 
 /**
- * Send email and log it
+ * Send email via Resend and log to database
  */
 async function sendEmail(options: EmailOptions) {
   try {
     const { to, subject, html, type, userId, bookingId } = options;
 
-    // Log email in database
+    // Log email in database first
     const { data: emailLog } = await supabase
-      .from('email_logs')
+      .from("email_logs")
       .insert({
-        to,
+        to_email: to,
         subject,
         type,
         user_id: userId,
@@ -43,17 +55,42 @@ async function sendEmail(options: EmailOptions) {
       .select()
       .single();
 
-    // For now, just log the email (no external email service)
-    console.log("Email would be sent to:", to);
-    console.log("Subject:", subject);
-    console.log("Type:", type);
+    // Send via Resend if API key is configured
+    const apiKey = process.env.RESEND_API_KEY;
+    if (apiKey) {
+      const resend = new Resend(apiKey);
+      const from = `${FROM_NAME} <${FROM_EMAIL}>`;
+      const { data, error } = await resend.emails.send({
+        from,
+        to: [to],
+        subject,
+        html,
+      });
+
+      if (error) {
+        console.error("[EMAIL] Resend error:", error);
+
+        if (emailLog) {
+          await supabase
+            .from("email_logs")
+            .update({ status: "FAILED",
+              sent_at: new Date().toISOString() })
+            .eq("id", emailLog.id);
+        }
+        throw error;
+      }
+
+      console.log("[EMAIL] Sent via Resend:", type, "to", to);
+    } else {
+      console.log("[EMAIL] RESEND_API_KEY not set — would send to:", to, "Subject:", subject);
+    }
 
     // Mark as sent
     if (emailLog) {
       await supabase
-        .from('email_logs')
+        .from("email_logs")
         .update({ status: "SENT", sent_at: new Date().toISOString() })
-        .eq('id', emailLog.id);
+        .eq("id", emailLog.id);
     }
 
     return emailLog;
@@ -76,7 +113,7 @@ export async function sendWelcomeEmail(
     <p>Dear ${firstName},</p>
     <p>Thank you for joining us. We're excited to have you on board.</p>
     <p>You can now browse our beautiful villa collection and make your first booking.</p>
-    <a href="${process.env.FRONTEND_URL}/properties" style="background-color: #0677A1; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Browse Rooms</a>
+    <a href="${getFrontendUrl()}/properties" style="background-color: #0677A1; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Browse Rooms</a>
     <p>Best regards,<br/>The LEONIDIONHOUSES Team</p>
   `;
 
@@ -114,7 +151,7 @@ export async function sendBookingConfirmationEmail(
     <h2>Total Amount: €${booking.totalPrice?.toFixed(2) || '0.00'}</h2>
     <p><strong>Deposit (25%):</strong> €${((booking.totalPrice || 0) * 0.25).toFixed(2)} (Due immediately)</p>
     <p><strong>Balance (75%):</strong> €${((booking.totalPrice || 0) * 0.75).toFixed(2)} (Due 21 days before arrival)</p>
-    <a href="${process.env.FRONTEND_URL}/dashboard" style="background-color: #0677A1; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">View Booking</a>
+    <a href="${getFrontendUrl()}/dashboard" style="background-color: #0677A1; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">View Booking</a>
     <p>Best regards,<br/>The LEONIDIONHOUSES Team</p>
   `;
 
@@ -157,7 +194,7 @@ export async function sendPaymentReceiptEmail(
       <li><strong>Transaction ID:</strong> ${payment.stripeChargeId || "N/A"}</li>
     </ul>
     <p>Thank you for your payment!</p>
-    <a href="${process.env.FRONTEND_URL}/dashboard" style="background-color: #0677A1; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">View Booking</a>
+    <a href="${getFrontendUrl()}/dashboard" style="background-color: #0677A1; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">View Booking</a>
     <p>Best regards,<br/>The LEONIDIONHOUSES Team</p>
   `;
 
@@ -179,7 +216,7 @@ export async function sendPasswordResetEmail(
   resetToken: string,
   userId?: string,
 ) {
-  const resetLink = `${process.env.FRONTEND_URL}/reset-password?token=${resetToken}`;
+  const resetLink = `${getFrontendUrl()}/reset-password?token=${resetToken}`;
 
   const html = `
     <h1>Password Reset Request</h1>
@@ -221,7 +258,7 @@ export async function sendArrivalReminderEmail(
       <li><strong>Check-in Time:</strong> 3:00 PM (or by arrangement)</li>
     </ul>
     <p>Please ensure you have the necessary documents and contact information saved.</p>
-    <a href="${process.env.FRONTEND_URL}/dashboard" style="background-color: #0677A1; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">View Booking Details</a>
+    <a href="${getFrontendUrl()}/dashboard" style="background-color: #0677A1; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">View Booking Details</a>
     <p>If you have any questions, please don't hesitate to contact us.</p>
     <p>Best regards,<br/>The LEONIDIONHOUSES Team</p>
   `;
@@ -279,7 +316,7 @@ export async function sendReviewRequestEmail(
   booking: any,
   userId?: string,
 ) {
-  const reviewLink = `${process.env.FRONTEND_URL}/dashboard/bookings/${booking.id}/review`;
+  const reviewLink = `${getFrontendUrl()}/dashboard/bookings/${booking.id}/review`;
 
   const html = `
     <h1>Share Your Experience</h1>
@@ -297,6 +334,70 @@ export async function sendReviewRequestEmail(
     type: "REVIEW_REQUEST",
     userId,
     bookingId: booking.id,
+  });
+}
+
+/**
+ * New inquiry notification to admin
+ */
+export async function sendInquiryNotificationEmail(
+  adminEmail: string,
+  inquiry: { guest_name: string; guest_email: string; checkin_date: string; checkout_date: string; guests: number },
+  propertyName: string,
+) {
+  const dashboardUrl = `${getFrontendUrl()}/admin/inquiries`;
+
+  const html = `
+    <h1>New Inquiry Received</h1>
+    <p>A new inquiry has been submitted for <strong>${propertyName}</strong>.</p>
+    <h2>Guest Details</h2>
+    <ul>
+      <li><strong>Name:</strong> ${inquiry.guest_name}</li>
+      <li><strong>Email:</strong> ${inquiry.guest_email}</li>
+      <li><strong>Check-in:</strong> ${new Date(inquiry.checkin_date).toLocaleDateString()}</li>
+      <li><strong>Check-out:</strong> ${new Date(inquiry.checkout_date).toLocaleDateString()}</li>
+      <li><strong>Guests:</strong> ${inquiry.guests}</li>
+    </ul>
+    <a href="${dashboardUrl}" style="background-color: #0677A1; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">View Inquiries</a>
+    <p>Best regards,<br/>LEONIDIONHOUSES</p>
+  `;
+
+  return sendEmail({
+    to: adminEmail,
+    subject: `New inquiry from ${inquiry.guest_name} - ${propertyName}`,
+    html,
+    type: "INQUIRY_NEW",
+  });
+}
+
+/**
+ * Inquiry reply email to guest (when admin replies)
+ */
+export async function sendInquiryReplyEmail(
+  guestEmail: string,
+  guestName: string,
+  message: string,
+  propertyName: string,
+  inquiryId: string,
+) {
+  const inquiryUrl = `${getFrontendUrl()}/inquiry/${inquiryId}`;
+
+  const html = `
+    <h1>Reply to Your Inquiry</h1>
+    <p>Dear ${guestName},</p>
+    <p>You have received a reply regarding your inquiry for <strong>${propertyName}</strong>.</p>
+    <div style="background: #f5f5f5; padding: 15px; border-radius: 5px; margin: 15px 0;">
+      <p style="margin: 0;">${message.replace(/\n/g, "<br/>")}</p>
+    </div>
+    <a href="${inquiryUrl}" style="background-color: #0677A1; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">View Your Inquiry</a>
+    <p>Best regards,<br/>The LEONIDIONHOUSES Team</p>
+  `;
+
+  return sendEmail({
+    to: guestEmail,
+    subject: `Reply to your inquiry - ${propertyName}`,
+    html,
+    type: "INQUIRY_REPLY",
   });
 }
 

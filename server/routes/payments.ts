@@ -131,7 +131,12 @@ router.post(
     }
 
     if (!webhookSecret) {
-      console.warn("[WEBHOOK] STRIPE_WEBHOOK_SECRET not set — accepting event WITHOUT signature verification (dev mode)");
+      if (process.env.NODE_ENV === "production") {
+        console.error("[WEBHOOK] STRIPE_WEBHOOK_SECRET required in production — rejecting");
+        res.status(500).send("Webhook not configured");
+        return;
+      }
+      console.warn("[WEBHOOK] STRIPE_WEBHOOK_SECRET not set — accepting WITHOUT verification (dev only)");
       try {
         const bodyStr = Buffer.isBuffer(rawBody) ? rawBody.toString("utf8") : rawBody;
         const event = JSON.parse(bodyStr) as Stripe.Event;

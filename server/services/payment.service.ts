@@ -1,6 +1,10 @@
 import { supabase } from "../lib/db";
 import { NotFoundError, AppError, ValidationError } from "../lib/errors";
 import Stripe from "stripe";
+import {
+  sendBookingConfirmationEmail,
+  sendPaymentReceiptEmail,
+} from "./email.service";
 
 const GUEST_USER_ID = "00000000-0000-0000-0000-000000000001";
 
@@ -368,6 +372,76 @@ async function updateBookingAfterPayment(
     console.error(`[BOOKING-UPDATE] FAILED to update booking ${bookingId}:`, updateError.message);
   } else {
     console.log(`[BOOKING-UPDATE] Booking ${bookingId} updated successfully — status=${update.status}, payment_status=${update.payment_status}`);
+
+    // Send emails (non-blocking)
+    sendEmailsAfterPayment(bookingId, paymentType, update).catch((err) =>
+      console.error("[BOOKING-UPDATE] Email send failed:", err),
+    );
+  }
+}
+
+async function sendEmailsAfterPayment(
+  bookingId: string,
+  paymentType: string,
+  update: Record<string, any>,
+) {
+  const { data: booking } = await supabase
+    .from("bookings")
+    .select("*, unit:units(*, property:properties(*))")
+    .eq("id", bookingId)
+    .single();
+
+  if (!booking) return;
+
+  const { data: lastPayment } = await supabase
+    .from("payments")
+    .select("*")
+    .eq("booking_id", bookingId)
+    .eq("status", "COMPLETED")
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .single();
+
+  if (!lastPayment) return;
+
+  const guestEmail = booking.guest_email;
+  const unit = booking.unit as any;
+  const property = unit?.property;
+  const bookingForEmail = {
+    id: booking.id,
+    guestName: booking.guest_name,
+    bookingNumber: booking.booking_number,
+    checkInDate: booking.check_in_date,
+    checkOutDate: booking.check_out_date,
+    nights: booking.nights,
+    guests: booking.guests,
+    totalPrice: Number(booking.total_price),
+    unit: {
+      name: unit?.name || "N/A",
+      property: { name: property?.name || "N/A" },
+    },
+  };
+
+  // Always send payment receipt
+  await sendPaymentReceiptEmail(
+    guestEmail,
+    bookingForEmail,
+    {
+      paymentType: lastPayment.payment_type,
+      amount: Number(lastPayment.amount),
+      createdAt: lastPayment.created_at,
+      stripeChargeId: lastPayment.stripe_charge_id,
+    },
+    booking.user_id,
+  );
+
+  // Send booking confirmation when status becomes CONFIRMED (first payment)
+  if (update.status === "CONFIRMED") {
+    await sendBookingConfirmationEmail(
+      guestEmail,
+      bookingForEmail,
+      booking.user_id,
+    );
   }
 }
 

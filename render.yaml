@@ -1,15 +1,29 @@
-# Render Blueprint - Backend API για Netlify frontend
-# Στο Render Dashboard: προσθέστε Persistent Disk και DATABASE_URL=file:./data/dev.db
+# Render Blueprint - Backend API for leonidion-houses.com
+# Deploy: Connect repo and Render will use this config
 
 services:
   - type: web
-    name: leonidionhouses-api
+    name: leonidion-houses-api
     runtime: node
-    plan: free
-    buildCommand: pnpm install && pnpm prisma generate && pnpm prisma db push && pnpm db:seed && pnpm run build:server
+
+    buildCommand: pnpm install && pnpm run build
     startCommand: pnpm start
+
     envVars:
-      - key: DATABASE_URL
-        sync: false
       - key: NODE_ENV
         value: production
+      - key: PORT
+        value: 10000
+      # Add these in Render Dashboard → Environment (sensitive):
+      # - SUPABASE_URL
+      # - SUPABASE_SERVICE_ROLE_KEY
+      # - STRIPE_SECRET_KEY (sk_test_xxx for test mode)
+      # - STRIPE_PUBLISHABLE_KEY (pk_test_xxx)
+      # - STRIPE_WEBHOOK_SECRET (whsec_xxx from Stripe webhook)
+      # - RESEND_API_KEY
+      # - FRONTEND_URL = https://www.leonidion-houses.com
+      # - API_URL = https://leonidion-houses-api.onrender.com (your service URL)
+      # - JWT_SECRET
+      # - JWT_REFRESH_SECRET
+      # - ADMIN_EMAIL
+      # - FROM_EMAIL (must be verified in Resend)
