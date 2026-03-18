@@ -35,6 +35,7 @@ https://www.leonidion-houses.com/api/payments/webhook
 | Variable | Value |
 |----------|-------|
 | ~~`VITE_API_URL`~~ | **ΜΗΝ ορίζετε** — αφαιρέστε αν υπάρχει (CORS fix) |
+| `VITE_SUPABASE_URL` | **Απαραίτητο για εικόνες** — ίδιο με SUPABASE_URL (π.χ. https://xxx.supabase.co) |
 | `STRIPE_SECRET_KEY` | `sk_test_...` |
 | `STRIPE_WEBHOOK_SECRET` | `whsec_...` |
 | `STRIPE_PUBLISHABLE_KEY` | `pk_test_...` |
@@ -53,6 +54,20 @@ https://www.leonidion-houses.com/api/payments/webhook
 1. Commit & push στο GitHub
 2. Netlify θα κάνει αυτόματο deploy
 3. Ή: **Deploys → Trigger deploy → Clear cache and deploy site**
+
+## Εικόνες (404 fix)
+
+Για να φορτώσουν οι εικόνες στο Netlify:
+
+1. **VITE_SUPABASE_URL**: Ορίστε το ίδιο URL με το `SUPABASE_URL` (π.χ. `https://xxx.supabase.co`)
+2. **Supabase Storage**: Δημιουργήστε bucket `uploads` (public) στο Supabase Dashboard → Storage
+3. **Ανέβασμα εικόνων**: Τρέξτε `pnpm run upload-images-to-supabase` για να ανεβάσετε τις εικόνες από το τοπικό `uploads/` στο Supabase Storage
+
+Χωρίς `VITE_SUPABASE_URL`, οι εικόνες θα δείχνουν 404.
+
+**Τιμές & Admin:** Για ίδιες τιμές και admin login όπως τοπικά, βεβαιωθείτε ότι τα `SUPABASE_URL` και `SUPABASE_SERVICE_ROLE_KEY` στο Netlify είναι **ίδια** με το τοπικό `.env` (ίδιο Supabase project).
+
+---
 
 ## Δοκιμή
 

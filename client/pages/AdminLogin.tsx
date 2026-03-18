@@ -46,7 +46,7 @@ export default function AdminLogin() {
       }
     } catch (err) {
       setError(
-        "Δεν ήταν δυνατή η σύνδεση με το backend. Ελέγξτε ότι το VITE_API_URL ορίζει το Render URL και κάντε redeploy στο Netlify."
+        "Δεν ήταν δυνατή η σύνδεση με το backend. Ελέγξτε τη σύνδεση και ξαναδοκιμάστε."
       );
     } finally {
       setLoading(false);

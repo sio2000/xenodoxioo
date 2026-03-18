@@ -38,8 +38,8 @@ export function imageUrl(path: string | null | undefined | Record<string, unknow
   if (resolved.startsWith("/uploads/")) {
     const filename = resolved.replace("/uploads/", "");
     const supabaseUrl = import.meta.env?.VITE_SUPABASE_URL;
-    if (supabaseUrl && supabaseUrl !== "https://jkolkjvhlguaqcfgaaig.supabase.co") {
-      return `${supabaseUrl}/storage/v1/object/public/uploads/${filename}`;
+    if (typeof supabaseUrl === "string" && supabaseUrl.startsWith("https://") && supabaseUrl.includes("supabase.co")) {
+      return `${supabaseUrl.replace(/\/$/, "")}/storage/v1/object/public/uploads/${filename}`;
     }
     return apiUrl(resolved);
   }

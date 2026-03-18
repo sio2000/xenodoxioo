@@ -544,6 +544,68 @@ async function handleAdminRoutes(path: string, method: string, supabase: any, ev
   console.log(`🔧 [${requestId}] ${method} ${path}`);
 
   try {
+    // POST /api/admin/login
+    if (path === '/api/admin/login' && method === 'POST') {
+      let body: { email?: string; password?: string } = {};
+      try {
+        body = typeof event.body === 'string' ? JSON.parse(event.body) : event.body || {};
+      } catch {
+        return {
+          statusCode: 400,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ success: false, error: 'Invalid JSON body' })
+        };
+      }
+      const { email, password } = body;
+      if (!email || !password) {
+        return {
+          statusCode: 400,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ success: false, error: 'Email and password are required' })
+        };
+      }
+      const { data: user, error } = await supabase
+        .from('users')
+        .select('id, email, first_name, last_name, role, password')
+        .eq('email', String(email).toLowerCase())
+        .single();
+      if (error || !user) {
+        return {
+          statusCode: 401,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ success: false, error: 'Invalid credentials' })
+        };
+      }
+      if (user.role !== 'ADMIN') {
+        return {
+          statusCode: 403,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ success: false, error: 'Admin access required' })
+        };
+      }
+      const bcrypt = await import('bcryptjs');
+      const valid = await bcrypt.compare(String(password), user.password);
+      if (!valid) {
+        return {
+          statusCode: 401,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ success: false, error: 'Invalid credentials' })
+        };
+      }
+      return {
+        statusCode: 200,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          success: true,
+          id: user.id,
+          email: user.email,
+          firstName: user.first_name,
+          lastName: user.last_name,
+          role: user.role
+        })
+      };
+    }
+
     // GET /api/admin/stats
     if (path === '/api/admin/stats' && method === 'GET') {
       const [bookingsResult, usersResult, propertiesResult] = await Promise.all([

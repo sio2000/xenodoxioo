@@ -25,7 +25,8 @@
     "db:seed": "tsx prisma/seed-working.ts",
     "migration:phase7": "tsx scripts/phase7-pricing-verification.ts",
     "migration:phase7:dashboard": "tsx scripts/phase7-generate-dashboard-sql.ts",
-    "migration:phase8": "tsx scripts/phase8-netlify-deployment.ts"
+    "migration:phase8": "tsx scripts/phase8-netlify-deployment.ts",
+    "upload-images-to-supabase": "node scripts/upload-images-to-supabase.mjs"
   },
   "dependencies": {
     "@stripe/react-stripe-js": "^5.6.1",

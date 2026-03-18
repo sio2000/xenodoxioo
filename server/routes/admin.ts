@@ -33,9 +33,40 @@ const upload = multer({
   },
 });
 
-// Stub admin routes - TODO: Implement with Supabase
 router.post("/login", async (req, res) => {
-  res.json({ success: false, message: "Admin login not implemented yet" });
+  try {
+    const { email, password } = req.body || {};
+    if (!email || !password) {
+      return res.status(400).json({ success: false, error: "Email and password are required" });
+    }
+    const { data: user } = await supabase
+      .from("users")
+      .select("id, email, first_name, last_name, role, password")
+      .eq("email", String(email).toLowerCase())
+      .single();
+    if (!user) {
+      return res.status(401).json({ success: false, error: "Invalid credentials" });
+    }
+    if (user.role !== "ADMIN") {
+      return res.status(403).json({ success: false, error: "Admin access required" });
+    }
+    const bcrypt = await import("bcryptjs");
+    const valid = await bcrypt.compare(String(password), user.password);
+    if (!valid) {
+      return res.status(401).json({ success: false, error: "Invalid credentials" });
+    }
+    res.json({
+      success: true,
+      id: user.id,
+      email: user.email,
+      firstName: user.first_name,
+      lastName: user.last_name,
+      role: user.role,
+    });
+  } catch (err) {
+    console.error("Admin login error:", err);
+    res.status(500).json({ success: false, error: "Login failed" });
+  }
 });
 
 router.get("/stats", async (req, res) => {
