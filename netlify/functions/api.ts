@@ -375,6 +375,213 @@ export const handler = async (event: any, context: any) => {
       };
     }
 
+    // GET /api/bookings/user - user's bookings (requires auth)
+    if ((path === '/api/bookings/user' || path === '/bookings/user') && method === 'GET') {
+      const authHeader = event.headers?.authorization || event.headers?.Authorization;
+      const token = typeof authHeader === 'string' && authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
+      if (!token) {
+        return {
+          statusCode: 401,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ success: false, error: 'Unauthorized' })
+        };
+      }
+      try {
+        const jwt = await import('jsonwebtoken');
+        const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
+        const payload = jwt.verify(token, JWT_SECRET) as { userId: string };
+        const qs = event.queryStringParameters || {};
+        const page = parseInt(qs.page || '1', 10);
+        const pageSize = parseInt(qs.pageSize || '20', 10);
+        const from = (page - 1) * pageSize;
+        const to = from + pageSize - 1;
+        const { data: bookings, count } = await supabase
+          .from('bookings')
+          .select('*, unit:units(*, property:properties(*))', { count: 'exact' })
+          .eq('user_id', payload.userId)
+          .order('created_at', { ascending: false })
+          .range(from, to);
+        const mapped = (bookings || []).map((b: any) => ({
+          id: b.id,
+          bookingNumber: b.booking_number,
+          checkInDate: b.check_in_date,
+          checkOutDate: b.check_out_date,
+          nights: b.nights,
+          status: b.status,
+          paymentStatus: b.payment_status,
+          totalPrice: parseFloat(b.total_price) || 0,
+          totalPaid: parseFloat(b.total_paid) || 0,
+          guestName: b.guest_name,
+          guestEmail: b.guest_email,
+          guests: b.guests,
+          unit: b.unit ? { id: b.unit.id, name: b.unit.name, property: b.unit.property } : null,
+        }));
+        return {
+          statusCode: 200,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            success: true,
+            data: { bookings: mapped, total: count ?? 0, page, pageSize }
+          })
+        };
+      } catch {
+        return {
+          statusCode: 401,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ success: false, error: 'Invalid or expired token' })
+        };
+      }
+    }
+
+    // GET /api/bookings/:id - single booking (auth or email)
+    const bookingIdMatch = path.match(/^\/api\/bookings\/([^/]+)$/);
+    if (bookingIdMatch && method === 'GET') {
+      const id = bookingIdMatch[1];
+      if (id === 'user' || id === 'quote' || id === 'occupied-dates') return null as any;
+      const authHeader = event.headers?.authorization || event.headers?.Authorization;
+      const token = typeof authHeader === 'string' && authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
+      const email = event.queryStringParameters?.email?.trim();
+      let userId: string | null = null;
+      if (token) {
+        try {
+          const jwt = await import('jsonwebtoken');
+          const payload = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key') as { userId: string };
+          userId = payload.userId;
+        } catch { /* invalid token */ }
+      }
+      if (!userId && !email) {
+        return {
+          statusCode: 401,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ success: false, error: 'Sign in or provide email' })
+        };
+      }
+      const { data: booking, error } = await supabase
+        .from('bookings')
+        .select('*, unit:units(*, property:properties(*))')
+        .eq('id', id)
+        .single();
+      if (error || !booking) {
+        return {
+          statusCode: 404,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ success: false, error: 'Booking not found' })
+        };
+      }
+      if (userId && booking.user_id !== userId) {
+        return {
+          statusCode: 403,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ success: false, error: 'Unauthorized' })
+        };
+      }
+      if (email && booking.guest_email?.toLowerCase() !== email.toLowerCase()) {
+        return {
+          statusCode: 403,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ success: false, error: 'Email does not match booking' })
+        };
+      }
+      const unit = booking.unit || {};
+      const prop = unit.property || {};
+      return {
+        statusCode: 200,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          success: true,
+          data: {
+            id: booking.id,
+            bookingNumber: booking.booking_number,
+            checkInDate: booking.check_in_date,
+            checkOutDate: booking.check_out_date,
+            nights: booking.nights,
+            status: booking.status,
+            totalPrice: parseFloat(booking.total_price) || 0,
+            subtotal: parseFloat(booking.subtotal) || 0,
+            cleaningFee: parseFloat(booking.cleaning_fee) || 0,
+            taxes: parseFloat(booking.taxes) || 0,
+            discountAmount: parseFloat(booking.discount_amount) || 0,
+            guestName: booking.guest_name,
+            guestEmail: booking.guest_email,
+            guestPhone: booking.guest_phone,
+            guests: booking.guests,
+            unit: { id: unit.id, name: unit.name, property: { id: prop.id, name: prop.name } },
+          }
+        })
+      };
+    }
+
+    // POST /api/bookings/:id/cancel
+    const cancelMatch = path.match(/^\/api\/bookings\/([^/]+)\/cancel$/);
+    if (cancelMatch && method === 'POST') {
+      const id = cancelMatch[1];
+      const authHeader = event.headers?.authorization || event.headers?.Authorization;
+      const token = typeof authHeader === 'string' && authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
+      let userId: string | null = null;
+      let guestEmail: string | null = null;
+      if (token) {
+        try {
+          const jwt = await import('jsonwebtoken');
+          const payload = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key') as { userId: string };
+          userId = payload.userId;
+        } catch { /* invalid */ }
+      }
+      if (!userId) {
+        let body: { guestEmail?: string } = {};
+        try {
+          body = typeof event.body === 'string' ? JSON.parse(event.body || '{}') : event.body || {};
+          guestEmail = body.guestEmail?.trim() || null;
+        } catch { /* */ }
+      }
+      if (!userId && !guestEmail) {
+        return {
+          statusCode: 401,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ success: false, error: 'Sign in or provide guest email' })
+        };
+      }
+      const { data: booking, error } = await supabase.from('bookings').select('*').eq('id', id).single();
+      if (error || !booking) {
+        return {
+          statusCode: 404,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ success: false, error: 'Booking not found' })
+        };
+      }
+      if (booking.status === 'CANCELLED') {
+        return {
+          statusCode: 400,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ success: false, error: 'Booking is already cancelled' })
+        };
+      }
+      if (userId && booking.user_id !== userId) {
+        return {
+          statusCode: 403,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ success: false, error: 'Unauthorized' })
+        };
+      }
+      if (guestEmail && booking.guest_email?.toLowerCase() !== guestEmail.toLowerCase()) {
+        return {
+          statusCode: 403,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ success: false, error: 'Email does not match' })
+        };
+      }
+      await supabase.from('bookings').update({
+        status: 'CANCELLED',
+        cancelled_at: new Date().toISOString(),
+        is_cancelled: true
+      }).eq('id', id);
+      const { data: updated } = await supabase.from('bookings').select('*').eq('id', id).single();
+      return {
+        statusCode: 200,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ success: true, data: updated })
+      };
+    }
+
     // POST /api/bookings/quote - pricing quote for checkout
     if ((path === '/api/bookings/quote' || path === '/bookings/quote') && method === 'POST') {
       try {
@@ -639,8 +846,8 @@ export const handler = async (event: any, context: any) => {
       if (authRes) return authRes;
     }
 
-    // Handle inquiries routes (admin list, detail, reply)
-    if (path.startsWith('/api/inquiries/')) {
+    // Handle inquiries routes (guest create/get/reply, admin list/detail/reply)
+    if (path === '/api/inquiries' || path.startsWith('/api/inquiries/')) {
       const inquiryRes = await handleInquiriesRoutes(path, method, supabase, event, requestId);
       if (inquiryRes) return inquiryRes;
     }
@@ -777,6 +984,223 @@ export const handler = async (event: any, context: any) => {
           message: 'Η κράτησή σας ακυρώθηκε επιτυχώς.'
         })
       };
+    }
+
+    // ── Payments routes ─────────────────────────────────────────────
+    if (path.startsWith('/api/payments/')) {
+      // GET /api/payments/settings
+      if (path === '/api/payments/settings' && method === 'GET') {
+        try {
+          const { data, error } = await supabase.from('payment_settings').select('*').eq('is_active', true).single();
+          const settings = error || !data
+            ? { depositPercentage: 25, balanceChargeDaysBefore: 21, fullPaymentThresholdDays: 21, refundDepositOnCancel: false, currency: 'EUR' }
+            : {
+                depositPercentage: Number(data.deposit_percentage) || 25,
+                balanceChargeDaysBefore: Number(data.balance_charge_days_before) || 21,
+                fullPaymentThresholdDays: Number(data.full_payment_threshold_days) || 21,
+                refundDepositOnCancel: Boolean(data.refund_deposit_on_cancel),
+                currency: data.currency || 'EUR',
+              };
+          return {
+            statusCode: 200,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ success: true, data: settings })
+          };
+        } catch {
+          return {
+            statusCode: 200,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              success: true,
+              data: { depositPercentage: 25, balanceChargeDaysBefore: 21, fullPaymentThresholdDays: 21, refundDepositOnCancel: false, currency: 'EUR' }
+            })
+          };
+        }
+      }
+
+      // GET /api/payments/history/:bookingId
+      const historyMatch = path.match(/^\/api\/payments\/history\/([^/]+)$/);
+      if (historyMatch && method === 'GET') {
+        const bookingId = historyMatch[1];
+        const { data, error } = await supabase
+          .from('payments')
+          .select('*')
+          .eq('booking_id', bookingId)
+          .order('created_at', { ascending: false });
+        if (error) {
+          return { statusCode: 500, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ success: false, error: error.message }) };
+        }
+        return {
+          statusCode: 200,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ success: true, data: data || [] })
+        };
+      }
+
+      // POST /api/payments/refund (auth)
+      if (path === '/api/payments/refund' && method === 'POST') {
+        const authHeader = event.headers?.authorization || event.headers?.Authorization;
+        const token = typeof authHeader === 'string' && authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
+        if (!token) {
+          return { statusCode: 401, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ success: false, error: 'Unauthorized' }) };
+        }
+        let userId: string;
+        try {
+          const jwt = await import('jsonwebtoken');
+          const payload = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key') as { userId: string };
+          userId = payload.userId;
+        } catch {
+          return { statusCode: 401, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ success: false, error: 'Invalid token' }) };
+        }
+        let body: { bookingId?: string; reason?: string } = {};
+        try {
+          body = typeof event.body === 'string' ? JSON.parse(event.body || '{}') : event.body || {};
+        } catch {
+          return { statusCode: 400, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ success: false, error: 'Invalid JSON' }) };
+        }
+        const { bookingId, reason } = body;
+        if (!bookingId) {
+          return { statusCode: 400, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ success: false, error: 'bookingId is required' }) };
+        }
+        const { data: payments } = await supabase.from('payments').select('*').eq('booking_id', bookingId).eq('status', 'COMPLETED').order('created_at', { ascending: false });
+        if (!payments || payments.length === 0) {
+          return { statusCode: 404, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ success: false, error: 'No completed payments found' }) };
+        }
+        const { data: booking } = await supabase.from('bookings').select('*').eq('id', bookingId).single();
+        if (!booking) {
+          return { statusCode: 404, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ success: false, error: 'Booking not found' }) };
+        }
+        if (booking.user_id && booking.user_id !== userId) {
+          return { statusCode: 403, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ success: false, error: 'Unauthorized' }) };
+        }
+        const { data: settingsRow } = await supabase.from('payment_settings').select('*').eq('is_active', true).single();
+        const refundDepositOnCancel = settingsRow ? Boolean(settingsRow.refund_deposit_on_cancel) : false;
+        if (!refundDepositOnCancel) {
+          return { statusCode: 400, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ success: false, error: 'Refund policy is disabled' }) };
+        }
+        const depositPayment = payments.find((p: any) => p.payment_type === 'DEPOSIT');
+        if (!depositPayment || !depositPayment.stripe_payment_intent_id) {
+          return { statusCode: 404, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ success: false, error: 'No deposit payment found for refund' }) };
+        }
+        try {
+          const Stripe = (await import('stripe')).default;
+          const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '');
+          const refund = await stripe.refunds.create({
+            payment_intent: depositPayment.stripe_payment_intent_id,
+            reason: 'requested_by_customer',
+            metadata: { bookingId, paymentId: depositPayment.id, reason: reason || 'Customer requested refund' },
+          });
+          await supabase.from('payments').update({
+            status: 'REFUNDED',
+            refund_amount: depositPayment.amount,
+            is_refundable: false,
+          }).eq('id', depositPayment.id);
+          await supabase.from('bookings').update({
+            status: 'CANCELLED',
+            payment_status: 'REFUNDED',
+            cancelled_at: new Date().toISOString(),
+            cancellation_reason: reason || 'Customer requested cancellation with refund',
+          }).eq('id', bookingId);
+          return {
+            statusCode: 200,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ success: true, data: { refundId: refund.id, amount: Number(depositPayment.amount), status: refund.status } })
+          };
+        } catch (err: any) {
+          return {
+            statusCode: 500,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ success: false, error: err?.message || 'Refund failed' })
+          };
+        }
+      }
+
+      // POST /api/payments/create-intent (auth) - for logged-in users
+      if (path === '/api/payments/create-intent' && method === 'POST') {
+        const authHeader = event.headers?.authorization || event.headers?.Authorization;
+        const token = typeof authHeader === 'string' && authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
+        if (!token) {
+          return { statusCode: 401, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ success: false, error: 'Unauthorized' }) };
+        }
+        let userId: string;
+        try {
+          const jwt = await import('jsonwebtoken');
+          const payload = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key') as { userId: string };
+          userId = payload.userId;
+        } catch {
+          return { statusCode: 401, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ success: false, error: 'Invalid token' }) };
+        }
+        let body: { bookingId?: string; paymentType?: string } = {};
+        try {
+          body = typeof event.body === 'string' ? JSON.parse(event.body || '{}') : event.body || {};
+        } catch {
+          return { statusCode: 400, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ success: false, error: 'Invalid JSON' }) };
+        }
+        const { bookingId, paymentType } = body;
+        if (!bookingId) {
+          return { statusCode: 400, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ success: false, error: 'bookingId is required' }) };
+        }
+        const { data: booking } = await supabase.from('bookings').select('*, unit:units(*, property:properties(*))').eq('id', bookingId).single();
+        if (!booking) {
+          return { statusCode: 404, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ success: false, error: 'Booking not found' }) };
+        }
+        if (booking.user_id && booking.user_id !== userId) {
+          return { statusCode: 403, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ success: false, error: 'Unauthorized' }) };
+        }
+        const { data: settingsRow } = await supabase.from('payment_settings').select('*').eq('is_active', true).single();
+        const settings = settingsRow
+          ? { depositPercentage: Number(settingsRow.deposit_percentage) || 25, balanceChargeDaysBefore: Number(settingsRow.balance_charge_days_before) || 21, fullPaymentThresholdDays: Number(settingsRow.full_payment_threshold_days) || 21, currency: settingsRow.currency || 'EUR' }
+          : { depositPercentage: 25, balanceChargeDaysBefore: 21, fullPaymentThresholdDays: 21, currency: 'EUR' };
+        const daysToCheckIn = Math.ceil((new Date(booking.check_in_date).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+        const effectiveType = paymentType || (daysToCheckIn <= settings.fullPaymentThresholdDays ? 'FULL' : 'DEPOSIT');
+        let amountEur = 0;
+        if (effectiveType === 'FULL') amountEur = Number(booking.total_price) || 0;
+        else if (effectiveType === 'DEPOSIT') amountEur = Number(booking.deposit_amount) || Number(booking.total_price) * (settings.depositPercentage / 100);
+        else amountEur = Number(booking.remaining_amount) || Number(booking.balance_amount) || 0;
+        const cents = Math.round(amountEur * 100);
+        if (cents < 50) {
+          return { statusCode: 400, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ success: false, error: 'Payment amount too small' }) };
+        }
+        try {
+          const Stripe = (await import('stripe')).default;
+          const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '');
+          const existingCustomers = await stripe.customers.list({ email: booking.guest_email, limit: 1 });
+          const customerId = existingCustomers.data.length ? existingCustomers.data[0].id : (await stripe.customers.create({ email: booking.guest_email, name: booking.guest_name, phone: booking.guest_phone, metadata: { source: 'booking_platform' } })).id;
+          const intentParams: any = {
+            amount: cents,
+            currency: (settings.currency || 'eur').toLowerCase(),
+            customer: customerId,
+            metadata: { bookingId, paymentType: effectiveType, bookingNumber: booking.booking_number },
+            payment_method_types: ['card'],
+          };
+          if (effectiveType === 'DEPOSIT') intentParams.setup_future_usage = 'off_session';
+          const paymentIntent = await stripe.paymentIntents.create(intentParams);
+          const GUEST_USER_ID = '00000000-0000-0000-0000-000000000001';
+          await supabase.from('payments').insert({
+            booking_id: bookingId,
+            user_id: booking.user_id || GUEST_USER_ID,
+            amount: amountEur,
+            currency: settings.currency || 'EUR',
+            payment_type: effectiveType,
+            stripe_payment_intent_id: paymentIntent.id,
+            stripe_customer_id: customerId,
+            status: 'PENDING',
+            description: `${effectiveType} payment for booking ${booking.booking_number}`,
+          });
+          await supabase.from('bookings').update({ stripe_customer_id: customerId }).eq('id', bookingId);
+          return {
+            statusCode: 200,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ success: true, data: { clientSecret: paymentIntent.client_secret, paymentIntentId: paymentIntent.id, amount: amountEur, paymentType: effectiveType } })
+          };
+        } catch (err: any) {
+          return {
+            statusCode: 500,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ success: false, error: err?.message || 'Failed to create payment intent' })
+          };
+        }
+      }
     }
 
     // Default response
@@ -1106,9 +1530,176 @@ async function handleAuthRoutes(path: string, method: string, supabase: any, eve
   }
 }
 
-// Inquiries routes handler (admin list, detail, reply)
+// Inquiries routes handler (guest create/get/reply, admin list/detail/reply)
 async function handleInquiriesRoutes(path: string, method: string, supabase: any, event: any, requestId: string): Promise<any> {
   try {
+    // POST /api/inquiries - guest create inquiry (no auth)
+    if (path === '/api/inquiries' && method === 'POST') {
+      let body: { propertyId?: string; guestName?: string; guestEmail?: string; checkinDate?: string; checkoutDate?: string; guests?: number; message?: string } = {};
+      try {
+        body = typeof event.body === 'string' ? JSON.parse(event.body || '{}') : event.body || {};
+      } catch {
+        return {
+          statusCode: 400,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ success: false, error: 'Invalid JSON' })
+        };
+      }
+      const { propertyId, guestName, guestEmail, checkinDate, checkoutDate, guests, message } = body;
+      if (!propertyId || !guestName || !guestEmail || !checkinDate || !checkoutDate || !guests || !message || message.length < 5) {
+        return {
+          statusCode: 400,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ success: false, error: 'Missing or invalid fields (propertyId, guestName, guestEmail, checkinDate, checkoutDate, guests, message min 5 chars)' })
+        };
+      }
+      const { data: inquiry, error } = await supabase
+        .from('inquiries')
+        .insert({
+          property_id: propertyId,
+          guest_name: guestName,
+          guest_email: guestEmail,
+          checkin_date: checkinDate,
+          checkout_date: checkoutDate,
+          guests,
+          status: 'NEW',
+        })
+        .select()
+        .single();
+      if (error || !inquiry) {
+        return {
+          statusCode: 500,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ success: false, error: 'Failed to create inquiry' })
+        };
+      }
+      await supabase.from('inquiry_messages').insert({
+        inquiry_id: inquiry.id,
+        sender_type: 'guest',
+        message,
+      });
+      const adminEmail = process.env.ADMIN_EMAIL || 'admin@leonidion-houses.com';
+      const { data: property } = await supabase.from('properties').select('name').eq('id', propertyId).single();
+      const propertyName = property?.name || 'Property';
+      const apiKey = process.env.RESEND_API_KEY;
+      if (apiKey) {
+        const Resend = (await import('resend')).Resend;
+        const resend = new Resend(apiKey);
+        const from = `${process.env.FROM_NAME || 'LEONIDIONHOUSES'} <${process.env.FROM_EMAIL || 'onboarding@resend.dev'}>`;
+        const dashboardUrl = `${process.env.FRONTEND_URL || 'https://www.leonidion-houses.com'}/admin/inquiries`;
+        const html = `
+          <h1>New Inquiry Received</h1>
+          <p>A new inquiry has been submitted for <strong>${propertyName}</strong>.</p>
+          <h2>Guest Details</h2>
+          <ul>
+            <li><strong>Name:</strong> ${guestName}</li>
+            <li><strong>Email:</strong> ${guestEmail}</li>
+            <li><strong>Check-in:</strong> ${new Date(checkinDate).toLocaleDateString()}</li>
+            <li><strong>Check-out:</strong> ${new Date(checkoutDate).toLocaleDateString()}</li>
+            <li><strong>Guests:</strong> ${guests}</li>
+          </ul>
+          <a href="${dashboardUrl}" style="background-color: #0677A1; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">View Inquiries</a>
+          <p>Best regards,<br/>LEONIDIONHOUSES</p>
+        `;
+        await resend.emails.send({ from, to: [adminEmail], subject: `New inquiry from ${guestName} - ${propertyName}`, html }).catch((err: any) => console.error('[INQUIRY] Email failed:', err));
+      }
+      return {
+        statusCode: 201,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ success: true, data: { inquiryId: inquiry.id } })
+      };
+    }
+
+    // GET /api/inquiries/:id - guest view conversation (email param)
+    const guestInquiryMatch = path.match(/^\/api\/inquiries\/([^/]+)$/);
+    if (guestInquiryMatch && method === 'GET') {
+      const id = guestInquiryMatch[1];
+      if (id === 'admin') return null as any;
+      const email = event.queryStringParameters?.email?.trim();
+      const { data: inquiry, error } = await supabase
+        .from('inquiries')
+        .select('*, property:properties(name, location)')
+        .eq('id', id)
+        .single();
+      if (error || !inquiry) {
+        return {
+          statusCode: 404,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ success: false, error: 'Inquiry not found' })
+        };
+      }
+      if (email && inquiry.guest_email?.toLowerCase() !== email.toLowerCase()) {
+        return {
+          statusCode: 403,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ success: false, error: 'Unauthorized' })
+        };
+      }
+      const { data: messages } = await supabase
+        .from('inquiry_messages')
+        .select('*')
+        .eq('inquiry_id', id)
+        .order('created_at', { ascending: true });
+      return {
+        statusCode: 200,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          success: true,
+          data: { inquiry, messages: messages || [] }
+        })
+      };
+    }
+
+    // POST /api/inquiries/:id/guest-reply
+    const guestReplyMatch = path.match(/^\/api\/inquiries\/([^/]+)\/guest-reply$/);
+    if (guestReplyMatch && method === 'POST') {
+      const id = guestReplyMatch[1];
+      let body: { guestEmail?: string; message?: string } = {};
+      try {
+        body = typeof event.body === 'string' ? JSON.parse(event.body || '{}') : event.body || {};
+      } catch {
+        return {
+          statusCode: 400,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ success: false, error: 'Invalid JSON' })
+        };
+      }
+      const { guestEmail, message } = body;
+      if (!guestEmail || !message) {
+        return {
+          statusCode: 400,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ success: false, error: 'guestEmail and message are required' })
+        };
+      }
+      const { data: inquiry } = await supabase.from('inquiries').select('*').eq('id', id).single();
+      if (!inquiry) {
+        return {
+          statusCode: 404,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ success: false, error: 'Inquiry not found' })
+        };
+      }
+      if (inquiry.guest_email?.toLowerCase() !== guestEmail.toLowerCase()) {
+        return {
+          statusCode: 403,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ success: false, error: 'Unauthorized' })
+        };
+      }
+      await supabase.from('inquiry_messages').insert({
+        inquiry_id: id,
+        sender_type: 'guest',
+        message,
+      });
+      await supabase.from('inquiries').update({ status: 'GUEST_REPLIED' }).eq('id', id);
+      return {
+        statusCode: 200,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ success: true })
+      };
+    }
+
     // GET /api/inquiries/admin/list
     if (path === '/api/inquiries/admin/list' && method === 'GET') {
       const qs = event.queryStringParameters || {};
