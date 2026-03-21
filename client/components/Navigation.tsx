@@ -73,6 +73,14 @@ export default function Navigation() {
             >
               {t("nav.contact")}
             </Link>
+            {isLoggedIn && (
+              <Link
+                to="/dashboard"
+                className="text-foreground hover:text-primary transition-colors font-medium"
+              >
+                {t("nav.myProfile")}
+              </Link>
+            )}
           </div>
 
           {/* Auth & Actions */}
@@ -144,6 +152,15 @@ export default function Navigation() {
             >
               {t("nav.contact")}
             </Link>
+            {isLoggedIn && (
+              <Link
+                to="/dashboard"
+                className="block py-2 text-foreground hover:text-primary transition-colors"
+                onClick={() => setIsOpen(false)}
+              >
+                {t("nav.myProfile")}
+              </Link>
+            )}
             <div className="flex flex-col gap-2 pt-4 border-t border-border mt-4">
               {isLoggedIn ? (
                 <>

@@ -168,23 +168,36 @@ async function processSuccessfulPayment(
     });
 
     if (update.status === "CONFIRMED") {
+      const cancelLink = booking.cancellation_token
+        ? `${frontendUrl}/cancel-booking?token=${booking.cancellation_token}`
+        : null;
+      const cancelSection = cancelLink
+        ? `
+          <p>Αν επιθυμείτε να ακυρώσετε την κράτησή σας, μπορείτε να το κάνετε πατώντας στον παρακάτω σύνδεσμο:</p>
+          <p><a href="${cancelLink}" style="background:#dc2626;color:white;padding:10px 20px;text-decoration:none;border-radius:5px;">Ακύρωση κράτησης</a></p>
+          <p><strong>Σημαντικό:</strong> Πριν την ακύρωση, θα σας εμφανιστούν οι όροι και θα ζητηθεί επιβεβαίωση.</p>
+          <p>Ο σύνδεσμος είναι προσωπικός και αφορά μόνο τη συγκεκριμένη κράτηση.</p>
+        `
+        : "";
+
       await resend.emails.send({
         from,
         to: booking.guest_email,
-        subject: `Booking Confirmation - ${booking.booking_number}`,
+        subject: "Επιβεβαίωση κράτησης",
         html: `
-          <h1>Booking Confirmation</h1>
-          <p>Dear ${bookingForEmail.guestName},</p>
-          <p>Thank you for booking with LEONIDIONHOUSES!</p>
+          <h1>Επιβεβαίωση κράτησης</h1>
+          <p>Καλημέρα ${bookingForEmail.guestName},</p>
+          <p>Σας ευχαριστούμε για την κράτησή σας.</p>
           <ul>
-            <li><strong>Booking:</strong> ${bookingForEmail.bookingNumber}</li>
-            <li><strong>Room:</strong> ${bookingForEmail.unit?.property?.name}</li>
-            <li><strong>Check-in:</strong> ${new Date(bookingForEmail.checkInDate).toLocaleDateString()}</li>
-            <li><strong>Check-out:</strong> ${new Date(bookingForEmail.checkOutDate).toLocaleDateString()}</li>
-            <li><strong>Total:</strong> €${bookingForEmail.totalPrice?.toFixed(2)}</li>
+            <li><strong>Κράτηση:</strong> ${bookingForEmail.bookingNumber}</li>
+            <li><strong>Δωμάτιο:</strong> ${bookingForEmail.unit?.property?.name}</li>
+            <li><strong>Άφιξη:</strong> ${new Date(bookingForEmail.checkInDate).toLocaleDateString("el-GR")}</li>
+            <li><strong>Αναχώρηση:</strong> ${new Date(bookingForEmail.checkOutDate).toLocaleDateString("el-GR")}</li>
+            <li><strong>Σύνολο:</strong> €${bookingForEmail.totalPrice?.toFixed(2)}</li>
           </ul>
-          <a href="${frontendUrl}/dashboard" style="background:#0677A1;color:white;padding:10px 20px;text-decoration:none;border-radius:5px;">View Booking</a>
-          <p>Best regards,<br/>LEONIDIONHOUSES</p>
+          ${cancelSection}
+          <p><a href="${frontendUrl}/dashboard" style="background:#0677A1;color:white;padding:10px 20px;text-decoration:none;border-radius:5px;">Προβολή κράτησης</a></p>
+          <p>Με εκτίμηση,<br/>LEONIDIONHOUSES</p>
         `,
       });
     }

@@ -1,5 +1,6 @@
 import Layout from "@/components/Layout";
 import { apiUrl, imageUrl } from "@/lib/api";
+import { sortByRoomOrder } from "@/lib/room-display-order";
 import { Link } from "react-router-dom";
 import {
   Calendar,
@@ -260,9 +261,33 @@ export default function Index() {
         }
 
         const json = await response.json();
-        const items = (json.data ?? []) as PropertySummary[];
+        const properties = (json.data ?? []) as Array<PropertySummary & { units?: Array<{ id: string; name: string; images?: string[]; basePrice?: number }> }>;
 
-        setFeaturedProperties(items.slice(0, 6));
+        // Flatten to one card per unit (same as /properties), then sort
+        const flattened: (PropertySummary & { _unitId?: string })[] = [];
+        properties.forEach((prop) => {
+          const units = prop.units ?? [];
+          if (units.length > 0) {
+            units.forEach((unit) => {
+              flattened.push({
+                id: prop.id,
+                _unitId: unit.id,
+                name: unit.name,
+                description: prop.description,
+                location: prop.location,
+                city: prop.city,
+                country: prop.country,
+                mainImage: (unit.images?.[0] ?? prop.mainImage ?? (prop as { main_image?: string }).main_image) as string,
+                unitsCount: 1,
+                startingFrom: unit.basePrice ?? prop.startingFrom ?? null,
+              });
+            });
+          } else {
+            flattened.push({ ...prop } as PropertySummary & { _unitId?: string });
+          }
+        });
+
+        setFeaturedProperties(sortByRoomOrder(flattened).slice(0, 6));
       } catch (error) {
         console.error("❌ [CLIENT] Error loading properties", error);
         setPropertiesError(
@@ -411,7 +436,7 @@ export default function Index() {
             <div className="grid md:grid-cols-3 gap-6">
               {featuredProperties.map((property, idx) => (
                 <Link
-                  key={property.id}
+                  key={(property as { _unitId?: string })._unitId ?? property.id}
                   to={`/properties/${property.id}`}
                   className="card-hover overflow-hidden group"
                   onMouseEnter={() => fetch(apiUrl(`/api/properties/id/${property.id}`))}
@@ -428,10 +453,10 @@ export default function Index() {
                     {property.startingFrom != null && (
                       <div className="absolute top-4 right-4 bg-white rounded-lg px-3 py-1 shadow-lg">
                         <span className="text-primary font-bold">
-                          {formatCurrency(property.startingFrom, language)}
+                          {t("property.priceFrom")} {formatCurrency(property.startingFrom, language)}
                         </span>
                         <span className="text-muted-foreground text-sm">
-                          /night
+                          {" "}{t("common.perNight")}
                         </span>
                       </div>
                     )}

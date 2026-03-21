@@ -7,6 +7,7 @@ import {
 } from "../lib/errors";
 
 import { nanoid } from "nanoid";
+import { randomBytes } from "crypto";
 
 // Only these statuses block dates (payment succeeded); PENDING = unpaid, does not reserve
 const BLOCKING_STATUSES = ["CONFIRMED", "COMPLETED", "CHECKED_IN", "CHECKED_OUT", "NO_SHOW"];
@@ -277,6 +278,8 @@ export async function createBooking(
   const bookingNumber = `BK${nanoid(8).toUpperCase()}`;
   const nights = Math.ceil((checkOutDate.getTime() - checkInDate.getTime()) / (1000 * 60 * 60 * 24));
 
+  const cancellationToken = randomBytes(32).toString("hex");
+
   const paymentType = pricing.isFullPayment ? "FULL" : "DEPOSIT";
 
   const { data: booking } = await supabase
@@ -308,6 +311,7 @@ export async function createBooking(
       balance_paid: false,
       status: "PENDING",
       scheduled_charge_date: pricing.scheduledChargeDate,
+      cancellation_token: cancellationToken,
     })
     .select()
     .single();
@@ -383,7 +387,10 @@ export async function getUserBookings(userId: string, page = 1, pageSize = 20) {
 export async function updateBookingStatus(bookingId: string, status: string, reason?: string) {
   const updateData: Record<string, any> = { status };
   if (reason) updateData.cancellation_reason = reason;
-  if (status === "CANCELLED") updateData.cancelled_at = new Date().toISOString();
+  if (status === "CANCELLED") {
+    updateData.cancelled_at = new Date().toISOString();
+    updateData.is_cancelled = true;
+  }
 
   const { data } = await supabase
     .from("bookings")
@@ -425,6 +432,45 @@ export async function cancelBooking(
   }
 
   return await updateBookingStatus(bookingId, "CANCELLED", reason);
+}
+
+// ── Get Booking by Cancellation Token ──────────────────────────────
+
+export async function getBookingByCancellationToken(token: string) {
+  if (!token || token.length < 32) return null;
+
+  const { data: booking } = await supabase
+    .from("bookings")
+    .select("*, unit:units(*, property:properties(*))")
+    .eq("cancellation_token", token)
+    .single();
+
+  if (!booking) return null;
+
+  if (booking.status === "CANCELLED") {
+    return { error: "ALREADY_CANCELLED" as const, booking };
+  }
+
+  if (booking.token_expires_at && new Date(booking.token_expires_at) < new Date()) {
+    return { error: "EXPIRED" as const, booking };
+  }
+
+  return { booking };
+}
+
+// ── Cancel Booking by Token ────────────────────────────────────────
+
+export async function cancelBookingByToken(token: string) {
+  const result = await getBookingByCancellationToken(token);
+  if (!result) throw new ValidationError("Μη έγκυρος σύνδεσμος");
+  if ("error" in result) {
+    if (result.error === "ALREADY_CANCELLED") throw new ValidationError("Η κράτηση έχει ήδη ακυρωθεί");
+    if (result.error === "EXPIRED") throw new ValidationError("Ο σύνδεσμος έχει λήξει");
+  }
+  const booking = result.booking;
+  if (!booking) throw new ValidationError("Μη έγκυρος σύνδεσμος");
+
+  return await updateBookingStatus(booking.id, "CANCELLED");
 }
 
 // ── Admin: Get All Bookings ────────────────────────────────────────

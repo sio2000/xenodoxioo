@@ -1,7 +1,7 @@
 import Layout from "@/components/Layout";
 import { apiUrl } from "@/lib/api";
 import { Link, useNavigate } from "react-router-dom";
-import { Calendar, User, Settings, LogOut, Edit } from "lucide-react";
+import { Calendar, User, LogOut } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useLanguage } from "@/hooks/useLanguage";
 import formatCurrency from "@/lib/currency";
@@ -36,6 +36,15 @@ export default function Dashboard() {
   const [bookingsError, setBookingsError] = useState<string | null>(null);
   const [cancellingBooking, setCancellingBooking] = useState<DashboardBooking | null>(null);
   const [cancelLoading, setCancelLoading] = useState(false);
+  const [profileForm, setProfileForm] = useState({
+    firstName: "",
+    lastName: "",
+    phone: "",
+  });
+  const [profileLoading, setProfileLoading] = useState(false);
+  const [profileSaving, setProfileSaving] = useState(false);
+  const [profileError, setProfileError] = useState<string | null>(null);
+  const [profileSuccess, setProfileSuccess] = useState(false);
   const navigate = useNavigate();
   const { t, language } = useLanguage();
 
@@ -107,6 +116,88 @@ export default function Dashboard() {
       navigate("/login");
     }
   }, [navigate]);
+
+  // Load profile when switching to profile tab
+  useEffect(() => {
+    if (activeTab !== "profile" || !auth?.accessToken) return;
+    const loadProfile = async () => {
+      setProfileLoading(true);
+      setProfileError(null);
+      try {
+        const res = await fetch(apiUrl("/api/auth/me"), {
+          headers: { Authorization: `Bearer ${auth.accessToken}` },
+        });
+        const json = await res.json().catch(() => ({}));
+        if (res.ok && json.data) {
+          const d = json.data;
+          setProfileForm({
+            firstName: d.firstName ?? auth.user.firstName ?? "",
+            lastName: d.lastName ?? auth.user.lastName ?? "",
+            phone: d.phone ?? "",
+          });
+        } else {
+          setProfileForm({
+            firstName: auth.user.firstName ?? "",
+            lastName: auth.user.lastName ?? "",
+            phone: "",
+          });
+        }
+      } catch {
+        setProfileForm({
+          firstName: auth.user.firstName ?? "",
+          lastName: auth.user.lastName ?? "",
+          phone: "",
+        });
+      } finally {
+        setProfileLoading(false);
+      }
+    };
+    loadProfile();
+  }, [activeTab, auth?.accessToken, auth?.user?.firstName, auth?.user?.lastName]);
+
+  const handleProfileSave = async () => {
+    if (!auth?.accessToken) return;
+    setProfileSaving(true);
+    setProfileError(null);
+    setProfileSuccess(false);
+    try {
+      const res = await fetch(apiUrl("/api/auth/profile"), {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${auth.accessToken}`,
+        },
+        body: JSON.stringify({
+          firstName: profileForm.firstName.trim(),
+          lastName: profileForm.lastName.trim(),
+          phone: profileForm.phone.trim() || undefined,
+        }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (res.ok) {
+        setProfileSuccess(true);
+        setAuth((prev) =>
+          prev
+            ? {
+                ...prev,
+                user: {
+                  ...prev.user,
+                  firstName: profileForm.firstName.trim(),
+                  lastName: profileForm.lastName.trim(),
+                },
+              }
+            : null
+        );
+        setTimeout(() => setProfileSuccess(false), 3000);
+      } else {
+        setProfileError(json.error || t("dashboard.profileSaveError"));
+      }
+    } catch {
+      setProfileError(t("dashboard.profileSaveError"));
+    } finally {
+      setProfileSaving(false);
+    }
+  };
 
   const handleLogout = () => {
     localStorage.removeItem("auth");
@@ -181,7 +272,6 @@ export default function Dashboard() {
                 {[
                   { id: "bookings", label: t("dashboard.myBookings"), icon: Calendar },
                   { id: "profile", label: t("dashboard.profileSettings"), icon: User },
-                  { id: "preferences", label: t("dashboard.preferences"), icon: Settings },
                 ].map((item) => {
                   const Icon = item.icon;
                   return (
@@ -329,9 +419,16 @@ export default function Dashboard() {
                   <h3 className="text-lg font-bold text-foreground mb-3">
                     {t("dashboard.cancelConfirmTitle")}
                   </h3>
-                  <p className="text-muted-foreground text-sm mb-4">
+                  <p className="text-muted-foreground text-sm mb-3">
                     {t("dashboard.cancelConfirmMessage")}
                   </p>
+                  <div className="text-muted-foreground text-sm mb-4">
+                    <p className="font-medium text-foreground mb-2">{t("dashboard.cancelConfirm21DaysTitle")}</p>
+                    <ul className="list-disc list-inside space-y-1 pl-1">
+                      <li>{t("dashboard.cancelConfirmBullet1")}</li>
+                      <li>{t("dashboard.cancelConfirmBullet2")}</li>
+                    </ul>
+                  </div>
                   <p className="text-sm text-foreground mb-4">
                     {cancellingBooking.propertyName} · {cancellingBooking.checkIn} → {cancellingBooking.checkOut}
                   </p>
@@ -364,101 +461,85 @@ export default function Dashboard() {
                   {t("dashboard.profileSettings")}
                 </h2>
                 <div className="bg-card border border-border rounded-lg p-6 space-y-6 max-w-md">
-                  <div>
-                    <label className="block text-sm font-semibold text-foreground mb-2">
-                      {t("dashboard.fullName")}
-                    </label>
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="text"
-                        defaultValue={userName}
-                        className="flex-1 px-4 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary text-foreground"
-                      />
-                      <button className="p-2 hover:bg-muted rounded transition-colors">
-                        <Edit size={18} />
+                  {profileLoading ? (
+                    <p className="text-muted-foreground">{t("dashboard.loadingBookings")}</p>
+                  ) : (
+                    <>
+                      <div>
+                        <label className="block text-sm font-semibold text-foreground mb-2">
+                          {t("dashboard.fullName")}
+                        </label>
+                        <div className="grid grid-cols-2 gap-3">
+                          <input
+                            type="text"
+                            value={profileForm.firstName}
+                            onChange={(e) =>
+                              setProfileForm((p) => ({ ...p, firstName: e.target.value }))
+                            }
+                            placeholder={t("dashboard.firstName")}
+                            className="px-4 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary text-foreground bg-background"
+                          />
+                          <input
+                            type="text"
+                            value={profileForm.lastName}
+                            onChange={(e) =>
+                              setProfileForm((p) => ({ ...p, lastName: e.target.value }))
+                            }
+                            placeholder={t("dashboard.lastName")}
+                            className="px-4 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary text-foreground bg-background"
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-semibold text-foreground mb-2">
+                          {t("dashboard.emailAddress")}
+                        </label>
+                        <input
+                          type="email"
+                          value={auth?.user.email ?? ""}
+                          disabled
+                          className="w-full px-4 py-2 border border-border rounded-lg bg-muted text-foreground"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-semibold text-foreground mb-2">
+                          {t("dashboard.phoneNumber")}
+                        </label>
+                        <input
+                          type="tel"
+                          value={profileForm.phone}
+                          onChange={(e) =>
+                            setProfileForm((p) => ({ ...p, phone: e.target.value }))
+                          }
+                          placeholder="+30 27540 51234"
+                          className="w-full px-4 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary text-foreground bg-background"
+                        />
+                      </div>
+
+                      {profileError && (
+                        <p className="text-destructive text-sm">{profileError}</p>
+                      )}
+                      {profileSuccess && (
+                        <p className="text-green-600 text-sm font-medium">
+                          {t("dashboard.profileSaved")}
+                        </p>
+                      )}
+
+                      <button
+                        onClick={handleProfileSave}
+                        disabled={profileSaving}
+                        className="btn-primary w-full justify-center disabled:opacity-50"
+                      >
+                        {profileSaving ? t("dashboard.saving") : t("dashboard.saveChanges")}
                       </button>
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-semibold text-foreground mb-2">
-                      {t("dashboard.emailAddress")}
-                    </label>
-                    <input
-                      type="email"
-                      defaultValue={auth?.user.email}
-                      disabled
-                      className="w-full px-4 py-2 border border-border rounded-lg bg-muted text-foreground"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-semibold text-foreground mb-2">
-                      {t("dashboard.phoneNumber")}
-                    </label>
-                    <input
-                      type="tel"
-                      defaultValue=""
-                      className="w-full px-4 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary text-foreground"
-                    />
-                  </div>
-
-                  <button className="btn-primary w-full justify-center">
-                    {t("dashboard.saveChanges")}
-                  </button>
+                    </>
+                  )}
                 </div>
               </div>
             )}
 
-            {/* Preferences Tab */}
-            {activeTab === "preferences" && (
-              <div>
-                <h2 className="text-2xl font-bold text-foreground mb-6">
-                  Preferences
-                </h2>
-                <div className="bg-card border border-border rounded-lg p-6 space-y-6 max-w-md">
-                  <label className="flex items-center gap-3 cursor-pointer">
-                    <input type="checkbox" defaultChecked className="w-4 h-4" />
-                    <div>
-                      <p className="font-semibold text-foreground">
-                        Email Notifications
-                      </p>
-                      <p className="text-sm text-muted-foreground">
-                        Booking confirmations and reminders
-                      </p>
-                    </div>
-                  </label>
-
-                  <label className="flex items-center gap-3 cursor-pointer">
-                    <input type="checkbox" defaultChecked className="w-4 h-4" />
-                    <div>
-                      <p className="font-semibold text-foreground">
-                        Marketing Emails
-                      </p>
-                      <p className="text-sm text-muted-foreground">
-                        {t("dashboard.specialOffers")}
-                      </p>
-                    </div>
-                  </label>
-
-                  <label className="flex items-center gap-3 cursor-pointer">
-                    <input type="checkbox" className="w-4 h-4" />
-                    <div>
-                      <p className="font-semibold text-foreground">
-                        SMS Notifications
-                      </p>
-                      <p className="text-sm text-muted-foreground">
-                        Important booking updates via SMS
-                      </p>
-                    </div>
-                  </label>
-
-                  <button className="btn-primary w-full justify-center">
-                    Save Preferences
-                  </button>
-                </div>
-              </div>
-            )}
           </div>
         </div>
       </div>

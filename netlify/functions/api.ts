@@ -1,3 +1,5 @@
+import { randomBytes } from 'crypto';
+
 /** Effective max guests per unit. Small/Big Bungalow & Lykoskufi 1 = 3, Lykoskufi 2 = 5, others from DB. */
 function getEffectiveMaxGuests(unitName: string, dbMaxGuests: number): number {
   const u = (unitName || "").toLowerCase().trim().replace(/\s+/g, " ");
@@ -459,9 +461,10 @@ export const handler = async (event: any, context: any) => {
           };
         }
         
-        // Generate booking number
+        // Generate booking number and cancellation token
         const bookingNumber = `BK-${Date.now()}-${Math.random().toString(36).substr(2, 9).toUpperCase()}`;
-        
+        const cancellationToken = randomBytes(32).toString('hex');
+
         // Calculate nights
         const checkIn = new Date(body.checkInDate);
         const checkOut = new Date(body.checkOutDate);
@@ -519,7 +522,8 @@ export const handler = async (event: any, context: any) => {
             base_price: basePrice,
             cleaning_fee: cleaningFee,
             total_price: totalPrice,
-            status: 'PENDING'
+            status: 'PENDING',
+            cancellation_token: cancellationToken
           }])
           .select()
           .single();
@@ -570,6 +574,12 @@ export const handler = async (event: any, context: any) => {
       }
     }
 
+    // Handle auth routes (register, login)
+    if (path.startsWith('/api/auth/')) {
+      const authRes = await handleAuthRoutes(path, method, supabase, event, requestId);
+      if (authRes) return authRes;
+    }
+
     // Handle inquiries routes (admin list, detail, reply)
     if (path.startsWith('/api/inquiries/')) {
       const inquiryRes = await handleInquiriesRoutes(path, method, supabase, event, requestId);
@@ -579,6 +589,135 @@ export const handler = async (event: any, context: any) => {
     // Handle admin routes
     if (path.startsWith('/api/admin/')) {
       return await handleAdminRoutes(path, method, supabase, event, requestId);
+    }
+
+    // GET /api/cancel-booking?token=xxx — Validate token and return booking info
+    if ((path === '/api/cancel-booking' || path === '/cancel-booking') && method === 'GET') {
+      const token = (event.queryStringParameters?.token || '').trim();
+      if (!token) {
+        return {
+          statusCode: 400,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ success: false, error: 'Μη έγκυρος σύνδεσμος' })
+        };
+      }
+      const { data: booking } = await supabase
+        .from('bookings')
+        .select('*, unit:units(*, property:properties(*))')
+        .eq('cancellation_token', token)
+        .single();
+      if (!booking) {
+        return {
+          statusCode: 400,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ success: false, error: 'Μη έγκυρος σύνδεσμος' })
+        };
+      }
+      if (booking.status === 'CANCELLED') {
+        return {
+          statusCode: 400,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ success: false, error: 'Η κράτηση έχει ήδη ακυρωθεί' })
+        };
+      }
+      if (booking.token_expires_at && new Date(booking.token_expires_at) < new Date()) {
+        return {
+          statusCode: 400,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ success: false, error: 'Ο σύνδεσμος έχει λήξει' })
+        };
+      }
+      const unit = booking.unit || {};
+      const property = unit.property || {};
+      return {
+        statusCode: 200,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          success: true,
+          data: {
+            id: booking.id,
+            bookingNumber: booking.booking_number,
+            guestName: booking.guest_name,
+            checkInDate: booking.check_in_date,
+            checkOutDate: booking.check_out_date,
+            nights: booking.nights,
+            guests: booking.guests,
+            totalPrice: Number(booking.total_price),
+            unitName: unit.name || 'N/A',
+            propertyName: property.name || 'N/A',
+          }
+        })
+      };
+    }
+
+    // POST /api/cancel-booking — Execute cancellation
+    if ((path === '/api/cancel-booking' || path === '/cancel-booking') && method === 'POST') {
+      let body: { token?: string } = {};
+      try {
+        body = typeof event.body === 'string' ? JSON.parse(event.body || '{}') : event.body || {};
+      } catch {
+        return {
+          statusCode: 400,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ success: false, error: 'Μη έγκυρος σύνδεσμος' })
+        };
+      }
+      const token = (body.token || '').trim();
+      if (!token) {
+        return {
+          statusCode: 400,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ success: false, error: 'Μη έγκυρος σύνδεσμος' })
+        };
+      }
+      const { data: booking } = await supabase
+        .from('bookings')
+        .select('id, status, token_expires_at')
+        .eq('cancellation_token', token)
+        .single();
+      if (!booking) {
+        return {
+          statusCode: 400,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ success: false, error: 'Μη έγκυρος σύνδεσμος' })
+        };
+      }
+      if (booking.status === 'CANCELLED') {
+        return {
+          statusCode: 400,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ success: false, error: 'Η κράτηση έχει ήδη ακυρωθεί' })
+        };
+      }
+      if (booking.token_expires_at && new Date(booking.token_expires_at) < new Date()) {
+        return {
+          statusCode: 400,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ success: false, error: 'Ο σύνδεσμος έχει λήξει' })
+        };
+      }
+      const { data: updated, error } = await supabase
+        .from('bookings')
+        .update({ status: 'CANCELLED', cancelled_at: new Date().toISOString(), is_cancelled: true })
+        .eq('id', booking.id)
+        .select()
+        .single();
+      if (error) {
+        return {
+          statusCode: 500,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ success: false, error: 'Σφάλμα κατά την ακύρωση' })
+        };
+      }
+      return {
+        statusCode: 200,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          success: true,
+          data: updated,
+          message: 'Η κράτησή σας ακυρώθηκε επιτυχώς.'
+        })
+      };
     }
 
     // Default response
@@ -608,6 +747,305 @@ export const handler = async (event: any, context: any) => {
     };
   }
 };
+
+// Auth routes handler (register, login)
+async function handleAuthRoutes(path: string, method: string, supabase: any, event: any, requestId: string): Promise<any> {
+  try {
+    const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
+    const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || 'your-refresh-secret';
+    const JWT_EXPIRY = process.env.JWT_EXPIRY || '7d';
+    const JWT_REFRESH_EXPIRY = process.env.JWT_REFRESH_EXPIRY || '30d';
+
+    // POST /api/auth/register
+    if (path === '/api/auth/register' && method === 'POST') {
+      let body: { email?: string; firstName?: string; lastName?: string; password?: string } = {};
+      try {
+        body = typeof event.body === 'string' ? JSON.parse(event.body) : event.body || {};
+      } catch {
+        return {
+          statusCode: 400,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ success: false, error: 'Invalid JSON body' })
+        };
+      }
+      const { email, firstName, lastName, password } = body;
+      if (!email || !firstName || !lastName || !password) {
+        return {
+          statusCode: 400,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ success: false, error: 'Missing required fields: email, firstName, lastName, password' })
+        };
+      }
+      if (String(password).length < 8) {
+        return {
+          statusCode: 400,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ success: false, error: 'Password must be at least 8 characters long' })
+        };
+      }
+      const emailLower = String(email).toLowerCase();
+      const { data: existingUser } = await supabase.from('users').select('id').eq('email', emailLower).single();
+      if (existingUser) {
+        return {
+          statusCode: 409,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ success: false, error: 'User with this email already exists' })
+        };
+      }
+      const bcrypt = await import('bcryptjs');
+      const hashedPassword = await bcrypt.hash(String(password), 10);
+      const { data: user, error } = await supabase
+        .from('users')
+        .insert({
+          email: emailLower,
+          first_name: String(firstName).trim(),
+          last_name: String(lastName).trim(),
+          password: hashedPassword
+        })
+        .select()
+        .single();
+      if (error) {
+        console.error(`❌ [${requestId}] Register DB error:`, error);
+        return {
+          statusCode: 500,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ success: false, error: `Failed to create user: ${error.message}` })
+        };
+      }
+      if (!user) {
+        return {
+          statusCode: 500,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ success: false, error: 'Failed to create user: No data returned' })
+        };
+      }
+      return {
+        statusCode: 201,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          success: true,
+          data: {
+            id: user.id,
+            email: user.email,
+            firstName: user.first_name,
+            lastName: user.last_name,
+            role: user.role
+          }
+        })
+      };
+    }
+
+    // POST /api/auth/login
+    if (path === '/api/auth/login' && method === 'POST') {
+      let body: { email?: string; password?: string } = {};
+      try {
+        body = typeof event.body === 'string' ? JSON.parse(event.body) : event.body || {};
+      } catch {
+        return {
+          statusCode: 400,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ success: false, error: 'Invalid JSON body' })
+        };
+      }
+      const { email, password } = body;
+      if (!email || !password) {
+        return {
+          statusCode: 400,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ success: false, error: 'Email and password are required' })
+        };
+      }
+      const { data: user, error } = await supabase
+        .from('users')
+        .select('*')
+        .eq('email', String(email).toLowerCase())
+        .single();
+      if (error || !user) {
+        return {
+          statusCode: 401,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ success: false, error: 'Invalid email or password' })
+        };
+      }
+      const bcrypt = await import('bcryptjs');
+      const valid = await bcrypt.compare(String(password), user.password);
+      if (!valid) {
+        return {
+          statusCode: 401,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ success: false, error: 'Invalid email or password' })
+        };
+      }
+      const jwt = await import('jsonwebtoken');
+      const payload = { userId: user.id, email: user.email, role: user.role };
+      const accessToken = jwt.sign(payload, JWT_SECRET, { expiresIn: JWT_EXPIRY } as any);
+      const refreshToken = jwt.sign(payload, JWT_REFRESH_SECRET, { expiresIn: JWT_REFRESH_EXPIRY } as any);
+      const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+      await supabase.from('sessions').insert({
+        user_id: user.id,
+        token: accessToken,
+        refresh_token: refreshToken,
+        expires_at: expiresAt
+      });
+      return {
+        statusCode: 200,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          success: true,
+          data: {
+            user: {
+              id: user.id,
+              email: user.email,
+              firstName: user.first_name,
+              lastName: user.last_name,
+              role: user.role
+            },
+            accessToken,
+            refreshToken
+          }
+        })
+      };
+    }
+
+    // GET /api/auth/me - require Bearer token
+    if (path === '/api/auth/me' && method === 'GET') {
+      const authHeader = event.headers?.authorization || event.headers?.Authorization;
+      const token = typeof authHeader === 'string' && authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
+      if (!token) {
+        return {
+          statusCode: 401,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ success: false, error: 'Unauthorized' })
+        };
+      }
+      try {
+        const jwt = await import('jsonwebtoken');
+        const payload = jwt.verify(token, JWT_SECRET) as { userId: string; email: string; role: string };
+        const { data: user, error } = await supabase
+          .from('users')
+          .select('id, email, first_name, last_name, phone, role, is_email_verified, created_at')
+          .eq('id', payload.userId)
+          .single();
+        if (error || !user) {
+          return {
+            statusCode: 404,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ success: false, error: 'User not found' })
+          };
+        }
+        return {
+          statusCode: 200,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            success: true,
+            data: {
+              id: user.id,
+              email: user.email,
+              firstName: user.first_name,
+              lastName: user.last_name,
+              phone: user.phone ?? '',
+              role: user.role,
+              isEmailVerified: user.is_email_verified,
+              createdAt: user.created_at
+            }
+          })
+        };
+      } catch {
+        return {
+          statusCode: 401,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ success: false, error: 'Invalid or expired token' })
+        };
+      }
+    }
+
+    // PUT /api/auth/profile - require Bearer token
+    if (path === '/api/auth/profile' && method === 'PUT') {
+      const authHeader = event.headers?.authorization || event.headers?.Authorization;
+      const token = typeof authHeader === 'string' && authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
+      if (!token) {
+        return {
+          statusCode: 401,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ success: false, error: 'Unauthorized' })
+        };
+      }
+      let body: { firstName?: string; lastName?: string; phone?: string } = {};
+      try {
+        body = typeof event.body === 'string' ? JSON.parse(event.body) : event.body || {};
+      } catch {
+        return {
+          statusCode: 400,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ success: false, error: 'Invalid JSON body' })
+        };
+      }
+      try {
+        const jwt = await import('jsonwebtoken');
+        const payload = jwt.verify(token, JWT_SECRET) as { userId: string };
+        const updateData: Record<string, unknown> = {};
+        if (body.firstName !== undefined) updateData.first_name = body.firstName;
+        if (body.lastName !== undefined) updateData.last_name = body.lastName;
+        if (body.phone !== undefined) updateData.phone = body.phone || null;
+        if (Object.keys(updateData).length === 0) {
+          return {
+            statusCode: 400,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ success: false, error: 'No fields to update' })
+          };
+        }
+        const { data: user, error } = await supabase
+          .from('users')
+          .update(updateData)
+          .eq('id', payload.userId)
+          .select('id, email, first_name, last_name, phone, role, is_email_verified, created_at')
+          .single();
+        if (error || !user) {
+          return {
+            statusCode: 500,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ success: false, error: error?.message || 'Failed to update profile' })
+          };
+        }
+        return {
+          statusCode: 200,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            success: true,
+            data: {
+              id: user.id,
+              email: user.email,
+              firstName: user.first_name,
+              lastName: user.last_name,
+              phone: user.phone ?? '',
+              role: user.role,
+              isEmailVerified: user.is_email_verified,
+              createdAt: user.created_at
+            }
+          })
+        };
+      } catch (err: any) {
+        if (err?.name === 'JsonWebTokenError' || err?.name === 'TokenExpiredError') {
+          return {
+            statusCode: 401,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ success: false, error: 'Invalid or expired token' })
+          };
+        }
+        throw err;
+      }
+    }
+
+    return null;
+  } catch (err: any) {
+    console.error(`❌ [${requestId}] Auth error:`, err);
+    return {
+      statusCode: 500,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ success: false, error: err?.message || 'Server error' })
+    };
+  }
+}
 
 // Inquiries routes handler (admin list, detail, reply)
 async function handleInquiriesRoutes(path: string, method: string, supabase: any, event: any, requestId: string): Promise<any> {
@@ -928,25 +1366,55 @@ async function handleAdminRoutes(path: string, method: string, supabase: any, ev
 
     // GET /api/admin/users
     if (path === '/api/admin/users' && method === 'GET') {
-      const { data: users, error } = await supabase
-        .from('users')
-        .select('*')
-        .order('created_at', { ascending: false });
+      const qs = event.queryStringParameters || {};
+      const page = parseInt(qs.page || '1', 10);
+      const pageSize = parseInt(qs.pageSize || '10', 10);
+      const status = qs.status;
+      const search = (qs.search || '').trim();
+      const start = (page - 1) * pageSize;
+      const end = start + pageSize - 1;
+
+      let query = supabase.from('users').select('*', { count: 'exact' });
+      if (status && status !== 'ALL') query = query.eq('status', status);
+      if (search) {
+        const escaped = search.replace(/'/g, "''");
+        const pattern = `%${escaped}%`;
+        query = query.or(`email.ilike.'${pattern}',first_name.ilike.'${pattern}',last_name.ilike.'${pattern}'`);
+      }
+      const { data: allUsers, count: totalCount, error } = await query.order('created_at', { ascending: false }).range(start, end);
 
       if (error) {
         return {
           statusCode: 500,
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ error: error.message })
+          body: JSON.stringify({ success: false, error: error.message })
         };
       }
+
+      const users = allUsers || [];
+      const totalItems = totalCount ?? users.length;
+      const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
+      const transformed = users.map((u: any) => ({
+        id: u.id,
+        email: u.email,
+        firstName: u.first_name ?? u.firstName ?? '',
+        lastName: u.last_name ?? u.lastName ?? '',
+        phone: u.phone ?? '',
+        status: u.status ?? 'ACTIVE',
+        isEmailVerified: u.is_email_verified ?? u.isEmailVerified ?? false,
+        createdAt: u.created_at ?? u.createdAt ?? null,
+        _count: { bookings: u._count?.bookings ?? 0 }
+      }));
 
       return {
         statusCode: 200,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           success: true,
-          data: users || []
+          data: transformed,
+          totalPages,
+          currentPage: page,
+          totalItems
         })
       };
     }
@@ -1141,6 +1609,7 @@ async function handleAdminRoutes(path: string, method: string, supabase: any, ev
       const pageSize = parseInt(qs.pageSize || '20', 10);
       const status = qs.status;
       const search = qs.search;
+      const userId = qs.userId;
 
       let query = supabase
         .from('bookings')
@@ -1150,6 +1619,9 @@ async function handleAdminRoutes(path: string, method: string, supabase: any, ev
           user:users(id, email, first_name, last_name)
         `, { count: 'exact' });
 
+      if (userId) {
+        query = query.eq('user_id', userId);
+      }
       if (status && status !== 'ALL') {
         query = query.eq('status', status);
       }

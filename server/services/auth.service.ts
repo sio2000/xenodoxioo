@@ -330,6 +330,7 @@ export async function getUserById(userId: string) {
       email,
       first_name,
       last_name,
+      phone,
       role,
       is_email_verified,
       created_at
@@ -346,6 +347,7 @@ export async function getUserById(userId: string) {
     email: user.email,
     firstName: user.first_name,
     lastName: user.last_name,
+    phone: user.phone,
     role: user.role,
     isEmailVerified: user.is_email_verified,
     createdAt: user.created_at,
@@ -368,9 +370,9 @@ export async function updateUserProfile(
   },
 ) {
   const updateData: any = {};
-  if (data.firstName) updateData.first_name = data.firstName;
-  if (data.lastName) updateData.last_name = data.lastName;
-  // Add other fields as needed
+  if (data.firstName !== undefined) updateData.first_name = data.firstName;
+  if (data.lastName !== undefined) updateData.last_name = data.lastName;
+  if (data.phone !== undefined) updateData.phone = data.phone || null;
 
   const { data: user } = await supabase
     .from('users')
@@ -381,6 +383,7 @@ export async function updateUserProfile(
       email,
       first_name,
       last_name,
+      phone,
       role,
       is_email_verified,
       created_at
@@ -396,6 +399,7 @@ export async function updateUserProfile(
     email: user.email,
     firstName: user.first_name,
     lastName: user.last_name,
+    phone: user.phone,
     role: user.role,
     isEmailVerified: user.is_email_verified,
     createdAt: user.created_at,

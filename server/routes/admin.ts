@@ -771,7 +771,7 @@ router.post("/coupons/validate", async (req, res) => {
 // Admin Bookings Management
 router.get("/bookings", async (req, res) => {
   try {
-    const { page = 1, pageSize = 20, status, search } = req.query;
+    const { page = 1, pageSize = 20, status, search, userId } = req.query;
     
     let query = supabase
       .from('bookings')
@@ -780,6 +780,11 @@ router.get("/bookings", async (req, res) => {
         unit:units(*, property:properties(*)),
         user:users(*)
       `);
+
+    // Filter by user (for "View booking history" in user details)
+    if (userId && typeof userId === 'string') {
+      query = query.eq('user_id', userId);
+    }
 
     // Apply status filter if provided
     if (status && status !== 'ALL') {
@@ -931,6 +936,7 @@ router.get("/users", async (req, res) => {
       email: u.email,
       firstName: u.first_name ?? u.firstName,
       lastName: u.last_name ?? u.lastName,
+      phone: u.phone ?? '',
       status: u.status,
       isEmailVerified: u.is_email_verified ?? u.isEmailVerified ?? false,
       createdAt: u.created_at ?? u.createdAt,

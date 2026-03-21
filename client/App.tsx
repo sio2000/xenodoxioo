@@ -21,6 +21,7 @@ import LegalDetails from "./pages/LegalDetails";
 import Contact from "./pages/Contact";
 import NotFound from "./pages/NotFound";
 import InquiryConversation from "./pages/InquiryConversation";
+import CancelBooking from "./pages/CancelBooking";
 
 const queryClient = new QueryClient();
 
@@ -48,6 +49,7 @@ const App = () => (
             <Route path="/legal" element={<LegalDetails />} />
             <Route path="/contact" element={<Contact />} />
             <Route path="/inquiry/:id" element={<InquiryConversation />} />
+            <Route path="/cancel-booking" element={<CancelBooking />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>
