@@ -51,6 +51,7 @@ export default function PropertyManagement() {
   const [editingProperty, setEditingProperty] = useState<Property | null>(null);
   const [editingUnit, setEditingUnit] = useState<Unit | null>(null);
   const [updatingUnit, setUpdatingUnit] = useState(false);
+  const [updatingProperty, setUpdatingProperty] = useState(false);
 
   useEffect(() => {
     fetchData();
@@ -211,26 +212,64 @@ export default function PropertyManagement() {
 
   const handleUpdateProperty = async (formData: any) => {
     if (!editingProperty) return;
+    setUpdatingProperty(true);
+    const uploadUrl = apiUrl("/api/admin/upload-image");
+    const putUrl = apiUrl(`/api/admin/properties/${editingProperty.id}`);
     try {
-      const fd = new FormData();
-      fd.append("name", formData.name);
-      fd.append("description", formData.description);
-      fd.append("location", formData.location || editingProperty.location);
-      fd.append("city", formData.city);
-      fd.append("country", formData.country);
-      if (formData.mainImage instanceof File) fd.append("mainImage", formData.mainImage);
-
-      const response = await fetch(apiUrl(`/api/admin/properties/${editingProperty.id}`), {
+      let mainImageUrl = editingProperty.main_image || "";
+      if (formData.mainImage instanceof File) {
+        const base64 = await compressAndToBase64(formData.mainImage);
+        const uploadRes = await fetch(uploadUrl, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            base64Data: base64,
+            filename: `property-main-${Date.now()}-${Math.random().toString(36).slice(2, 9)}.jpg`,
+          }),
+        });
+        const uploadJson = await uploadRes.json();
+        if (uploadJson.success && uploadJson.imageUrl) {
+          mainImageUrl = uploadJson.imageUrl;
+        } else {
+          console.error("[UPDATE PROPERTY] Upload failed:", uploadJson);
+          alert(uploadJson?.error || "Failed to upload image");
+          setUpdatingProperty(false);
+          return;
+        }
+      }
+      const body = {
+        name: formData.name,
+        description: formData.description ?? editingProperty.description ?? "",
+        location: formData.location ?? editingProperty.location ?? "",
+        city: formData.city ?? editingProperty.city ?? "",
+        country: formData.country ?? editingProperty.country ?? "Greece",
+        main_image: mainImageUrl,
+      };
+      const response = await fetch(putUrl, {
         method: "PUT",
-        body: fd,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
       });
+      let responseData: any = {};
+      try {
+        const text = await response.text();
+        responseData = text ? JSON.parse(text) : {};
+      } catch {
+        responseData = {};
+      }
       if (response.ok) {
         setShowPropertyForm(false);
         setEditingProperty(null);
         fetchData();
+      } else {
+        console.error("[UPDATE PROPERTY] Failed:", responseData);
+        alert(responseData?.error || responseData?.message || "Failed to update property");
       }
     } catch (error) {
-      console.error("Failed to update property:", error);
+      console.error("[UPDATE PROPERTY] Exception:", error);
+      alert("Failed to update property");
+    } finally {
+      setUpdatingProperty(false);
     }
   };
 
@@ -550,6 +589,7 @@ export default function PropertyManagement() {
         <PropertyForm
           property={editingProperty}
           onSubmit={editingProperty ? handleUpdateProperty : handleCreateProperty}
+          updating={updatingProperty}
           onClose={() => {
             setShowPropertyForm(false);
             setEditingProperty(null);
@@ -578,7 +618,7 @@ export default function PropertyManagement() {
 }
 
 // Property Form Component
-function PropertyForm({ property, onSubmit, onClose }: any) {
+function PropertyForm({ property, onSubmit, onClose, updating = false }: any) {
   const { t } = useLanguage();
   const [formData, setFormData] = useState({
     name: property?.name ?? "",
@@ -678,10 +718,10 @@ function PropertyForm({ property, onSubmit, onClose }: any) {
             )}
           </div>
           <div className="flex gap-2 pt-4">
-            <button type="submit" className="btn-primary">
-              {property ? t("admin.updateProperty") : t("admin.createProperty")}
+            <button type="submit" className="btn-primary" disabled={updating}>
+              {updating ? t("common.loading") : (property ? t("admin.updateProperty") : t("admin.createProperty"))}
             </button>
-            <button type="button" onClick={onClose} className="btn-secondary">
+            <button type="button" onClick={onClose} className="btn-secondary" disabled={updating}>
               {t("common.cancel")}
             </button>
           </div>

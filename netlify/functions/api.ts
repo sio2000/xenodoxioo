@@ -1354,6 +1354,69 @@ async function handleAdminRoutes(path: string, method: string, supabase: any, ev
       };
     }
 
+    // PUT /api/admin/properties/:id
+    if (path.startsWith('/api/admin/properties/') && path !== '/api/admin/properties' && method === 'PUT') {
+      const id = path.split('/').pop();
+      if (!id) {
+        return {
+          statusCode: 400,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ success: false, error: 'Missing property ID' })
+        };
+      }
+      console.log(`🔍 [${requestId}] PUT /api/admin/properties/:id — id=${id}, isBase64Encoded=${event.isBase64Encoded}, bodyLength=${(event.body || '').length}`);
+      let body: any = {};
+      try {
+        const rawBody = event.isBase64Encoded ? Buffer.from(event.body || '', 'base64').toString('utf8') : (event.body || '{}');
+        body = JSON.parse(rawBody);
+        console.log(`✅ [${requestId}] Parsed body: name=${body.name}, main_image=${body.main_image ? 'yes' : 'no'}`);
+      } catch (parseErr: any) {
+        console.error(`❌ [${requestId}] Body parse error:`, parseErr?.message);
+        return {
+          statusCode: 400,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ success: false, error: 'Invalid JSON body', detail: parseErr?.message })
+        };
+      }
+      const updateData: any = {
+        name: body.name,
+        description: body.description ?? '',
+        location: body.location ?? '',
+        city: body.city,
+        country: body.country
+      };
+      if (body.main_image != null) {
+        updateData.main_image = body.main_image;
+      }
+      const { data: property, error } = await supabase
+        .from('properties')
+        .update(updateData)
+        .eq('id', id)
+        .select()
+        .single();
+      if (error) {
+        console.error(`❌ [${requestId}] Property update error:`, error);
+        return {
+          statusCode: 500,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ success: false, error: error.message })
+        };
+      }
+      if (!property) {
+        return {
+          statusCode: 404,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ success: false, error: 'Property not found' })
+        };
+      }
+      console.log(`✅ [${requestId}] Property updated successfully`);
+      return {
+        statusCode: 200,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ success: true, data: property, requestId })
+      };
+    }
+
     // POST /api/admin/upload-image
     if (path === '/api/admin/upload-image' && method === 'POST') {
       console.log(`🖼️ [${requestId}] === IMAGE UPLOAD START ===`);

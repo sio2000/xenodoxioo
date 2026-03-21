@@ -345,6 +345,8 @@ router.put("/properties/:id", upload.any(), async (req, res) => {
     const mainImageFile = files.find((f) => f.fieldname === "mainImage");
     if (mainImageFile) {
       updateData.main_image = "/uploads/" + mainImageFile.filename;
+    } else if (body.main_image != null) {
+      updateData.main_image = body.main_image;
     }
 
     const { data: property, error } = await supabase
