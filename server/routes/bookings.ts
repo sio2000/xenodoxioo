@@ -3,6 +3,7 @@ import { z } from "zod";
 import { validate } from "../middleware/validation";
 import { authenticate, optionalAuthenticate } from "../middleware/auth";
 import * as bookingService from "../services/booking.service";
+import * as customOfferService from "../services/custom-offer.service";
 
 const router = Router();
 
@@ -99,6 +100,31 @@ function parseDateOnly(str: string): Date {
   }
   return new Date(s);
 }
+
+// Get custom offer by token (public, for checkout)
+router.get("/offer/:token", async (req, res, next) => {
+  try {
+    const offer = await customOfferService.getOfferByToken(req.params.token);
+    const checkInStr = (offer.check_in_date || "").toString().slice(0, 10);
+    const checkOutStr = (offer.check_out_date || "").toString().slice(0, 10);
+    res.json({
+      success: true,
+      data: {
+        token: offer.token,
+        unitId: offer.unit_id,
+        propertyId: offer.property_id,
+        checkIn: checkInStr,
+        checkOut: checkOutStr,
+        guests: offer.guests,
+        customTotalEur: Number(offer.custom_total_eur),
+        unit: offer.unit,
+        property: offer.property,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+});
 
 // Quote endpoint — uses dynamic tax and payment settings
 router.post("/quote", validate(quoteSchema), async (req, res, next) => {

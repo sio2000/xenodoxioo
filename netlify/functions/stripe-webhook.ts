@@ -58,12 +58,167 @@ export const handler = async (event: any) => {
   return { statusCode: 200, body: JSON.stringify({ received: true }) };
 };
 
+async function processOfferPayment(
+  supabase: ReturnType<typeof createClient>,
+  _stripe: Stripe,
+  paymentIntentId: string,
+  chargeId?: string
+) {
+  const { data: pending } = await supabase
+    .from("pending_offer_checkouts")
+    .select("*")
+    .eq("stripe_payment_intent_id", paymentIntentId)
+    .single();
+
+  if (!pending) {
+    console.warn("[WEBHOOK] No pending offer for PI", paymentIntentId);
+    return;
+  }
+
+  const { data: offer } = await supabase
+    .from("custom_checkout_offers")
+    .select("*")
+    .eq("token", pending.offer_token)
+    .single();
+
+  if (!offer || offer.used_at) {
+    console.warn("[WEBHOOK] Offer not found or used:", pending.offer_token);
+    return;
+  }
+
+  const { nanoid } = await import("nanoid");
+  const { randomBytes } = await import("crypto");
+  const bookingNumber = `BK${nanoid(8).toUpperCase()}`;
+  // Parse dates as YYYY-MM-DD noon UTC to avoid timezone shift when displaying
+  const parseOfferDate = (s: string) => {
+    const m = String(s || "").match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (m) return new Date(Date.UTC(parseInt(m[1], 10), parseInt(m[2], 10) - 1, parseInt(m[3], 10), 12, 0, 0));
+    return new Date(s);
+  };
+  const checkIn = parseOfferDate((offer.check_in_date || "").toString().slice(0, 10));
+  const checkOut = parseOfferDate((offer.check_out_date || "").toString().slice(0, 10));
+  const nights = Math.ceil((checkOut.getTime() - checkIn.getTime()) / (1000 * 60 * 60 * 24));
+  const customTotal = Number(offer.custom_total_eur) || 0;
+  const cancellationToken = randomBytes(32).toString("hex");
+
+  const { data: booking, error: bookErr } = await supabase
+    .from("bookings")
+    .insert({
+      booking_number: bookingNumber,
+      unit_id: offer.unit_id,
+      user_id: null,
+      check_in_date: checkIn.toISOString(),
+      check_out_date: checkOut.toISOString(),
+      nights,
+      base_price: Math.round((customTotal / nights) * 100) / 100,
+      total_nights: nights,
+      subtotal: customTotal,
+      cleaning_fee: 0,
+      taxes: 0,
+      discount_amount: 0,
+      deposit_amount: customTotal,
+      balance_amount: 0,
+      remaining_amount: 0,
+      total_price: customTotal,
+      guests: offer.guests,
+      guest_name: pending.guest_name,
+      guest_email: pending.guest_email,
+      guest_phone: pending.guest_phone,
+      payment_status: "PENDING",
+      payment_type: "FULL",
+      deposit_paid: false,
+      balance_paid: false,
+      status: "PENDING",
+      cancellation_token: cancellationToken,
+    })
+    .select()
+    .single();
+
+  if (bookErr || !booking) {
+    console.error("[WEBHOOK] Failed to create booking from offer:", bookErr);
+    return;
+  }
+
+  await supabase.from("payments").insert({
+    booking_id: booking.id,
+    user_id: GUEST_USER_ID,
+    amount: customTotal,
+    currency: "EUR",
+    payment_type: "FULL",
+    stripe_payment_intent_id: paymentIntentId,
+    stripe_charge_id: chargeId || null,
+    status: "COMPLETED",
+    processed_at: new Date().toISOString(),
+    description: `Full payment (custom offer) for ${bookingNumber}`,
+  });
+
+  await supabase
+    .from("bookings")
+    .update({
+      deposit_paid: true,
+      balance_paid: true,
+      payment_status: "PAID_FULL",
+      status: "CONFIRMED",
+      total_paid: customTotal,
+      remaining_amount: 0,
+    })
+    .eq("id", booking.id);
+
+  await supabase
+    .from("custom_checkout_offers")
+    .update({ used_at: new Date().toISOString() })
+    .eq("token", pending.offer_token);
+
+  await supabase.from("pending_offer_checkouts").delete().eq("id", pending.id);
+
+  const frontendUrl = process.env.FRONTEND_URL || "https://www.leonidion-houses.com";
+  const { data: fullBooking } = await supabase
+    .from("bookings")
+    .select("*, unit:units(*, property:properties(*))")
+    .eq("id", booking.id)
+    .single();
+
+  const apiKey = process.env.RESEND_API_KEY;
+  if (apiKey && fullBooking) {
+    const resend = new Resend(apiKey);
+    const from = `${process.env.FROM_NAME || "LEONIDIONHOUSES"} <${process.env.FROM_EMAIL || "onboarding@resend.dev"}>`;
+    const unit = (fullBooking as any).unit;
+    const property = unit?.property;
+    const viewUrl = `${frontendUrl}/booking/${booking.id}?email=${encodeURIComponent(booking.guest_email || "")}`;
+    const cancelUrl = cancellationToken ? `${frontendUrl}/cancel-booking?token=${encodeURIComponent(cancellationToken)}` : null;
+    const checkInStr = checkIn.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+    const checkOutStr = checkOut.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+
+    await resend.emails.send({
+      from,
+      to: booking.guest_email,
+      subject: "Payment Receipt - " + bookingNumber,
+      html: `<h1>Payment Receipt</h1><p>Dear ${booking.guest_name},</p><p>Your payment of €${customTotal.toFixed(2)} has been processed. Booking ${bookingNumber} confirmed.</p><p><a href="${viewUrl}" style="background:#0677A1;color:white;padding:10px 20px;text-decoration:none;border-radius:5px;">View Booking</a></p><p>Best regards,<br/>LEONIDIONHOUSES</p>`,
+    });
+
+    await resend.emails.send({
+      from,
+      to: booking.guest_email,
+      subject: "Booking Confirmation",
+      html: `<h1>Booking Confirmation</h1><p>Dear ${booking.guest_name},</p><p>Thank you for your booking.</p><ul><li><strong>Booking:</strong> ${bookingNumber}</li><li><strong>Room:</strong> ${property?.name || "N/A"}</li><li><strong>Arrival:</strong> ${checkInStr}</li><li><strong>Departure:</strong> ${checkOutStr}</li><li><strong>Total:</strong> €${customTotal.toFixed(2)}</li></ul><p><a href="${viewUrl}" style="background:#0677A1;color:white;padding:10px 20px;text-decoration:none;border-radius:5px;">View Booking</a></p>${cancelUrl ? `<p>Need to cancel? <a href="${cancelUrl}" style="color:#0677A1;">Cancel your booking</a></p>` : ""}<p>Best regards,<br/>LEONIDIONHOUSES</p>`,
+    });
+  }
+
+  console.log("[WEBHOOK] Created booking from custom offer:", bookingNumber);
+}
+
 async function processSuccessfulPayment(
   supabase: ReturnType<typeof createClient>,
   stripe: Stripe,
   paymentIntentId: string,
   chargeId?: string
 ) {
+  const pi = await stripe.paymentIntents.retrieve(paymentIntentId);
+  if (pi.metadata?.type === "custom_offer" || pi.metadata?.offerToken) {
+    await processOfferPayment(supabase, stripe, paymentIntentId, chargeId);
+    return;
+  }
+
   const { data: payment } = await supabase
     .from("payments")
     .select("*")

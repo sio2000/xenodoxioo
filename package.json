@@ -12,6 +12,7 @@
   },
   "scripts": {
     "dev": "vite",
+    "dev:stripe": "echo Run in separate terminal: stripe listen --forward-to localhost:8080/api/payments/webhook",
     "build": "npm run build:client && npm run build:server",
     "build:client": "vite build --config vite.config.client.ts",
     "build:server": "vite build --config vite.config.server.ts",

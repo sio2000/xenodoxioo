@@ -254,6 +254,189 @@ export async function createGuestPaymentIntent(
   };
 }
 
+// ── Create Payment Intent from Custom Offer (no booking yet) ────────
+
+export async function createPaymentIntentFromOffer(
+  offerToken: string,
+  guestName: string,
+  guestEmail: string,
+  guestPhone?: string,
+) {
+  const { data: offer } = await supabase
+    .from("custom_checkout_offers")
+    .select("*")
+    .eq("token", offerToken)
+    .is("used_at", null)
+    .single();
+
+  if (!offer) throw new NotFoundError("Offer not found or already used");
+
+  const amountEur = Number(offer.custom_total_eur) || 0;
+  const cents = toCents(amountEur);
+  if (cents < 50) throw new ValidationError("Payment amount too small (min €0.50)");
+
+  const settings = await getPaymentSettings();
+  const stripe = getStripe();
+  const customerId = await ensureStripeCustomer(guestEmail, guestName, guestPhone);
+
+  const paymentIntent = await stripe.paymentIntents.create({
+    amount: cents,
+    currency: settings.currency.toLowerCase(),
+    customer: customerId,
+    metadata: {
+      offerToken: offerToken,
+      type: "custom_offer",
+    },
+    payment_method_types: ["card"],
+  });
+
+  const { data: pending, error: pendingErr } = await supabase
+    .from("pending_offer_checkouts")
+    .insert({
+      offer_token: offerToken,
+      guest_name: guestName,
+      guest_email: guestEmail,
+      guest_phone: guestPhone || null,
+      stripe_payment_intent_id: paymentIntent.id,
+    })
+    .select()
+    .single();
+
+  if (pendingErr || !pending) {
+    console.error("[PAYMENT] Failed to create pending offer checkout:", pendingErr);
+    throw new Error("Failed to create checkout session");
+  }
+
+  return {
+    clientSecret: paymentIntent.client_secret,
+    paymentIntentId: paymentIntent.id,
+    amount: amountEur,
+    paymentType: "FULL",
+  };
+}
+
+// ── Create Booking from Offer (after payment success) ────────────────
+
+export async function createBookingFromOffer(paymentIntentId: string, chargeId?: string) {
+  const { data: pending } = await supabase
+    .from("pending_offer_checkouts")
+    .select("*")
+    .eq("stripe_payment_intent_id", paymentIntentId)
+    .single();
+
+  if (!pending) {
+    console.warn("[PAYMENT] No pending offer for PI", paymentIntentId);
+    return null;
+  }
+
+  const { data: offer } = await supabase
+    .from("custom_checkout_offers")
+    .select("*")
+    .eq("token", pending.offer_token)
+    .single();
+
+  if (!offer || offer.used_at) {
+    console.warn("[PAYMENT] Offer not found or already used:", pending.offer_token);
+    return null;
+  }
+
+  const { nanoid: nanoidFn } = await import("nanoid");
+  const { randomBytes } = await import("crypto");
+  const bookingNumber = `BK${nanoidFn(8).toUpperCase()}`;
+  // Parse dates consistently (YYYY-MM-DD noon UTC) to avoid timezone shift
+  const parseOfferDate = (s: string) => {
+    const str = String(s || "").slice(0, 10);
+    const m = str.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (m) return new Date(Date.UTC(parseInt(m[1], 10), parseInt(m[2], 10) - 1, parseInt(m[3], 10), 12, 0, 0));
+    return new Date(s);
+  };
+  const checkIn = parseOfferDate(String(offer.check_in_date || ""));
+  const checkOut = parseOfferDate(String(offer.check_out_date || ""));
+  const nights = Math.ceil((checkOut.getTime() - checkIn.getTime()) / (1000 * 60 * 60 * 24));
+  const customTotal = Number(offer.custom_total_eur) || 0;
+  const cancellationToken = randomBytes(32).toString("hex");
+
+  const { data: booking, error: bookErr } = await supabase
+    .from("bookings")
+    .insert({
+      booking_number: bookingNumber,
+      unit_id: offer.unit_id,
+      user_id: null,
+      check_in_date: checkIn.toISOString(),
+      check_out_date: checkOut.toISOString(),
+      nights,
+      base_price: Math.round((customTotal / nights) * 100) / 100,
+      total_nights: nights,
+      subtotal: customTotal,
+      cleaning_fee: 0,
+      taxes: 0,
+      discount_amount: 0,
+      deposit_amount: customTotal,
+      balance_amount: 0,
+      remaining_amount: 0,
+      total_price: customTotal,
+      guests: offer.guests,
+      guest_name: pending.guest_name,
+      guest_email: pending.guest_email,
+      guest_phone: pending.guest_phone,
+      payment_status: "PENDING",
+      payment_type: "FULL",
+      deposit_paid: false,
+      balance_paid: false,
+      status: "PENDING",
+      stripe_customer_id: null,
+      cancellation_token: cancellationToken,
+    })
+    .select()
+    .single();
+
+  if (bookErr || !booking) {
+    console.error("[PAYMENT] Failed to create booking from offer:", bookErr);
+    return null;
+  }
+
+  await supabase
+    .from("payments")
+    .insert({
+      booking_id: booking.id,
+      user_id: "00000000-0000-0000-0000-000000000001",
+      amount: customTotal,
+      currency: "EUR",
+      payment_type: "FULL",
+      stripe_payment_intent_id: paymentIntentId,
+      stripe_charge_id: chargeId || null,
+      stripe_customer_id: null,
+      status: "COMPLETED",
+      processed_at: new Date().toISOString(),
+      description: `Full payment (custom offer) for booking ${bookingNumber}`,
+    });
+
+  await supabase
+    .from("bookings")
+    .update({
+      deposit_paid: true,
+      balance_paid: true,
+      payment_status: "PAID_FULL",
+      status: "CONFIRMED",
+      total_paid: customTotal,
+      remaining_amount: 0,
+    })
+    .eq("id", booking.id);
+
+  await supabase
+    .from("custom_checkout_offers")
+    .update({ used_at: new Date().toISOString() })
+    .eq("token", pending.offer_token);
+
+  await supabase.from("pending_offer_checkouts").delete().eq("id", pending.id);
+
+  sendEmailsAfterPayment(booking.id, "FULL", { status: "CONFIRMED", payment_status: "PAID_FULL" }).catch((err) =>
+    console.error("[PAYMENT] Offer booking email failed:", err),
+  );
+
+  return booking;
+}
+
 // ── Process Successful Payment (called from webhook) ───────────────
 
 export async function processSuccessfulPayment(
@@ -262,6 +445,11 @@ export async function processSuccessfulPayment(
 ) {
   const stripe = getStripe();
   const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
+
+  if (paymentIntent.metadata?.type === "custom_offer" || paymentIntent.metadata?.offerToken) {
+    const booking = await createBookingFromOffer(paymentIntentId, chargeId);
+    return booking ? { type: "offer", booking } : null;
+  }
 
   const { data: payment } = await supabase
     .from("payments")
@@ -416,6 +604,7 @@ async function sendEmailsAfterPayment(
     nights: booking.nights,
     guests: booking.guests,
     totalPrice: Number(booking.total_price),
+    cancellationToken: booking.cancellation_token,
     unit: {
       name: unit?.name || "N/A",
       property: { name: property?.name || "N/A" },

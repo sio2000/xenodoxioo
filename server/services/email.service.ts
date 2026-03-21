@@ -137,6 +137,14 @@ function getViewBookingUrl(booking: any, userId?: string | null, guestEmail?: st
   return `${base}/dashboard`;
 }
 
+function formatDateSafe(dateVal: string | Date): string {
+  if (!dateVal) return "N/A";
+  const d = typeof dateVal === "string" && /^\d{4}-\d{2}-\d{2}/.test(dateVal)
+    ? (() => { const [y, m, day] = dateVal.slice(0, 10).split("-").map(Number); return new Date(y, m - 1, day); })()
+    : new Date(dateVal);
+  return isNaN(d.getTime()) ? String(dateVal) : d.toLocaleDateString();
+}
+
 /**
  * Booking confirmation email
  */
@@ -146,6 +154,9 @@ export async function sendBookingConfirmationEmail(
   userId?: string,
 ) {
   const viewUrl = getViewBookingUrl(booking, userId, email);
+  const cancelUrl = booking.cancellationToken
+    ? `${getFrontendUrl()}/cancel-booking?token=${encodeURIComponent(booking.cancellationToken)}`
+    : null;
   const html = `
     <h1>Booking Confirmation</h1>
     <p>Dear ${booking.guestName},</p>
@@ -155,15 +166,16 @@ export async function sendBookingConfirmationEmail(
       <li><strong>Booking Number:</strong> ${booking.bookingNumber}</li>
       <li><strong>Room:</strong> ${booking.unit?.property?.name || 'N/A'}</li>
       <li><strong>Unit:</strong> ${booking.unit?.name || 'N/A'}</li>
-      <li><strong>Check-in:</strong> ${new Date(booking.checkInDate).toLocaleDateString()}</li>
-      <li><strong>Check-out:</strong> ${new Date(booking.checkOutDate).toLocaleDateString()}</li>
+      <li><strong>Check-in:</strong> ${formatDateSafe(booking.checkInDate)}</li>
+      <li><strong>Check-out:</strong> ${formatDateSafe(booking.checkOutDate)}</li>
       <li><strong>Nights:</strong> ${booking.nights}</li>
       <li><strong>Guests:</strong> ${booking.guests}</li>
     </ul>
     <h2>Total Amount: €${booking.totalPrice?.toFixed(2) || '0.00'}</h2>
     <p><strong>Deposit (25%):</strong> €${((booking.totalPrice || 0) * 0.25).toFixed(2)} (Due immediately)</p>
     <p><strong>Balance (75%):</strong> €${((booking.totalPrice || 0) * 0.75).toFixed(2)} (Due 21 days before arrival)</p>
-    <a href="${viewUrl}" style="background-color: #0677A1; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">View Booking</a>
+    <p><a href="${viewUrl}" style="background-color: #0677A1; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">View Booking</a></p>
+    ${cancelUrl ? `<p>Need to cancel? <a href="${cancelUrl}" style="color: #0677A1;">Cancel your booking</a></p>` : ""}
     <p>Best regards,<br/>The LEONIDIONHOUSES Team</p>
   `;
 
@@ -394,7 +406,7 @@ export async function sendInquiryReplyEmail(
   propertyName: string,
   inquiryId: string,
 ) {
-  const inquiryUrl = `${getFrontendUrl()}/inquiry/${inquiryId}`;
+  const inquiryUrl = `${getFrontendUrl()}/inquiry/${inquiryId}?email=${encodeURIComponent(guestEmail)}`;
 
   const html = `
     <h1>Reply to Your Inquiry</h1>

@@ -21,6 +21,13 @@ const createIntentSchema = z.object({
   paymentType: z.enum(["DEPOSIT", "BALANCE", "FULL"]).optional(),
 });
 
+const createOfferIntentSchema = z.object({
+  offerToken: z.string(),
+  guestName: z.string().min(2),
+  guestEmail: z.string().email(),
+  guestPhone: z.string().optional(),
+});
+
 const refundSchema = z.object({
   bookingId: z.string(),
   reason: z.string().optional(),
@@ -50,6 +57,27 @@ router.post(
         bookingId,
         req.user!.userId,
         paymentType,
+      );
+      res.json({ success: true, data: result });
+    } catch (error) {
+      next(error);
+    }
+  },
+);
+
+// ── Create Payment Intent from Custom Offer (no auth, no booking) ──
+
+router.post(
+  "/create-intent-from-offer",
+  validate(createOfferIntentSchema),
+  async (req, res, next) => {
+    try {
+      const { offerToken, guestName, guestEmail, guestPhone } = req.body;
+      const result = await paymentService.createPaymentIntentFromOffer(
+        offerToken,
+        guestName,
+        guestEmail,
+        guestPhone,
       );
       res.json({ success: true, data: result });
     } catch (error) {

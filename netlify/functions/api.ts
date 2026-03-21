@@ -339,6 +339,31 @@ export const handler = async (event: any, context: any) => {
       };
     }
 
+    // GET /api/bookings/offer/:token - custom offer for checkout (public)
+    const offerTokenMatch = path.match(/^\/api\/bookings\/offer\/([^/]+)$/);
+    if (offerTokenMatch && method === 'GET') {
+      const token = offerTokenMatch[1];
+      const { data: offer, error } = await supabase
+        .from('custom_checkout_offers')
+        .select('*, unit:units(name, max_guests), property:properties(name)')
+        .eq('token', token)
+        .is('used_at', null)
+        .single();
+      if (error || !offer) {
+        return { statusCode: 404, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ success: false, error: 'Offer not found or already used' }) };
+      }
+      const checkInStr = (offer.check_in_date || '').toString().slice(0, 10);
+      const checkOutStr = (offer.check_out_date || '').toString().slice(0, 10);
+      return {
+        statusCode: 200,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          success: true,
+          data: { token: offer.token, unitId: offer.unit_id, propertyId: offer.property_id, checkIn: checkInStr, checkOut: checkOutStr, guests: offer.guests, customTotalEur: Number(offer.custom_total_eur), unit: offer.unit, property: offer.property }
+        })
+      };
+    }
+
     // GET /api/bookings/occupied-dates - blocked dates for calendar (CRITICAL: prevents double booking)
     if ((path === '/api/bookings/occupied-dates' || path === '/bookings/occupied-dates') && method === 'GET') {
       const unitId = event.queryStringParameters?.unitId?.trim();
@@ -1154,6 +1179,60 @@ export const handler = async (event: any, context: any) => {
         }
       }
 
+      // POST /api/payments/create-intent-from-offer (no auth)
+      if (path === '/api/payments/create-intent-from-offer' && method === 'POST') {
+        let body: { offerToken?: string; guestName?: string; guestEmail?: string; guestPhone?: string } = {};
+        try {
+          body = typeof event.body === 'string' ? JSON.parse(event.body || '{}') : event.body || {};
+        } catch {
+          return { statusCode: 400, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ success: false, error: 'Invalid JSON' }) };
+        }
+        const { offerToken, guestName, guestEmail, guestPhone } = body;
+        if (!offerToken || !guestName || !guestEmail || guestName.length < 2) {
+          return { statusCode: 400, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ success: false, error: 'offerToken, guestName (min 2 chars), guestEmail required' }) };
+        }
+        const { data: offer } = await supabase.from('custom_checkout_offers').select('*').eq('token', offerToken).is('used_at', null).single();
+        if (!offer) {
+          return { statusCode: 404, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ success: false, error: 'Offer not found or already used' }) };
+        }
+        const amountEur = Number(offer.custom_total_eur) || 0;
+        const cents = Math.round(amountEur * 100);
+        if (cents < 50) {
+          return { statusCode: 400, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ success: false, error: 'Payment amount too small' }) };
+        }
+        try {
+          const Stripe = (await import('stripe')).default;
+          const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '');
+          const customers = await stripe.customers.list({ email: guestEmail, limit: 1 });
+          let customerId = customers.data[0]?.id;
+          if (!customerId) {
+            const c = await stripe.customers.create({ email: guestEmail, name: guestName, phone: guestPhone || undefined });
+            customerId = c.id;
+          }
+          const pi = await stripe.paymentIntents.create({
+            amount: cents,
+            currency: 'eur',
+            customer: customerId,
+            metadata: { offerToken, type: 'custom_offer' },
+            payment_method_types: ['card'],
+          });
+          await supabase.from('pending_offer_checkouts').insert({
+            offer_token: offerToken,
+            guest_name: guestName,
+            guest_email: guestEmail,
+            guest_phone: guestPhone || null,
+            stripe_payment_intent_id: pi.id,
+          });
+          return {
+            statusCode: 200,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ success: true, data: { clientSecret: pi.client_secret, paymentIntentId: pi.id, amount: amountEur, paymentType: 'FULL' } })
+          };
+        } catch (err: any) {
+          return { statusCode: 500, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ success: false, error: err?.message || 'Payment setup failed' }) };
+        }
+      }
+
       // POST /api/payments/create-intent (auth) - for logged-in users
       if (path === '/api/payments/create-intent' && method === 'POST') {
         const authHeader = event.headers?.authorization || event.headers?.Authorization;
@@ -1617,6 +1696,7 @@ async function handleInquiriesRoutes(path: string, method: string, supabase: any
         sender_type: 'guest',
         message,
       });
+      await supabase.from('inquiries').update({ last_guest_message_at: new Date().toISOString() }).eq('id', inquiry.id);
       const adminEmail = process.env.ADMIN_EMAIL || 'admin@leonidion-houses.com';
       const { data: property } = await supabase.from('properties').select('name').eq('id', propertyId).single();
       const propertyName = property?.name || 'Property';
@@ -1732,7 +1812,7 @@ async function handleInquiriesRoutes(path: string, method: string, supabase: any
         sender_type: 'guest',
         message,
       });
-      await supabase.from('inquiries').update({ status: 'GUEST_REPLIED' }).eq('id', id);
+      await supabase.from('inquiries').update({ status: 'GUEST_REPLIED', last_guest_message_at: new Date().toISOString() }).eq('id', id);
       return {
         statusCode: 200,
         headers: { 'Content-Type': 'application/json' },
@@ -1798,6 +1878,12 @@ async function handleInquiriesRoutes(path: string, method: string, supabase: any
         };
       }
 
+      // Mark as viewed by admin (for unread badge)
+      await supabase
+        .from('inquiries')
+        .update({ admin_last_viewed_at: new Date().toISOString() })
+        .eq('id', id);
+
       const { data: messages } = await supabase
         .from('inquiry_messages')
         .select('*')
@@ -1814,6 +1900,57 @@ async function handleInquiriesRoutes(path: string, method: string, supabase: any
             messages: messages || []
           }
         })
+      };
+    }
+
+    // POST /api/inquiries/admin/:id/custom-offer
+    const customOfferMatch = path.match(/^\/api\/inquiries\/admin\/([^/]+)\/custom-offer$/);
+    if (customOfferMatch && method === 'POST') {
+      const inquiryId = customOfferMatch[1];
+      let body: { unitId?: string; checkInDate?: string; checkOutDate?: string; guests?: number; customTotalEur?: number } = {};
+      try {
+        body = typeof event.body === 'string' ? JSON.parse(event.body) : event.body || {};
+      } catch {
+        return { statusCode: 400, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ success: false, error: 'Invalid JSON' }) };
+      }
+      const { unitId, checkInDate, checkOutDate, guests = 2, customTotalEur } = body;
+      if (!unitId || !checkInDate || !checkOutDate || !customTotalEur || customTotalEur < 1) {
+        return { statusCode: 400, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ success: false, error: 'unitId, checkInDate, checkOutDate, customTotalEur (min 1) required' }) };
+      }
+      const { data: inquiry } = await supabase.from('inquiries').select('property_id').eq('id', inquiryId).single();
+      if (!inquiry) return { statusCode: 404, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ success: false, error: 'Inquiry not found' }) };
+      const { data: unit } = await supabase.from('units').select('id, property_id').eq('id', unitId).eq('is_active', true).single();
+      if (!unit || unit.property_id !== inquiry.property_id) {
+        return { statusCode: 400, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ success: false, error: 'Unit not found or does not belong to inquiry property' }) };
+      }
+      const BLOCKING = ['CONFIRMED', 'COMPLETED', 'CHECKED_IN', 'CHECKED_OUT', 'NO_SHOW'];
+      const { data: conflicting } = await supabase.from('bookings').select('id')
+        .eq('unit_id', unitId).in('status', BLOCKING)
+        .lt('check_in_date', checkOutDate).gt('check_out_date', checkInDate);
+      if (conflicting && conflicting.length > 0) {
+        return { statusCode: 409, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ success: false, error: 'Dates already booked' }) };
+      }
+      const { randomBytes } = await import('crypto');
+      const token = randomBytes(16).toString('hex');
+      const toNoonUtc = (s: string) => {
+        const m = String(s || '').match(/^(\d{4})-(\d{2})-(\d{2})/);
+        if (m) return new Date(Date.UTC(parseInt(m[1], 10), parseInt(m[2], 10) - 1, parseInt(m[3], 10), 12, 0, 0)).toISOString();
+        return new Date(s).toISOString();
+      };
+      const { data: offer, error: offerErr } = await supabase.from('custom_checkout_offers').insert({
+        token, inquiry_id: inquiryId, unit_id: unitId, property_id: inquiry.property_id,
+        check_in_date: toNoonUtc(checkInDate), check_out_date: toNoonUtc(checkOutDate),
+        guests: guests || 2, custom_total_eur: customTotalEur,
+      }).select().single();
+      if (offerErr || !offer) {
+        return { statusCode: 500, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ success: false, error: 'Failed to create offer' }) };
+      }
+      const baseUrl = process.env.FRONTEND_URL || 'https://www.leonidion-houses.com';
+      const checkoutUrl = `${baseUrl}/checkout?offer=${token}`;
+      return {
+        statusCode: 200,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ success: true, data: { token: offer.token, checkoutUrl, checkIn: offer.check_in_date, checkOut: offer.check_out_date, guests: offer.guests, customTotalEur: offer.custom_total_eur } })
       };
     }
 
@@ -1856,6 +1993,33 @@ async function handleInquiriesRoutes(path: string, method: string, supabase: any
       });
 
       await supabase.from('inquiries').update({ status: 'ANSWERED' }).eq('id', id);
+
+      // Send reply email to guest (same as Express server)
+      const { data: property } = await supabase.from('properties').select('name').eq('id', inquiry.property_id).single();
+      const propertyName = property?.name || 'Property';
+      const apiKey = process.env.RESEND_API_KEY;
+      if (apiKey) {
+        const Resend = (await import('resend')).Resend;
+        const resend = new Resend(apiKey);
+        const from = `${process.env.FROM_NAME || 'LEONIDIONHOUSES'} <${process.env.FROM_EMAIL || 'onboarding@resend.dev'}>`;
+        const inquiryUrl = `${process.env.FRONTEND_URL || 'https://www.leonidion-houses.com'}/inquiry/${id}?email=${encodeURIComponent(inquiry.guest_email)}`;
+        const html = `
+          <h1>Reply to Your Inquiry</h1>
+          <p>Dear ${inquiry.guest_name},</p>
+          <p>You have received a reply regarding your inquiry for <strong>${propertyName}</strong>.</p>
+          <div style="background: #f5f5f5; padding: 15px; border-radius: 5px; margin: 15px 0;">
+            <p style="margin: 0;">${String(message).replace(/\n/g, '<br/>')}</p>
+          </div>
+          <a href="${inquiryUrl}" style="background-color: #0677A1; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">View Your Inquiry</a>
+          <p>Best regards,<br/>The LEONIDIONHOUSES Team</p>
+        `;
+        await resend.emails.send({
+          from,
+          to: [inquiry.guest_email],
+          subject: `Reply to your inquiry - ${propertyName}`,
+          html
+        }).catch((err: any) => console.error('[INQUIRY] Reply email failed:', err));
+      }
 
       return {
         statusCode: 200,
@@ -1944,14 +2108,15 @@ async function handleAdminRoutes(path: string, method: string, supabase: any, ev
 
     // GET /api/admin/stats
     if (path === '/api/admin/stats' && method === 'GET') {
-      const [bookingsResult, usersResult, propertiesResult] = await Promise.all([
+      const [bookingsResult, usersResult, propertiesResult, inquiriesRpcResult] = await Promise.all([
         supabase.from('bookings').select('status, unit_id, check_in_date, check_out_date, total_paid'),
         supabase.from('users').select('id, status', { count: 'exact' }),
         supabase.from('properties').select(`
           id,
           name,
           units:units(id)
-        `)
+        `),
+        supabase.rpc('count_unread_inquiries')
       ]);
 
       const bookings = bookingsResult.data || [];
@@ -2002,6 +2167,14 @@ async function handleAdminRoutes(path: string, method: string, supabase: any, ev
         };
       });
 
+      let unreadInquiriesCount = 0;
+      if (!inquiriesRpcResult.error && typeof inquiriesRpcResult.data === 'number') {
+        unreadInquiriesCount = inquiriesRpcResult.data;
+      } else {
+        const fallback = await supabase.from('inquiries').select('*', { count: 'exact', head: true }).in('status', ['NEW', 'GUEST_REPLIED']);
+        unreadInquiriesCount = fallback.count ?? 0;
+      }
+
       const stats = {
         totalBookings: bookings.length,
         confirmedBookings: confirmedBookings.length,
@@ -2011,7 +2184,8 @@ async function handleAdminRoutes(path: string, method: string, supabase: any, ev
         totalUsers,
         propertiesCount: properties.length,
         occupancyByProperty,
-        activeUsers: (users as any[]).filter((u: any) => u?.status === 'ACTIVE').length || totalUsers
+        activeUsers: (users as any[]).filter((u: any) => u?.status === 'ACTIVE').length || totalUsers,
+        unreadInquiriesCount
       };
 
       return {

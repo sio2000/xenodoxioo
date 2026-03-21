@@ -3,6 +3,7 @@ import { z } from "zod";
 import { validate } from "../middleware/validation";
 import { supabase } from "../lib/db";
 import { sendInquiryNotificationEmail, sendInquiryReplyEmail } from "../services/email.service";
+import * as customOfferService from "../services/custom-offer.service";
 
 const router = Router();
 
@@ -20,6 +21,14 @@ const createInquirySchema = z.object({
 
 const replySchema = z.object({
   message: z.string().min(1),
+});
+
+const customOfferSchema = z.object({
+  unitId: z.string().uuid(),
+  checkInDate: z.string(),
+  checkOutDate: z.string(),
+  guests: z.coerce.number().min(1).max(20),
+  customTotalEur: z.coerce.number().min(1),
 });
 
 const guestReplySchema = z.object({
@@ -57,6 +66,8 @@ router.post("/", validate(createInquirySchema), async (req, res, next) => {
       sender_type: "guest",
       message,
     });
+
+    await supabase.from("inquiries").update({ last_guest_message_at: new Date().toISOString() }).eq("id", inquiry.id);
 
     // Send email notification to admin
     const adminEmail = process.env.ADMIN_EMAIL || "admin@leonidion-houses.com";
@@ -153,7 +164,7 @@ router.post("/:id/guest-reply", validate(guestReplySchema), async (req, res, nex
 
     await supabase
       .from("inquiries")
-      .update({ status: "GUEST_REPLIED" })
+      .update({ status: "GUEST_REPLIED", last_guest_message_at: new Date().toISOString() })
       .eq("id", id);
 
     res.json({ success: true });
@@ -210,6 +221,12 @@ router.get("/admin/:id", async (req, res, next) => {
       return res.status(404).json({ success: false, error: "Inquiry not found" });
     }
 
+    // Mark as viewed by admin (for unread badge)
+    await supabase
+      .from("inquiries")
+      .update({ admin_last_viewed_at: new Date().toISOString() })
+      .eq("id", req.params.id);
+
     const { data: messages } = await supabase
       .from("inquiry_messages")
       .select("*")
@@ -221,6 +238,41 @@ router.get("/admin/:id", async (req, res, next) => {
       data: {
         inquiry,
         messages: messages || [],
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// ── Admin: Create Custom Checkout Offer ─────────────────────────────
+
+router.post("/admin/:id/custom-offer", validate(customOfferSchema), async (req, res, next) => {
+  try {
+    const { id: inquiryId } = req.params;
+    const { unitId, checkInDate, checkOutDate, guests, customTotalEur } = req.body;
+
+    const offer = await customOfferService.createCustomOffer(
+      inquiryId,
+      unitId,
+      new Date(checkInDate),
+      new Date(checkOutDate),
+      guests,
+      customTotalEur,
+    );
+
+    const baseUrl = process.env.FRONTEND_URL || "https://www.leonidion-houses.com";
+    const checkoutUrl = `${baseUrl}/checkout?offer=${offer.token}`;
+
+    res.json({
+      success: true,
+      data: {
+        token: offer.token,
+        checkoutUrl,
+        checkIn: offer.check_in_date,
+        checkOut: offer.check_out_date,
+        guests: offer.guests,
+        customTotalEur: offer.custom_total_eur,
       },
     });
   } catch (error) {

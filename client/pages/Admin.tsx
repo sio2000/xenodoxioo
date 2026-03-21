@@ -13,6 +13,9 @@ import {
   Pencil,
   Trash2,
   Euro,
+  Link2,
+  Copy,
+  Check,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useLanguage } from "@/hooks/useLanguage";
@@ -126,8 +129,8 @@ function PaymentSettingsPanel() {
 
 // ── Inquiries Management ───────────────────────────────────────────
 
-function InquiriesManagement() {
-  const { t } = useLanguage();
+function InquiriesManagement({ onReplySent, onInquiryViewed }: { onReplySent?: () => void; onInquiryViewed?: () => void }) {
+  const { t, language } = useLanguage();
   const [inquiries, setInquiries] = useState<any[]>([]);
   const [selectedInquiry, setSelectedInquiry] = useState<any>(null);
   const [messages, setMessages] = useState<any[]>([]);
@@ -138,6 +141,17 @@ function InquiriesManagement() {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const pageSize = 10;
+
+  const [units, setUnits] = useState<{ id: string; name: string }[]>([]);
+  const [offerUnitId, setOfferUnitId] = useState("");
+  const [offerCheckIn, setOfferCheckIn] = useState("");
+  const [offerCheckOut, setOfferCheckOut] = useState("");
+  const [offerGuests, setOfferGuests] = useState(2);
+  const [offerTotal, setOfferTotal] = useState("");
+  const [generatedUrl, setGeneratedUrl] = useState("");
+  const [loadingOffer, setLoadingOffer] = useState(false);
+  const [offerError, setOfferError] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
 
   const fetchInquiries = async () => {
     setLoading(true);
@@ -161,6 +175,8 @@ function InquiriesManagement() {
 
   const viewInquiry = async (inquiry: any) => {
     setSelectedInquiry(inquiry);
+    setGeneratedUrl("");
+    setOfferError(null);
     try {
       const admin = localStorage.getItem("admin");
       const token = admin ? JSON.parse(admin).accessToken : "";
@@ -170,8 +186,58 @@ function InquiriesManagement() {
       if (res.ok) {
         const data = await res.json();
         setMessages(data.data?.messages || []);
+        onInquiryViewed?.();
+      }
+      const propRes = await fetch(apiUrl(`/api/properties/id/${inquiry.property_id}`));
+      if (propRes.ok) {
+        const propData = await propRes.json();
+        const u = (propData.data?.units || []).map((x: any) => ({ id: x.id, name: x.name || x.unit?.name || "Unit" }));
+        setUnits(u);
+        if (u.length) setOfferUnitId(u[0].id);
       }
     } catch {}
+  };
+
+  const handleGenerateLink = async () => {
+    if (!selectedInquiry || !offerUnitId || !offerCheckIn || !offerCheckOut || !offerTotal || Number(offerTotal) < 1) {
+      setOfferError("Please fill all fields (unit, dates, total €)");
+      return;
+    }
+    setLoadingOffer(true);
+    setOfferError(null);
+    try {
+      const admin = localStorage.getItem("admin");
+      const token = admin ? JSON.parse(admin).accessToken : "";
+      const res = await fetch(apiUrl(`/api/inquiries/admin/${selectedInquiry.id}/custom-offer`), {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          unitId: offerUnitId,
+          checkInDate: offerCheckIn,
+          checkOutDate: offerCheckOut,
+          guests: offerGuests,
+          customTotalEur: Number(offerTotal),
+        }),
+      });
+      const json = await res.json();
+      if (res.ok && json.data?.checkoutUrl) {
+        setGeneratedUrl(json.data.checkoutUrl);
+      } else {
+        setOfferError(json.error || "Failed to generate link");
+      }
+    } catch {
+      setOfferError("Failed to generate link");
+    } finally {
+      setLoadingOffer(false);
+    }
+  };
+
+  const copyToClipboard = () => {
+    if (generatedUrl) {
+      navigator.clipboard.writeText(generatedUrl);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
   };
 
   const handleReply = async () => {
@@ -189,6 +255,7 @@ function InquiriesManagement() {
         setReplyText("");
         viewInquiry(selectedInquiry);
         fetchInquiries();
+        onReplySent?.();
       }
     } catch {}
     finally { setSending(false); }
@@ -221,13 +288,82 @@ function InquiriesManagement() {
           ))}
         </div>
 
-        <div className="flex gap-3">
+        <div className="flex gap-3 mb-6">
           <input type="text" value={replyText} onChange={(e) => setReplyText(e.target.value)}
             placeholder={t("admin.typeYourReply")}
             className="flex-1 px-4 py-2 border border-border rounded-lg text-foreground" />
           <button onClick={handleReply} disabled={sending || !replyText.trim()} className="btn-primary px-6">
             {sending ? t("admin.sending") : t("admin.reply")}
           </button>
+        </div>
+
+        <div className="bg-card border border-border rounded-lg p-6">
+          <h4 className="font-bold text-foreground mb-4 flex items-center gap-2">
+            <Link2 size={20} />
+            {language === "el" ? "Δημιουργία σύνδεσμου κράτησης" : "Create booking link"}
+          </h4>
+          <p className="text-sm text-muted-foreground mb-4">
+            {language === "el"
+              ? "Επιλέξτε ημερομηνίες και τιμή· ο σύνδεσμος οδηγεί τον επισκέπτη στο checkout. Η κράτηση δημιουργείται ΜΟΝΟ όταν πληρώσει."
+              : "Select dates and price; the link takes the guest to checkout. Booking is created ONLY when they pay."}
+          </p>
+          {units.length === 0 && (
+            <div className="mb-4 p-3 bg-muted/50 border border-border rounded-lg text-muted-foreground text-sm">
+              {language === "el" ? "Δεν βρέθηκαν δωμάτια για αυτήν την ιδιοκτησία." : "No units found for this property."}
+            </div>
+          )}
+          <div className="grid md:grid-cols-2 gap-4 mb-4">
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-1">{language === "el" ? "Δωμάτιο" : "Unit"}</label>
+              <select value={offerUnitId} onChange={(e) => setOfferUnitId(e.target.value)}
+                disabled={units.length === 0}
+                className="w-full px-4 py-2 border border-border rounded-lg text-foreground bg-background disabled:opacity-50">
+                {units.map((u) => (
+                  <option key={u.id} value={u.id}>{u.name}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-1">{language === "el" ? "Έναρξη" : "Check-in"}</label>
+              <input type="date" value={offerCheckIn} onChange={(e) => setOfferCheckIn(e.target.value)}
+                className="w-full px-4 py-2 border border-border rounded-lg text-foreground bg-background" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-1">{language === "el" ? "Λήξη" : "Check-out"}</label>
+              <input type="date" value={offerCheckOut} onChange={(e) => setOfferCheckOut(e.target.value)}
+                className="w-full px-4 py-2 border border-border rounded-lg text-foreground bg-background" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-1">{language === "el" ? "Άτομα" : "Guests"}</label>
+              <input type="number" min={1} max={20} value={offerGuests} onChange={(e) => setOfferGuests(Number(e.target.value) || 2)}
+                className="w-full px-4 py-2 border border-border rounded-lg text-foreground bg-background" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-1">{language === "el" ? "Συνολική τιμή (€)" : "Total price (€)"}</label>
+              <input type="number" min={1} step={0.01} value={offerTotal} onChange={(e) => setOfferTotal(e.target.value)}
+                placeholder="e.g. 350"
+                className="w-full px-4 py-2 border border-border rounded-lg text-foreground bg-background" />
+            </div>
+          </div>
+          {offerError && (
+            <div className="mb-4 p-3 bg-destructive/10 border border-destructive/30 rounded-lg text-destructive text-sm">{offerError}</div>
+          )}
+          <button onClick={handleGenerateLink} disabled={loadingOffer || units.length === 0} className="btn-primary px-6 mb-4">
+            {loadingOffer ? (language === "el" ? "Δημιουργία..." : "Generating...") : (language === "el" ? "Δημιούργησε σύνδεσμο" : "Generate link")}
+          </button>
+          {generatedUrl && (
+            <div className="p-4 bg-muted/50 border border-border rounded-lg">
+              <label className="block text-sm font-medium text-foreground mb-2">{language === "el" ? "Σύνδεσμος (αντιγράψτε και στείλτε στον επισκέπτη)" : "Link (copy and send to guest)"}</label>
+              <div className="flex gap-2">
+                <input type="text" readOnly value={generatedUrl}
+                  className="flex-1 px-3 py-2 border border-border rounded-lg text-foreground bg-background text-sm" />
+                <button onClick={copyToClipboard} className="btn-secondary px-4 flex items-center gap-2">
+                  {copied ? <Check size={16} /> : <Copy size={16} />}
+                  {copied ? (language === "el" ? "Αντιγράφηκε" : "Copied") : (language === "el" ? "Αντιγραφή" : "Copy")}
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     );
@@ -770,6 +906,7 @@ export default function Admin() {
     propertiesCount: 0,
     occupancyByProperty: [],
     activeUsers: 0,
+    unreadInquiriesCount: 0,
   });
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
@@ -870,7 +1007,7 @@ export default function Admin() {
     { id: "pricing", label: t("admin.pricing"), icon: DollarSign },
     { id: "properties", label: t("admin.properties"), icon: Calendar },
     { id: "users", label: t("admin.users"), icon: Users },
-    { id: "inquiries", label: t("admin.inquiries"), icon: Tag },
+    { id: "inquiries", label: t("admin.inquiries"), icon: Tag, badge: stats?.unreadInquiriesCount ?? 0 },
     { id: "settings", label: t("admin.settings"), icon: Settings },
   ];
 
@@ -892,11 +1029,13 @@ export default function Admin() {
           <div className="flex gap-2 mb-8 overflow-x-auto pb-2">
             {adminMenuItems.map((item) => {
               const Icon = item.icon;
+              const badge = "badge" in item ? (item as { badge?: number }).badge : 0;
+              const hasAlert = badge > 0;
               return (
                 <button
                   key={item.id}
                   onClick={() => setActiveTab(item.id)}
-                  className={`flex items-center gap-2 px-4 py-2 rounded-lg whitespace-nowrap transition-colors ${
+                  className={`flex items-center gap-2 px-4 py-2 rounded-lg whitespace-nowrap transition-colors relative ${
                     activeTab === item.id
                       ? "bg-primary text-white"
                       : "border border-border text-foreground hover:bg-muted"
@@ -904,6 +1043,18 @@ export default function Admin() {
                 >
                   <Icon size={18} />
                   {item.label}
+                  {hasAlert && (
+                    <span
+                      className={`absolute -top-1 -right-1 flex min-w-[18px] h-[18px] items-center justify-center rounded-full px-1 text-[10px] font-bold ${
+                        activeTab === item.id
+                          ? "bg-white text-primary"
+                          : "bg-red-500 text-white animate-pulse"
+                      }`}
+                      title={badge === 1 ? "1 νέο αίτημα" : `${badge} νέα αιτήματα`}
+                    >
+                      {badge > 99 ? "99+" : badge}
+                    </span>
+                  )}
                 </button>
               );
             })}
@@ -1035,7 +1186,7 @@ export default function Admin() {
 
           {/* Inquiries Tab */}
           {activeTab === "inquiries" && (
-            <InquiriesManagement />
+            <InquiriesManagement onReplySent={() => fetchStats()} onInquiryViewed={() => fetchStats()} />
           )}
 
           {/* Settings Tab */}

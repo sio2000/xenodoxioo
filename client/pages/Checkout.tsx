@@ -126,12 +126,30 @@ export default function Checkout() {
   const [paymentComplete, setPaymentComplete] = useState(false);
   const [step, setStep] = useState<"info" | "payment">("info");
 
-  const unitId = searchParams.get("unit");
-  const propertyId = searchParams.get("property");
-  // Support both checkIn/checkin and checkOut/checkout (URL params can vary)
-  const checkIn = searchParams.get("checkIn") ?? searchParams.get("checkin");
-  const checkOut = searchParams.get("checkOut") ?? searchParams.get("checkout");
+  const offerToken = searchParams.get("offer");
+  const unitId = searchParams.get("unit") || null;
+  const propertyId = searchParams.get("property") || null;
+  const checkIn = searchParams.get("checkIn") ?? searchParams.get("checkin") ?? null;
+  const checkOut = searchParams.get("checkOut") ?? searchParams.get("checkout") ?? null;
   const guests = searchParams.get("guests") ?? "2";
+
+  const [offerData, setOfferData] = useState<{
+    token: string;
+    unitId: string;
+    propertyId: string;
+    checkIn: string;
+    checkOut: string;
+    guests: number;
+    customTotalEur: number;
+    unit?: { name?: string };
+    property?: { name?: string };
+  } | null>(null);
+
+  const isOfferFlow = !!offerToken;
+  const effectiveUnitId = isOfferFlow ? offerData?.unitId : unitId;
+  const effectiveCheckIn = isOfferFlow ? offerData?.checkIn : checkIn;
+  const effectiveCheckOut = isOfferFlow ? offerData?.checkOut : checkOut;
+  const effectiveGuests = isOfferFlow ? (offerData?.guests ?? 2) : Number(guests) || 2;
 
   const { language, t } = useLanguage();
 
@@ -145,6 +163,44 @@ export default function Checkout() {
       }
     } catch {}
   }, []);
+
+  useEffect(() => {
+    if (!offerToken) return;
+    setLoadingQuote(true);
+    setQuoteError(null);
+    fetch(apiUrl(`/api/bookings/offer/${offerToken}`))
+      .then((r) => r.json())
+      .then((json) => {
+        const d = json.data ?? json;
+        if (d?.token) {
+          setOfferData(d);
+          const ci = new Date(d.checkIn);
+          const co = new Date(d.checkOut);
+          const nights = Math.ceil((co.getTime() - ci.getTime()) / (1000 * 60 * 60 * 24));
+          setQuote({
+            unit: { id: d.unitId, name: d.unit?.name, maxGuests: d.guests },
+            pricing: {
+              nights,
+              basePrice: nights > 0 ? d.customTotalEur / nights : 0,
+              subtotal: d.customTotalEur,
+              cleaningFee: 0,
+              discountAmount: 0,
+              taxes: 0,
+              taxRate: 0,
+              totalPrice: d.customTotalEur,
+              depositAmount: d.customTotalEur,
+              balanceAmount: 0,
+              isFullPayment: true,
+              scheduledChargeDate: null,
+            },
+          });
+        } else {
+          setQuoteError(d?.error || "Offer not found or already used");
+        }
+      })
+      .catch(() => setQuoteError("Failed to load offer"))
+      .finally(() => setLoadingQuote(false));
+  }, [offerToken]);
 
   const [formData, setFormData] = useState({
     firstName: "",
@@ -162,6 +218,7 @@ export default function Checkout() {
   // Load quote (includes coupon when applied; re-runs when appliedCoupon changes)
   // couponOverride: pass null to fetch without coupon (e.g. when removing coupon)
   const loadQuote = useCallback(async (couponOverride?: string | null) => {
+    if (offerToken) return;
     if (!unitId || !checkIn || !checkOut) {
       setQuoteError("Missing booking details. Please start your booking again.");
       setLoadingQuote(false);
@@ -214,15 +271,50 @@ export default function Checkout() {
     } finally {
       if (!signal.aborted) setLoadingQuote(false);
     }
-  }, [unitId, checkIn, checkOut, guests, appliedCoupon?.code]);
+  }, [offerToken, unitId, checkIn, checkOut, guests, appliedCoupon?.code]);
 
   useEffect(() => {
     loadQuote();
   }, [loadQuote]);
 
-  // Step 1: Create booking + payment intent
+  // Step 1: Create booking + payment intent (or offer payment intent)
   const handleCreateBooking = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (isOfferFlow) {
+      if (!offerToken || !offerData) {
+        setCheckoutError("Offer not loaded.");
+        return;
+      }
+      setIsProcessing(true);
+      setCheckoutError(null);
+      try {
+        const paymentRes = await fetch(apiUrl("/api/payments/create-intent-from-offer"), {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            offerToken,
+            guestName: `${formData.firstName} ${formData.lastName}`.trim(),
+            guestEmail: formData.email,
+            guestPhone: formData.phone || undefined,
+          }),
+        });
+        const paymentJson = await paymentRes.json().catch(() => ({}));
+        if (!paymentRes.ok || !paymentJson.data?.clientSecret) {
+          setCheckoutError(paymentJson.error || "Failed to initialize payment");
+          return;
+        }
+        setClientSecret(paymentJson.data.clientSecret);
+        setPaymentType("FULL");
+        setStep("payment");
+      } catch (err) {
+        setCheckoutError((err as Error).message || "Something went wrong");
+      } finally {
+        setIsProcessing(false);
+      }
+      return;
+    }
+
     if (!unitId || !checkIn || !checkOut) {
       setCheckoutError("Missing booking details.");
       return;
@@ -313,7 +405,7 @@ export default function Checkout() {
   };
 
   const handlePaymentSuccess = async () => {
-    if (bookingId) {
+    if (!isOfferFlow && bookingId) {
       for (let attempt = 1; attempt <= 3; attempt++) {
         try {
           console.log(`[CHECKOUT] Confirming payment status (attempt ${attempt})...`);
@@ -415,8 +507,14 @@ export default function Checkout() {
   const balanceAmount = pricing?.balanceAmount ?? 0;
   const isFullPayment = pricing?.isFullPayment ?? false;
 
-  const formattedCheckIn = checkIn ? new Date(checkIn).toLocaleDateString() : "";
-  const formattedCheckOut = checkOut ? new Date(checkOut).toLocaleDateString() : "";
+  // Parse YYYY-MM-DD as local date to avoid timezone shift (e.g. 2026-04-15 must show as Apr 15, not Apr 14)
+  const formatDateOnly = (str: string) => {
+    const m = str.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (!m) return new Date(str).toLocaleDateString();
+    return new Date(parseInt(m[1], 10), parseInt(m[2], 10) - 1, parseInt(m[3], 10)).toLocaleDateString();
+  };
+  const formattedCheckIn = effectiveCheckIn ? formatDateOnly(effectiveCheckIn) : "";
+  const formattedCheckOut = effectiveCheckOut ? formatDateOnly(effectiveCheckOut) : "";
 
   // Payment success screen
   if (paymentComplete) {
@@ -438,8 +536,8 @@ export default function Checkout() {
     <Layout>
       <div className="container-max py-12">
         <div className="mb-12">
-          {propertyId && (
-            <Link to={`/properties/${propertyId}`} className="text-primary hover:text-primary/80 mb-4 inline-block">
+          {(propertyId || offerData?.propertyId) && (
+            <Link to={`/properties/${propertyId || offerData?.propertyId}`} className="text-primary hover:text-primary/80 mb-4 inline-block">
               &larr; {t("property.backToProperty")}
             </Link>
           )}
@@ -544,7 +642,8 @@ export default function Checkout() {
                   </div>
                 </div>
 
-                {/* Coupon */}
+                {/* Coupon (hidden for custom offer) */}
+                {!isOfferFlow && (
                 <div className="bg-card border border-border rounded-lg p-6">
                   <h2 className="text-xl font-bold text-foreground mb-6">{t("checkout.couponCode")}</h2>
                   {!appliedCoupon ? (
@@ -577,6 +676,7 @@ export default function Checkout() {
                     </div>
                   )}
                 </div>
+                )}
 
                 {/* Terms */}
                 <div className="space-y-4">
@@ -602,9 +702,9 @@ export default function Checkout() {
                   </div>
                 )}
 
-                <button type="submit" disabled={isProcessing}
+                <button type="submit" disabled={isProcessing || (isOfferFlow ? !offerData : !(unitId && checkIn && checkOut))}
                   className="btn-primary w-full justify-center text-lg py-3 disabled:opacity-50 disabled:cursor-not-allowed">
-                  {isProcessing ? "Creating booking..." : "Continue to Payment"}
+                  {isProcessing ? (isOfferFlow ? "Preparing payment..." : "Creating booking...") : "Continue to Payment"}
                 </button>
               </form>
             ) : (
