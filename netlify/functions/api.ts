@@ -1030,7 +1030,7 @@ export const handler = async (event: any, context: any) => {
         .from('bookings')
         .update({ status: 'CANCELLED', cancelled_at: new Date().toISOString(), is_cancelled: true })
         .eq('id', booking.id)
-        .select()
+        .select('*, unit:units(*, property:properties(*))')
         .single();
       if (error) {
         return {
@@ -1038,6 +1038,26 @@ export const handler = async (event: any, context: any) => {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ success: false, error: 'Σφάλμα κατά την ακύρωση' })
         };
+      }
+      const apiKey = process.env.RESEND_API_KEY;
+      if (apiKey && updated?.guest_email) {
+        try {
+          const { Resend } = await import('resend');
+          const resend = new Resend(apiKey);
+          const from = `${process.env.FROM_NAME || 'LEONIDIONHOUSES'} <${process.env.FROM_EMAIL || 'noreply@leonidion-houses.com'}>`;
+          const unit = (updated as any)?.unit;
+          const property = unit?.property;
+          const checkInStr = updated.check_in_date ? new Date(updated.check_in_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '';
+          const checkOutStr = updated.check_out_date ? new Date(updated.check_out_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '';
+          await resend.emails.send({
+            from,
+            to: updated.guest_email,
+            subject: 'Booking Cancelled - ' + (updated.booking_number || ''),
+            html: `<h1>Booking Cancelled</h1><p>Dear ${updated.guest_name || 'Guest'},</p><p>Your booking <strong>${updated.booking_number || ''}</strong> for ${property?.name || unit?.name || 'N/A'} (${checkInStr} - ${checkOutStr}) has been cancelled successfully.</p><p>The reserved dates have been released. If you wish to book again, please visit our website.</p><p>Best regards,<br/>LEONIDIONHOUSES</p>`,
+          });
+        } catch (emailErr: any) {
+          console.error('[API] cancel-booking email failed:', emailErr?.message);
+        }
       }
       return {
         statusCode: 200,
@@ -1370,13 +1390,14 @@ export const handler = async (event: any, context: any) => {
 
           const frontendUrl = process.env.FRONTEND_URL || 'https://www.leonidion-houses.com';
           const apiKey = process.env.RESEND_API_KEY;
-          const from = `${process.env.FROM_NAME || 'LEONIDIONHOUSES'} <${process.env.FROM_EMAIL || 'onboarding@resend.dev'}>`;
+          const from = `${process.env.FROM_NAME || 'LEONIDIONHOUSES'} <${process.env.FROM_EMAIL || 'noreply@leonidion-houses.com'}>`;
           const viewUrl = `${frontendUrl}/booking/${booking.id}?email=${encodeURIComponent(booking.guest_email || '')}`;
+          const cancelUrl = cancellationToken ? `${frontendUrl}/cancel-booking?token=${encodeURIComponent(cancellationToken)}` : null;
           const checkInStr = checkIn.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
           const checkOutStr = checkOut.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
 
           if (apiKey) {
-            const Resend = (await import('resend')).default;
+            const { Resend } = await import('resend');
             const resend = new Resend(apiKey);
             const { data: fullBooking } = await supabase.from('bookings').select('*, unit:units(*, property:properties(*))').eq('id', booking.id).single();
             const unit = (fullBooking as any)?.unit;
@@ -1391,7 +1412,7 @@ export const handler = async (event: any, context: any) => {
               from,
               to: booking.guest_email,
               subject: 'Booking Confirmation',
-              html: `<h1>Booking Confirmation</h1><p>Dear ${booking.guest_name},</p><p>Thank you for your booking.</p><ul><li><strong>Booking:</strong> ${bookingNumber}</li><li><strong>Room:</strong> ${property?.name || 'N/A'}</li><li><strong>Arrival:</strong> ${checkInStr}</li><li><strong>Departure:</strong> ${checkOutStr}</li><li><strong>Total:</strong> €${customTotal.toFixed(2)}</li></ul><p><a href="${viewUrl}" style="background:#0677A1;color:white;padding:10px 20px;text-decoration:none;border-radius:5px;">View Booking</a></p><p>Best regards,<br/>LEONIDIONHOUSES</p>`,
+              html: `<h1>Booking Confirmation</h1><p>Dear ${booking.guest_name},</p><p>Thank you for your booking.</p><ul><li><strong>Booking:</strong> ${bookingNumber}</li><li><strong>Room:</strong> ${property?.name || 'N/A'}</li><li><strong>Arrival:</strong> ${checkInStr}</li><li><strong>Departure:</strong> ${checkOutStr}</li><li><strong>Total:</strong> €${customTotal.toFixed(2)}</li></ul><p><a href="${viewUrl}" style="background:#0677A1;color:white;padding:10px 20px;text-decoration:none;border-radius:5px;">View Booking</a></p>${cancelUrl ? `<p>Need to cancel? <a href="${cancelUrl}" style="color:#0677A1;">Cancel your booking</a></p>` : ''}<p>Best regards,<br/>LEONIDIONHOUSES</p>`,
             });
           }
 
