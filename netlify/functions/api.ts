@@ -108,7 +108,7 @@ export const handler = async (event: any, context: any) => {
       let getClosed: (name: string) => { closed: boolean; reopenDate: string | null } = () => ({ closed: false, reopenDate: null });
       try {
         const pt = await import('../../server/services/price-table.service');
-        getMinPrice = pt.getMinimumPriceForRoom;
+        getMinPrice = (name: string) => pt.getMinimumPriceForRoomInPeriod(name);
         getClosed = pt.getRoomClosedStatusAndReopenDate;
       } catch (e) {
         console.warn(`⚠️ [${requestId}] Price table not loaded, using DB base_price`);
@@ -214,7 +214,7 @@ export const handler = async (event: any, context: any) => {
       let getClosed: (name: string) => { closed: boolean; reopenDate: string | null } = () => ({ closed: false, reopenDate: null });
       try {
         const pt = await import('../../server/services/price-table.service');
-        getMinPrice = pt.getMinimumPriceForRoom;
+        getMinPrice = (name: string) => pt.getMinimumPriceForRoomInPeriod(name);
         getClosed = pt.getRoomClosedStatusAndReopenDate;
       } catch {}
 
@@ -300,7 +300,7 @@ export const handler = async (event: any, context: any) => {
       let getClosed: (name: string) => { closed: boolean; reopenDate: string | null } = () => ({ closed: false, reopenDate: null });
       try {
         const pt = await import('../../server/services/price-table.service');
-        getMinPrice = pt.getMinimumPriceForRoom;
+        getMinPrice = (name: string) => pt.getMinimumPriceForRoomInPeriod(name);
         getClosed = pt.getRoomClosedStatusAndReopenDate;
       } catch {}
 
@@ -648,8 +648,17 @@ export const handler = async (event: any, context: any) => {
             body: JSON.stringify({ success: false, error: 'Missing unitId, checkInDate, or checkOutDate' })
           };
         }
-        const checkIn = new Date(checkInDate);
-        const checkOut = new Date(checkOutDate);
+        // Parse dates as date-only (YYYY-MM-DD) to avoid timezone shifts
+        function parseDateOnly(str: string): Date {
+          const s = String(str).trim();
+          const iso = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+          if (iso) {
+            return new Date(Date.UTC(parseInt(iso[1], 10), parseInt(iso[2], 10) - 1, parseInt(iso[3], 10), 12, 0, 0));
+          }
+          return new Date(s);
+        }
+        const checkIn = parseDateOnly(checkInDate);
+        const checkOut = parseDateOnly(checkOutDate);
         if (isNaN(checkIn.getTime()) || isNaN(checkOut.getTime()) || checkIn >= checkOut) {
           return {
             statusCode: 400,
@@ -657,53 +666,8 @@ export const handler = async (event: any, context: any) => {
             body: JSON.stringify({ success: false, error: 'Invalid dates' })
           };
         }
-        const nights = Math.ceil((checkOut.getTime() - checkIn.getTime()) / (1000 * 60 * 60 * 24));
-        const { data: unit, error: unitError } = await supabase.from('units').select('*').eq('id', unitId).single();
-        if (unitError || !unit) {
-          return {
-            statusCode: 404,
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ success: false, error: 'Unit not found' })
-          };
-        }
-        const maxGuests = getEffectiveMaxGuests(unit.name, unit.max_guests ?? 10);
-        if (guests > maxGuests) {
-          return {
-            statusCode: 400,
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              success: false,
-              error: `Maximum ${maxGuests} guests allowed for this room`
-            })
-          };
-        }
-        const basePrice = Number(unit.base_price) || 0;
-        const cleaningFee = Number(unit.cleaning_fee) || 0;
-        let subtotal = basePrice * nights;
-        let discountAmount = 0;
-        if (couponCode) {
-          const { data: coupon } = await supabase.from('coupons').select('*').eq('code', String(couponCode).toUpperCase()).eq('is_active', true).single();
-          if (coupon) {
-            discountAmount = coupon.discount_type === 'PERCENTAGE' ? subtotal * (Number(coupon.discount_value) / 100) : Number(coupon.discount_value);
-            discountAmount = Math.min(discountAmount, subtotal);
-          }
-        }
-        subtotal -= discountAmount;
-
-        const { data: taxRow } = await supabase.from('tax_settings').select('tax_rate, additional_fees').eq('is_active', true).single();
-        const taxRateDecimal = taxRow?.tax_rate != null ? parseFloat(taxRow.tax_rate) : 0.15;
-        const additionalFeesPct = taxRow?.additional_fees != null ? parseFloat(taxRow.additional_fees) : 0;
-        const taxRate = taxRateDecimal + (additionalFeesPct / 100);
-        const taxes = Math.round((subtotal + cleaningFee) * taxRate * 100) / 100;
-        const finalTotal = Math.round((subtotal + cleaningFee + taxes) * 100) / 100;
-
-        const { data: paymentRow } = await supabase.from('payment_settings').select('deposit_percentage, full_payment_threshold_days').eq('is_active', true).single();
-        const depositPct = (paymentRow?.deposit_percentage ?? 25) / 100;
-        const fullPaymentDays = paymentRow?.full_payment_threshold_days ?? 21;
-        const daysToCheckIn = Math.ceil((checkIn.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
-        const isFullPayment = daysToCheckIn <= fullPaymentDays;
-        const depositAmount = isFullPayment ? finalTotal : Math.round(finalTotal * depositPct * 100) / 100;
-        const balanceAmount = finalTotal - depositAmount;
+        const { calculateBookingPrice } = await import('../../server/services/booking.service');
+        const pricing = await calculateBookingPrice(unitId, checkIn, checkOut, Number(guests) || 1, couponCode);
         return {
           statusCode: 200,
           headers: { 'Content-Type': 'application/json' },
@@ -712,28 +676,30 @@ export const handler = async (event: any, context: any) => {
             data: {
               unit: { id: unitId },
               pricing: {
-                nights,
-                basePrice,
-                subtotal: basePrice * nights,
-                cleaningFee,
-                discountAmount,
-                taxes,
-                taxRate: Math.round(taxRate * 100),
-                totalPrice: finalTotal,
-                depositAmount,
-                balanceAmount,
-                isFullPayment,
-                scheduledChargeDate: null
+                nights: pricing.nights,
+                basePrice: pricing.basePrice,
+                subtotal: pricing.subtotal,
+                cleaningFee: pricing.cleaningFee,
+                discountAmount: pricing.discountAmount,
+                taxes: pricing.taxes,
+                taxRate: pricing.taxRate,
+                totalPrice: pricing.finalTotal,
+                depositAmount: pricing.depositAmount,
+                balanceAmount: pricing.balanceAmount,
+                isFullPayment: pricing.isFullPayment,
+                scheduledChargeDate: pricing.scheduledChargeDate
               }
             }
           })
         };
-      } catch (err) {
+      } catch (err: any) {
         console.error('Quote error:', err);
+        const message = err?.message || 'Failed to calculate quote';
+        const statusCode = message.includes('not found') ? 404 : message.includes('Invalid') || message.includes('must be') || message.includes('Minimum') || message.includes('Maximum') || message.includes('closed') ? 400 : 500;
         return {
-          statusCode: 500,
+          statusCode,
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ success: false, error: 'Failed to calculate quote' })
+          body: JSON.stringify({ success: false, error: message })
         };
       }
     }

@@ -399,6 +399,34 @@ export function getMinimumPriceForRoom(unitName: string): number | null {
   return minPrice;
 }
 
+/**
+ * Returns the "Από X€" price for a room in the period that contains refDate.
+ * Used for property cards to show prices according to current/selected period.
+ * For tiers: returns the lower of price6 and price10.
+ */
+export function getMinimumPriceForRoomInPeriod(unitName: string, refDate: Date = new Date()): number | null {
+  const table = parsePriceTable();
+  const normalized = unitName.toLowerCase().trim();
+  const room = table.rooms.find(
+    (r) =>
+      r.normalizedName === normalized ||
+      r.roomName.toLowerCase() === normalized ||
+      normalized.includes(r.normalizedName) ||
+      r.normalizedName.includes(normalized),
+  );
+  if (!room) return null;
+  const month = refDate.getMonth() + 1;
+  const day = refDate.getDate();
+  for (const period of room.periods) {
+    if (!dateInPeriod(month, day, period)) continue;
+    const p = period.price;
+    if (p.closed) return null;
+    const price = p.price ?? Math.min(p.price6 ?? Infinity, p.price10 ?? Infinity);
+    return price < Infinity ? price : null;
+  }
+  return null;
+}
+
 // ── Get closed status and next reopen date for a room ────────────────────
 
 /**

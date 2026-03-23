@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { supabase } from "../lib/db";
-import { getMinimumPriceForRoom, getRoomClosedStatusAndReopenDate } from "../services/price-table.service";
+import { getMinimumPriceForRoomInPeriod, getRoomClosedStatusAndReopenDate } from "../services/price-table.service";
 
 const router = Router();
 
@@ -30,7 +30,7 @@ router.get("/", async (_req, res, next) => {
     const aggregatedProperties = properties.map((property) => {
       const propertyUnits = units?.filter((u) => u.property_id === property.id) || [];
       const unitPrices = propertyUnits.map((u) => {
-        const fromTable = getMinimumPriceForRoom(u.name);
+        const fromTable = getMinimumPriceForRoomInPeriod(u.name);
         return fromTable ?? (Number(u.base_price) || 0);
       });
       const minPrice = unitPrices.length > 0 ? Math.min(...unitPrices) : 0;
@@ -50,7 +50,7 @@ router.get("/", async (_req, res, next) => {
           }
         }
 
-        const basePrice = getMinimumPriceForRoom(unit.name) ?? (Number(unit.base_price) || 0);
+        const basePrice = getMinimumPriceForRoomInPeriod(unit.name) ?? (Number(unit.base_price) || 0);
         const { closed: closedForCurrentPeriod, reopenDate } = getRoomClosedStatusAndReopenDate(unit.name);
         return {
           ...unit,
@@ -145,7 +145,7 @@ router.get("/:slug", async (req, res, next) => {
           parsedImages = [];
         }
       }
-      const basePrice = getMinimumPriceForRoom(unit.name) ?? (Number(unit.base_price) || 0);
+      const basePrice = getMinimumPriceForRoomInPeriod(unit.name) ?? (Number(unit.base_price) || 0);
       return {
         ...unit,
         images: parsedImages,
@@ -230,7 +230,7 @@ router.get("/id/:id", async (req, res) => {
             parsedImages = [];
           }
         }
-        const basePrice = getMinimumPriceForRoom(unit.name) ?? (Number(unit.base_price) || 0);
+        const basePrice = getMinimumPriceForRoomInPeriod(unit.name) ?? (Number(unit.base_price) || 0);
         const { closed: closedForCurrentPeriod, reopenDate } = getRoomClosedStatusAndReopenDate(unit.name);
         return {
           ...unit,
