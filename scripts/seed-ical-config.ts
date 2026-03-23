@@ -19,9 +19,9 @@ const AIRBNB_CONFIG = [
 
 // Booking.com — Import from Extranet > Calendar > Export
 const BOOKING_CONFIG: { slug: string; url: string }[] = [
-  { slug: "lykoskufi-1", url: "https://ical.booking.com/v1/export/t/c59de431-a5a0-4104-acc7-c2180b3bd6ae.ics" },
+  { slug: "lykoskufi-1", url: "https://ical.booking.com/v1/export/t/12033689-5f9a-4e81-96bd-2a079d64888f.ics" },
   { slug: "lykoskufi-2", url: "https://ical.booking.com/v1/export/t/9b198a70-c5fe-4ccc-8377-f84bbdcf8038.ics" },
-  { slug: "lykoskufi-5", url: "https://ical.booking.com/v1/export/t/582c4568-ed0d-4400-b190-0491aa5a166e.ics" },
+  { slug: "lykoskufi-5", url: "https://ical.booking.com/v1/export/t/2e20d5ea-e273-4207-9fc6-a494aaf4a1eb.ics" },
   { slug: "ogra-house", url: "https://ical.booking.com/v1/export/t/0e54f0e6-03af-4c26-9341-c7f1190a8527.ics" },
 ];
 
