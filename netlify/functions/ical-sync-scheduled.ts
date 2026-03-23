@@ -1,6 +1,6 @@
 /**
  * Netlify Scheduled Function: Import iCal feeds from Airbnb/Booking into external_bookings.
- * Runs every 15 minutes. Configure in netlify.toml: [functions."ical-sync-scheduled"] schedule = "*/15 * * * *"
+ * Runs every 15 minutes. Schedule configured in netlify.toml.
  */
 import { createClient } from "@supabase/supabase-js";
 import { syncExternalCalendars } from "../../server/services/ical.service";
