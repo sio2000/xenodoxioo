@@ -6,6 +6,13 @@ import { useLanguage } from "@/hooks/useLanguage";
 const MIN_NIGHTS = 7;
 const MIN_DAYS_AHEAD_FOR_CHECKIN = 3;
 
+/** YYYY-MM-DD for a calendar cell built with local y/m/d (must not use toISOString — UTC shift breaks booked check). */
+function localCalendarDayKey(year: number, monthIndex: number, day: number): string {
+  const m = String(monthIndex + 1).padStart(2, "0");
+  const d = String(day).padStart(2, "0");
+  return `${year}-${m}-${d}`;
+}
+
 interface AvailabilityCalendarProps {
   unitId?: string;
   onSelectDates?: (checkIn: Date, checkOut: Date) => void;
@@ -110,12 +117,11 @@ export default function AvailabilityCalendar({
   };
 
   const isBooked = (day: number) => {
-    const date = new Date(
+    const dateStr = localCalendarDayKey(
       currentMonth.getFullYear(),
       currentMonth.getMonth(),
       day,
     );
-    const dateStr = date.toISOString().slice(0, 10);
     return occupiedRanges.some((range) => {
       return dateStr >= range.start && dateStr < range.end;
     });
