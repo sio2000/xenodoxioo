@@ -27,6 +27,8 @@ export const translations: Record<Language, Record<string, string>> = {
     "home.featured.prop2": "Elegant seaside retreat for families",
     "home.featured.prop3": "Modern, cozy bungalows nestled in nature",
     "home.featured.viewAll": "View all residences",
+    "home.featured.loadError":
+      "Could not load rooms. Check your connection or try again. If the problem persists, verify Netlify env (remove VITE_API_URL if it points to localhost) and redeploy.",
     "home.why.title": "Why Book With LEONIDIONHOUSES",
     "home.experiences.title": "Authentic Greek Experiences",
     "home.experiences.subtitle": "Discover handpicked activities that showcase best of Leonidion's culture, cuisine, and natural beauty",
@@ -950,6 +952,8 @@ export const translations: Record<Language, Record<string, string>> = {
     "home.featured.subtitle":
       "Hébergements sélectionnés offrant le meilleur en luxe et confort",
     "home.featured.viewAll": "Voir toutes les résidences",
+    "home.featured.loadError":
+      "Impossible de charger les chambres. Vérifiez votre connexion ou réessayez.",
     "home.featured.prop1": "Hébergements de luxe avec vues imprenables sur la mer",
     "home.featured.prop2": "Retraite élégante au bord de la mer pour les familles",
     "home.featured.prop3": "Bungalows modernes et confortables nichés dans la nature",
@@ -1818,6 +1822,8 @@ export const translations: Record<Language, Record<string, string>> = {
     "home.featured.subtitle":
       "Handverlesene Unterkünfte mit dem Besten an Luxus und Komfort",
     "home.featured.viewAll": "Alle Unterkünfte ansehen",
+    "home.featured.loadError":
+      "Unterkünfte konnten nicht geladen werden. Bitte Verbindung prüfen oder später erneut versuchen.",
     "home.featured.prop1": "Luxuriöse Unterkünfte mit atemberaubendem Meerblick",
     "home.featured.prop2": "Elegante Strandresidenz für Familien",
     "home.featured.prop3": "Moderne, gemütliche Bungalows in der Natur",
@@ -2672,6 +2678,8 @@ export const translations: Record<Language, Record<string, string>> = {
     "home.featured.subtitle":
       "Επιλεγμένα καταλύματα που προσφέρουν το καλύτερο σε πολυτέλεια και άνεση",
     "home.featured.viewAll": "Προβολή όλων των κατοικιών",
+    "home.featured.loadError":
+      "Δεν φόρτωσαν τα δωμάτια. Ελέγξτε τη σύνδεση ή δοκιμάστε ξανά. Αν συνεχίζει, στο Netlify αφαιρέστε το VITE_API_URL αν δείχνει σε localhost και κάντε redeploy.",
     "home.featured.prop1": "Καταλύματα πολυτελείας με εκπληκτική θέα στη θάλασσα",
     "home.featured.prop2": "Κομψή παραθαλάσσια απόδραση για οικογένειες",
     "home.featured.prop3": "Μοντέρνα, άνετα μπανγκαλόου μέσα στη φύση",

@@ -313,16 +313,14 @@ export default function Index() {
         setFeaturedProperties(sortByRoomOrder(flattened).slice(0, 6));
       } catch (error) {
         console.error("❌ [CLIENT] Error loading properties", error);
-        setPropertiesError(
-          "Δεν φόρτωσαν τα δωμάτια. Αφαιρέστε το VITE_API_URL από τα Netlify env vars (αν υπάρχει) και κάντε redeploy."
-        );
+        setPropertiesError(t("home.featured.loadError"));
       } finally {
         setPropertiesLoading(false);
       }
     };
 
     loadProperties();
-  }, []);
+  }, [t]);
 
   return (
     <Layout>

@@ -8,6 +8,8 @@ import path from "path";
 
 export default defineConfig({
   base: process.env.VITE_BASE_URL || "/",
+  // Netlify often sets NEXT_PUBLIC_SUPABASE_* — expose to client bundle alongside VITE_*
+  envPrefix: ["VITE_", "NEXT_PUBLIC_"],
   build: {
     outDir: "dist/spa",
     rollupOptions: {

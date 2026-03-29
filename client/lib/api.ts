@@ -1,17 +1,47 @@
 /**
  * API base URL for fetch calls and image paths.
  * - Dev: empty (same origin, Vite proxies /api to Express)
- * - Netlify (same deploy): empty (redirects /api/* to function)
- * - Netlify + external backend: set VITE_API_URL in Netlify env (e.g. https://your-api.onrender.com)
+ * - Netlify (same deploy): empty (redirects /api/* to functions)
+ * - External API only: set VITE_API_URL to a public https host (never localhost on Netlify)
  */
-export const API_BASE =
-  typeof import.meta.env?.VITE_API_URL === "string" && import.meta.env.VITE_API_URL
-    ? import.meta.env.VITE_API_URL.replace(/\/$/, "")
-    : "";
+function rawViteApiUrl(): string {
+  const v = import.meta.env?.VITE_API_URL;
+  return typeof v === "string" ? v.trim().replace(/\/$/, "") : "";
+}
+
+function isLocalHostname(host: string): boolean {
+  return (
+    host === "localhost" ||
+    host === "127.0.0.1" ||
+    host === "[::1]"
+  );
+}
+
+/**
+ * On production domains, ignore VITE_API_URL if it points to localhost — common Netlify
+ * copy-paste from .env breaks /api/properties (browser calls visitor's machine, not your API).
+ */
+export function getApiBase(): string {
+  const raw = rawViteApiUrl();
+  if (!raw) return "";
+  if (typeof window === "undefined") return raw;
+  try {
+    const u = new URL(raw);
+    if (!isLocalHostname(window.location.hostname) && isLocalHostname(u.hostname)) {
+      console.warn(
+        "[api] Ignoring VITE_API_URL (localhost) on production host — using same-origin /api",
+      );
+      return "";
+    }
+    return raw;
+  } catch {
+    return "";
+  }
+}
 
 export function apiUrl(path: string): string {
   const p = path.startsWith("/") ? path : `/${path}`;
-  return `${API_BASE}${p}`;
+  return `${getApiBase()}${p}`;
 }
 
 /** Placeholder when no image is available - gray SVG (no external picsum) */
@@ -37,7 +67,8 @@ export function imageUrl(path: string | null | undefined | Record<string, unknow
 
   if (resolved.startsWith("/uploads/")) {
     const filename = resolved.replace("/uploads/", "");
-    const supabaseUrl = import.meta.env?.VITE_SUPABASE_URL;
+    const supabaseUrl =
+      import.meta.env?.VITE_SUPABASE_URL || import.meta.env?.NEXT_PUBLIC_SUPABASE_URL;
     if (typeof supabaseUrl === "string" && supabaseUrl.startsWith("https://") && supabaseUrl.includes("supabase.co")) {
       return `${supabaseUrl.replace(/\/$/, "")}/storage/v1/object/public/uploads/${filename}`;
     }
