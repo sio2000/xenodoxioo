@@ -5,6 +5,7 @@ import { Calendar, User, LogOut } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useLanguage } from "@/hooks/useLanguage";
 import formatCurrency from "@/lib/currency";
+import { formatStayDate, stayLocale } from "@/lib/stay-dates";
 
 type DashboardBooking = {
   id: string;
@@ -372,10 +373,12 @@ export default function Dashboard() {
 
                         <div className="flex items-center gap-6 text-sm text-muted-foreground mb-4 pb-4 border-b border-border">
                           <span>
-                            {t("dashboard.checkIn")}: {booking.checkIn}
+                            {t("dashboard.checkIn")}:{" "}
+                            {formatStayDate(booking.checkIn, stayLocale(language))}
                           </span>
                           <span>
-                            {t("dashboard.checkOut")}: {booking.checkOut}
+                            {t("dashboard.checkOut")}:{" "}
+                            {formatStayDate(booking.checkOut, stayLocale(language))}
                           </span>
                         </div>
 

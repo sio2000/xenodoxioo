@@ -4,6 +4,7 @@ import { Link, useSearchParams } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { useLanguage } from "@/hooks/useLanguage";
 import formatCurrency from "@/lib/currency";
+import { formatStayDate, stayLocale } from "@/lib/stay-dates";
 import { AlertTriangle, Calendar, Home, Users } from "lucide-react";
 
 type BookingPreview = {
@@ -153,12 +154,8 @@ export default function CancelBooking() {
 
   if (!booking) return null;
 
-  const checkIn = booking.checkInDate
-    ? new Date(booking.checkInDate).toLocaleDateString("el-GR", { day: "numeric", month: "long", year: "numeric" })
-    : "";
-  const checkOut = booking.checkOutDate
-    ? new Date(booking.checkOutDate).toLocaleDateString("el-GR", { day: "numeric", month: "long", year: "numeric" })
-    : "";
+  const checkIn = formatStayDate(booking.checkInDate, stayLocale(language), "long");
+  const checkOut = formatStayDate(booking.checkOutDate, stayLocale(language), "long");
 
   return (
     <Layout>

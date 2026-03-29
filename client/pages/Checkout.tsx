@@ -5,6 +5,7 @@ import { useSearchParams, Link, useNavigate } from "react-router-dom";
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useLanguage } from "@/hooks/useLanguage";
 import formatCurrency from "@/lib/currency";
+import { formatStayDate, stayLocale } from "@/lib/stay-dates";
 import { CreditCard, Lock, User, AlertCircle, CheckCircle2 } from "lucide-react";
 import { loadStripe, Stripe } from "@stripe/stripe-js";
 import { Elements, PaymentElement, useStripe, useElements } from "@stripe/react-stripe-js";
@@ -519,14 +520,12 @@ export default function Checkout() {
   const balanceAmount = pricing?.balanceAmount ?? 0;
   const isFullPayment = pricing?.isFullPayment ?? false;
 
-  // Parse YYYY-MM-DD as local date to avoid timezone shift (e.g. 2026-04-15 must show as Apr 15, not Apr 14)
-  const formatDateOnly = (str: string) => {
-    const m = str.match(/^(\d{4})-(\d{2})-(\d{2})/);
-    if (!m) return new Date(str).toLocaleDateString();
-    return new Date(parseInt(m[1], 10), parseInt(m[2], 10) - 1, parseInt(m[3], 10)).toLocaleDateString();
-  };
-  const formattedCheckIn = effectiveCheckIn ? formatDateOnly(effectiveCheckIn) : "";
-  const formattedCheckOut = effectiveCheckOut ? formatDateOnly(effectiveCheckOut) : "";
+  const formattedCheckIn = effectiveCheckIn
+    ? formatStayDate(effectiveCheckIn, stayLocale(language))
+    : "";
+  const formattedCheckOut = effectiveCheckOut
+    ? formatStayDate(effectiveCheckOut, stayLocale(language))
+    : "";
 
   // Payment success screen
   if (paymentComplete) {

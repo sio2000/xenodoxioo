@@ -3,19 +3,7 @@ import { apiUrl } from "@/lib/api";
 import { Search, Filter, Eye, Calendar, Users, DollarSign, Clock, ArrowRight, CreditCard } from "lucide-react";
 import { useLanguage } from "@/hooks/useLanguage";
 import formatCurrency from "@/lib/currency";
-
-/**
- * Check-in / check-out / scheduled charge: same calendar day as stored (server uses date-only → noon UTC).
- * Using UTC in toLocaleDateString avoids admin browser timezone showing July 3 when DB is July 2.
- */
-function formatStayDateUtc(d: string) {
-  if (!d) return "—";
-  const m = String(d).trim().match(/^(\d{4})-(\d{2})-(\d{2})/);
-  const date = m
-    ? new Date(Date.UTC(parseInt(m[1], 10), parseInt(m[2], 10) - 1, parseInt(m[3], 10), 12, 0, 0))
-    : new Date(d);
-  return date.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric", timeZone: "UTC" });
-}
+import { formatStayDate, stayLocale } from "@/lib/stay-dates";
 
 function formatTimestampLocal(d: string) {
   if (!d) return "—";
@@ -222,16 +210,16 @@ export default function BookingManagement() {
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 text-sm">
                   <Calendar size={14} className="text-primary flex-shrink-0" />
-                  <span className="font-medium text-foreground">{formatStayDateUtc(booking.checkInDate)}</span>
+                  <span className="font-medium text-foreground">{formatStayDate(booking.checkInDate, stayLocale(language))}</span>
                   <ArrowRight size={12} className="text-muted-foreground flex-shrink-0" />
-                  <span className="font-medium text-foreground">{formatStayDateUtc(booking.checkOutDate)}</span>
+                  <span className="font-medium text-foreground">{formatStayDate(booking.checkOutDate, stayLocale(language))}</span>
                   <span className="text-muted-foreground text-xs">({booking.nights}n)</span>
                 </div>
                 {/* Deposit: scheduled balance charge date */}
                 {booking.paymentType === "DEPOSIT" && booking.remainingAmount > 0 && booking.scheduledChargeDate && (
                   <div className="flex items-center gap-2 text-xs text-amber-600 mt-1">
                     <Clock size={12} className="flex-shrink-0" />
-                    <span>{t("admin.balanceDue").replace("{amount}", formatCurrency(booking.remainingAmount, language)).replace("{date}", formatStayDateUtc(booking.scheduledChargeDate ?? ""))}</span>
+                    <span>{t("admin.balanceDue").replace("{amount}", formatCurrency(booking.remainingAmount, language)).replace("{date}", formatStayDate(booking.scheduledChargeDate ?? "", stayLocale(language)))}</span>
                   </div>
                 )}
               </div>
@@ -369,12 +357,12 @@ function BookingDetailsModal({ booking, onClose, onStatusUpdate }: { booking: Bo
             <div className="flex items-center gap-3 text-sm">
               <div className="bg-primary/10 rounded-lg px-3 py-2 text-center">
                 <div className="text-xs text-muted-foreground">{t("admin.checkIn")}</div>
-                <div className="font-bold text-foreground">{formatStayDateUtc(booking.checkInDate)}</div>
+                <div className="font-bold text-foreground">{formatStayDate(booking.checkInDate, stayLocale(language))}</div>
               </div>
               <ArrowRight size={16} className="text-muted-foreground" />
               <div className="bg-primary/10 rounded-lg px-3 py-2 text-center">
                 <div className="text-xs text-muted-foreground">{t("admin.checkOut")}</div>
-                <div className="font-bold text-foreground">{formatStayDateUtc(booking.checkOutDate)}</div>
+                <div className="font-bold text-foreground">{formatStayDate(booking.checkOutDate, stayLocale(language))}</div>
               </div>
               <div className="ml-2 text-sm text-muted-foreground">{booking.nights === 1 ? t("admin.nightCountSingular") : t("admin.nightCount").replace("{count}", String(booking.nights))}</div>
             </div>
@@ -410,7 +398,7 @@ function BookingDetailsModal({ booking, onClose, onStatusUpdate }: { booking: Bo
                         <Clock size={14} />
                         {t("admin.autoChargeDate")}
                       </span>
-                      <span className="font-bold text-amber-700">{formatStayDateUtc(booking.scheduledChargeDate ?? "")}</span>
+                      <span className="font-bold text-amber-700">{formatStayDate(booking.scheduledChargeDate ?? "", stayLocale(language))}</span>
                     </div>
                   )}
                 </>

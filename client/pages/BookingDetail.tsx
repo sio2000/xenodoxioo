@@ -4,6 +4,7 @@ import { Link, useParams, useSearchParams } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { useLanguage } from "@/hooks/useLanguage";
 import formatCurrency from "@/lib/currency";
+import { formatStayDate, stayLocale } from "@/lib/stay-dates";
 
 type BookingData = {
   id: string;
@@ -153,12 +154,8 @@ export default function BookingDetail() {
     );
   }
 
-  const checkIn = booking.checkInDate
-    ? new Date(booking.checkInDate).toISOString().split("T")[0]
-    : "";
-  const checkOut = booking.checkOutDate
-    ? new Date(booking.checkOutDate).toISOString().split("T")[0]
-    : "";
+  const checkInLabel = formatStayDate(booking.checkInDate, stayLocale(language));
+  const checkOutLabel = formatStayDate(booking.checkOutDate, stayLocale(language));
   const statusKey =
     booking.status === "CONFIRMED"
       ? "confirmed"
@@ -203,8 +200,8 @@ export default function BookingDetail() {
                 {unitName && ` · ${unitName}`}
               </p>
               <p className="text-muted-foreground text-sm">
-                {t("dashboard.checkIn")}: {checkIn} → {t("dashboard.checkOut")}:{" "}
-                {checkOut} ({booking.nights} {t("common.nights")})
+                {t("dashboard.checkIn")}: {checkInLabel} → {t("dashboard.checkOut")}:{" "}
+                {checkOutLabel} ({booking.nights} {t("common.nights")})
               </p>
               <p className="text-muted-foreground text-sm">
                 {t("common.guests")}: {booking.guests}

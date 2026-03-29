@@ -140,10 +140,22 @@ function getViewBookingUrl(booking: any, userId?: string | null, guestEmail?: st
 
 function formatDateSafe(dateVal: string | Date): string {
   if (!dateVal) return "N/A";
-  const d = typeof dateVal === "string" && /^\d{4}-\d{2}-\d{2}/.test(dateVal)
-    ? (() => { const [y, m, day] = dateVal.slice(0, 10).split("-").map(Number); return new Date(y, m - 1, day); })()
-    : new Date(dateVal);
-  return isNaN(d.getTime()) ? String(dateVal) : d.toLocaleDateString();
+  const s = typeof dateVal === "string" ? dateVal.trim() : "";
+  const isoPrefix = typeof dateVal === "string" && /^\d{4}-\d{2}-\d{2}/.test(s);
+  if (isoPrefix) {
+    const [y, m, day] = s.slice(0, 10).split("-").map(Number);
+    const d = new Date(Date.UTC(y, m - 1, day, 12, 0, 0));
+    return d.toLocaleDateString("en-GB", {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+      timeZone: "UTC",
+    });
+  }
+  const d = new Date(dateVal as Date);
+  return isNaN(d.getTime())
+    ? String(dateVal)
+    : d.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
 }
 
 /**
