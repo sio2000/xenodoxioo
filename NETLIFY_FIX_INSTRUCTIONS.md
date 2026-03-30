@@ -1,34 +1,3 @@
-# 🔧 Netlify Supabase Connection Fix
-
-## Problem
-Your Netlify site is showing old Prisma data instead of current Supabase data.
-
-## Solution
-You need to add environment variables to your Netlify site so it can connect to your Supabase database.
-
-## 🚀 Quick Fix Steps
-
-### 1. Go to Netlify Environment Settings
-1. Visit: https://app.netlify.com/
-2. Go to your site: `incredible-panda-05189b`
-3. Click: **Site settings** → **Build & deploy** → **Environment**
-
-### 2. Add These Environment Variables
-
-Copy and paste these variables exactly as shown:
-
-```
-SUPABASE_URL=https://jkolkjvhlguaqcfgaaig.supabase.co
-SUPABASE_SERVICE_ROLE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imprb2xranZobGd1YXFjZmdhYWlnIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MjQ1NTkxNywiZXhwIjoyMDg4MDMxOTE3fQ.5D-FyZYezZ1w4HOPQco3XMjBJUrL52LbZudwR8WH8kU
-NEXT_PUBLIC_SUPABASE_URL=https://jkolkjvhlguaqcfgaaig.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imprb2xranZobGd1YXFjZmdhYWlnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI0NTU5MTcsImV4cCI6MjA4ODAzMTkxN30.xCGZEuL4_AjrUY6Yi7BuPCzL1fYAWq9BB_BQ14GGIqQ
-NODE_ENV=production
-JWT_SECRET=your-super-secret-jwt-key-change-in-production-2024
-JWT_REFRESH_SECRET=your-super-secret-refresh-key-change-in-production-2024
-ADMIN_EMAIL=admin@leonidionhouses.com
-CURRENCY=EUR
-FRONTEND_URL=https://incredible-panda-05189b.netlify.app
-```
 
 ### 3. Trigger New Deploy
 After adding the variables:
