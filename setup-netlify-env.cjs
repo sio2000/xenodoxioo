@@ -12,8 +12,8 @@ console.log('🔧 Netlify Environment Variables Setup');
 console.log('=====================================\n');
 
 try {
-  // Read the .env.final file
-  const envPath = path.join(__dirname, '.env.final');
+  // Read local .env only (never committed). Do not point this at files tracked in git.
+  const envPath = path.join(__dirname, '.env');
   const envContent = fs.readFileSync(envPath, 'utf8');
   
   // Extract the required environment variables

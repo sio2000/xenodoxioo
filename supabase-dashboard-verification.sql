@@ -5,8 +5,8 @@
 -- =====================================================
 
 -- Environment verification (manual check)
--- Your DATABASE_URL should be: postgresql://postgres:Skatanafas14!@db.jkolkjvhlguaqcfgaaig.supabase.co:5432/postgres
--- Your SUPABASE_URL should be: https://jkolkjvhlguaqcfgaaig.supabase.co
+-- DATABASE_URL: Supabase Dashboard → Settings → Database (never commit passwords)
+-- SUPABASE_URL: https://YOUR_PROJECT_REF.supabase.co
 
 -- 1. DATA INTEGRITY VERIFICATION
 SELECT 'DATA COUNTS VERIFICATION' as test_name;
@@ -48,7 +48,7 @@ SELECT 'IMAGE URL VERIFICATION' as test_name;
 
 SELECT 'properties_with_supabase_images' as check_name, COUNT(*) as count,
        CASE WHEN COUNT(*) = 6 THEN '✅ PASS' ELSE '❌ FAIL' END as status
-FROM "Property" WHERE "mainImage" LIKE 'https://jkolkjvhlguaqcfgaaig.supabase.co/storage/v1/object/public/%'
+FROM "Property" WHERE "mainImage" LIKE 'https://%.supabase.co/storage/v1/object/public/%'
 UNION ALL
 SELECT 'properties_with_local_images' as check_name, COUNT(*) as count,
        CASE WHEN COUNT(*) = 0 THEN '✅ PASS' ELSE '❌ FAIL' END as status

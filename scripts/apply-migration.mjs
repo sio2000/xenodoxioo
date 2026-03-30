@@ -1,7 +1,28 @@
 import https from "https";
+import dotenv from "dotenv";
 
-const supabaseUrl = "jkolkjvhlguaqcfgaaig.supabase.co";
-const serviceKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imprb2xranZobGd1YXFjZmdhYWlnIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MjQ1NTkxNywiZXhwIjoyMDg4MDMxOTE3fQ.5D-FyZYezZ1w4HOPQco3XMjBJUrL52LbZudwR8WH8kU";
+dotenv.config();
+
+function supabaseHostname() {
+  const raw = (process.env.SUPABASE_URL || "").trim();
+  if (!raw) return "";
+  try {
+    const href = raw.startsWith("http") ? raw : `https://${raw}`;
+    return new URL(href).hostname;
+  } catch {
+    return "";
+  }
+}
+
+const supabaseUrl = supabaseHostname();
+const serviceKey = (process.env.SUPABASE_SERVICE_ROLE_KEY || "").trim();
+
+if (!supabaseUrl || !serviceKey) {
+  console.error(
+    "Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY. Set them in .env (see .env.example).",
+  );
+  process.exit(1);
+}
 
 const statements = [
   `CREATE TABLE IF NOT EXISTS public.payment_settings (
@@ -82,7 +103,8 @@ async function main() {
   if (result.status === 404) {
     console.log("Supabase RPC exec_sql not available.");
     console.log("\n=== MANUAL MIGRATION REQUIRED ===");
-    console.log("Go to: https://supabase.com/dashboard/project/jkolkjvhlguaqcfgaaig/sql/new");
+    const ref = supabaseUrl.replace(/\.supabase\.co$/i, "");
+    console.log(`Go to: https://supabase.com/dashboard/project/${ref}/sql/new`);
     console.log("Paste the contents of migration-payment-inquiry.sql and click Run");
     console.log("=================================\n");
     return;
