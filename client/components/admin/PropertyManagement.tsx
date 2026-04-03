@@ -1,9 +1,8 @@
 import { useState, useEffect } from "react";
 import { normalizeUnitImageList } from "@shared/normalize-unit-images";
 import { apiUrl, imageUrl, placeholderImage } from "@/lib/api";
-import { Plus, Edit, Trash2, BedDouble, Image as ImageIcon } from "lucide-react";
+import { Plus, Edit, Trash2 } from "lucide-react";
 import { useLanguage } from "@/hooks/useLanguage";
-import formatCurrency from "@/lib/currency";
 
 interface Property {
   id: string;
@@ -42,7 +41,7 @@ interface Unit {
 }
 
 export default function PropertyManagement() {
-  const { language, t } = useLanguage();
+  const { t } = useLanguage();
   const [properties, setProperties] = useState<Property[]>([]);
   const [units, setUnits] = useState<Unit[]>([]);
   const [loading, setLoading] = useState(true);
@@ -628,14 +627,6 @@ export default function PropertyManagement() {
                     <div className="flex justify-between items-center">
                       <div>
                         <h4 className="font-semibold text-foreground">{unit.name}</h4>
-                        <div className="flex gap-4 mt-2 text-sm text-muted-foreground">
-                          <span className="flex items-center gap-1">
-                            <BedDouble size={14} />
-                            {t("admin.bedroomsCount").replace("{count}", String(unit.bedrooms))}
-                          </span>
-                          <span>{t("admin.guestsCount").replace("{count}", String(unit.maxGuests))}</span>
-                          <span>{formatCurrency(unit.basePrice, language)}{t("admin.perNightSuffix")}</span>
-                        </div>
                       </div>
                       <div className="flex gap-2">
                         <button
@@ -840,6 +831,8 @@ function UnitForm({ unit, propertyId, properties, onSubmit, onClose, onPropertyC
     onSubmit(formData);
   };
 
+  const isEditUnit = Boolean(unit);
+
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
       <div className="bg-card border border-border rounded-lg p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
@@ -880,6 +873,8 @@ function UnitForm({ unit, propertyId, properties, onSubmit, onClose, onPropertyC
               required
             />
           </div>
+          {!isEditUnit ? (
+            <>
           <div>
             <label className="block text-sm font-medium text-foreground mb-1">
               {t("admin.descriptionLabel")}
@@ -961,6 +956,22 @@ function UnitForm({ unit, propertyId, properties, onSubmit, onClose, onPropertyC
               />
             </div>
           </div>
+            </>
+          ) : (
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-1">
+                {t("admin.cleaningFeeLabel")}
+              </label>
+              <input
+                type="number"
+                value={formData.cleaningFee}
+                onChange={(e) => setFormData({ ...formData, cleaningFee: parseFloat(e.target.value) })}
+                className="w-full p-2 border border-border rounded-md bg-background text-foreground"
+                min="0"
+                step="0.01"
+              />
+            </div>
+          )}
           <div>
             <label className="block text-sm font-medium text-foreground mb-1">
               {t("admin.imagesLabel")}

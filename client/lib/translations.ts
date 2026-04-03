@@ -504,7 +504,26 @@ export const translations: Record<Language, Record<string, string>> = {
 
     // Admin
     "admin.title": "Admin Panel",
-    "admin.subtitle": "Manage your accommodation rental business",
+    "admin.subtitle": "Tap a coloured box to jump, or scroll the page.",
+    "admin.areasNavLabel": "Jump to area",
+    "admin.areasNavIntro": "Click a colored tile to jump to that section, or scroll the page.",
+    "admin.sectionHelpHint": "What is this section?",
+    "admin.jumpToSectionLabel": "Go to section",
+    "admin.jumpToSectionPlaceholder": "Choose a section…",
+    "admin.section.dashboard.help": "See bookings, revenue, and how full your accommodations are this month.",
+    "admin.section.bookings.help": "View and manage guest bookings, payments, and statuses.",
+    "admin.section.pricesPeriod.help": "Set seasonal periods and prices that apply across your business.",
+    "admin.section.pricing.help": "Create and manage discount coupon codes for guests.",
+    "admin.section.properties.help": "Add or edit accommodations, units, photos, and nightly prices.",
+    "admin.section.users.help": "Manage user accounts that can sign in to the site.",
+    "admin.section.inquiries.help": "Read messages from guests and send replies or special offers.",
+    "admin.section.settings.help": "Tax percentages, deposits, and payment rules for bookings.",
+    "admin.inquiriesNewBadgeOne": "1 new inquiry",
+    "admin.inquiriesNewBadgeMany": "{count} new inquiries",
+    "admin.inquiriesUnreadBanner": "You have unread guest messages or new inquiry activity ({count}). Open an inquiry below to review.",
+    "admin.prevMonth": "Previous month",
+    "admin.nextMonth": "Next month",
+    "admin.refreshPanel": "Refresh all",
     "admin.dashboard": "Dashboard",
     "admin.bookings": "Bookings",
     "admin.pricing": "Pricing & Discounts",
@@ -591,6 +610,20 @@ export const translations: Record<Language, Record<string, string>> = {
     "admin.login.button": "Login",
     "admin.login.loggingIn": "Logging in...",
 
+    // Programmer panel
+    "programmer.title": "Programmer panel",
+    "programmer.subtitle": "Prices, billing rules, and tax / payment settings.",
+    "programmer.areasNavLabel": "Programmer areas",
+    "programmer.login.title": "Programmer login",
+    "programmer.login.description": "Sign in with the programmer account (separate from admin). Password must be at least 12 characters.",
+    "programmer.login.email": "Email",
+    "programmer.login.password": "Password",
+    "programmer.login.button": "Sign in",
+    "programmer.login.loggingIn": "Signing in...",
+    "programmer.login.notConfigured": "Programmer login is not configured on the server.",
+    "programmer.logout": "Log out",
+    "programmer.backToSite": "Back to site",
+
     // Admin - Payment Settings
     "admin.paymentPolicy": "Payment Policy",
     "admin.paymentPolicyDesc": "Configure deposit percentages and payment thresholds.",
@@ -631,6 +664,7 @@ export const translations: Record<Language, Record<string, string>> = {
     "admin.allStatus": "All Status",
     "admin.statusPending": "Pending",
     "admin.statusConfirmed": "Confirmed",
+    "admin.statusCompleted": "Completed",
     "admin.statusCheckedIn": "Checked In",
     "admin.statusCheckedOut": "Checked Out",
     "admin.statusCancelled": "Cancelled",
@@ -819,6 +853,9 @@ export const translations: Record<Language, Record<string, string>> = {
     "calendar.rangeContainsUnavailable":
       "You cannot stay across booked or unavailable dates. Choose one continuous available period.",
     "calendar.checkInAdvanceDays": "Check-in must be at least 3 days from today.",
+    "calendar.rangeContainsClosedSeason":
+      "This stay includes dates outside the summer season (1 June – 30 September). Select check-in and check-out within that period only.",
+    "calendar.closedSeasonLegend": "Closed season (not bookable)",
 
     // Inquiry form
     "inquiry.title": "Planning a longer stay? Send us a message",
@@ -1189,6 +1226,25 @@ export const translations: Record<Language, Record<string, string>> = {
     "admin.properties": "Hébergements",
     "admin.users": "Utilisateurs",
     "admin.settings": "Paramètres",
+    "admin.areasNavLabel": "Aller à une zone",
+    "admin.areasNavIntro": "Cliquez sur une tuile colorée pour accéder à la section, ou faites défiler la page.",
+    "admin.sectionHelpHint": "A quoi sert cette section ?",
+    "admin.jumpToSectionLabel": "Aller à la section",
+    "admin.jumpToSectionPlaceholder": "Choisir une section…",
+    "admin.section.dashboard.help": "Voir les réservations, le chiffre d'affaires et le remplissage de vos hébergements ce mois-ci.",
+    "admin.section.bookings.help": "Consulter et gérer les réservations, les paiements et les statuts.",
+    "admin.section.pricesPeriod.help": "Définir les périodes saisonnières et les tarifs qui s'appliquent à votre activité.",
+    "admin.section.pricing.help": "Créer et gérer les codes promo et réductions pour les clients.",
+    "admin.section.properties.help": "Ajouter ou modifier les hébergements, les logements, les photos et les prix par nuit.",
+    "admin.section.users.help": "Gérer les comptes utilisateurs qui peuvent se connecter au site.",
+    "admin.section.inquiries.help": "Lire les messages des clients et envoyer des réponses ou des offres spéciales.",
+    "admin.section.settings.help": "TVA ou taxes, acomptes et règles de paiement pour les réservations.",
+    "admin.inquiriesNewBadgeOne": "1 nouvelle demande",
+    "admin.inquiriesNewBadgeMany": "{count} nouvelles demandes",
+    "admin.inquiriesUnreadBanner": "Messages invités non lus ou nouvelle activité ({count}). Ouvrez une demande ci-dessous pour consulter.",
+    "admin.prevMonth": "Mois précédent",
+    "admin.nextMonth": "Mois suivant",
+    "admin.refreshPanel": "Tout actualiser",
     "admin.totalBookings": "Total des réservations",
     "admin.revenue": "Chiffre d'affaires (ce mois)",
     "admin.totalUsers": "Total des utilisateurs",
@@ -1268,6 +1324,20 @@ export const translations: Record<Language, Record<string, string>> = {
     "admin.login.button": "Se connecter",
     "admin.login.loggingIn": "Connexion en cours...",
 
+    // Programmer panel
+    "programmer.title": "Panneau programmeur",
+    "programmer.subtitle": "Prix, facturation et paramètres fiscaux / paiement.",
+    "programmer.areasNavLabel": "Zones programmeur",
+    "programmer.login.title": "Connexion programmeur",
+    "programmer.login.description": "Connectez-vous avec le compte programmeur (distinct de l’admin). Le mot de passe doit faire au moins 12 caractères.",
+    "programmer.login.email": "E-mail",
+    "programmer.login.password": "Mot de passe",
+    "programmer.login.button": "Se connecter",
+    "programmer.login.loggingIn": "Connexion...",
+    "programmer.login.notConfigured": "La connexion programmeur n’est pas configurée sur le serveur.",
+    "programmer.logout": "Déconnexion",
+    "programmer.backToSite": "Retour au site",
+
     // Admin - Payment Settings
     "admin.paymentPolicy": "Politique de paiement",
     "admin.paymentPolicyDesc": "Configurez les pourcentages d'acompte et les seuils de paiement.",
@@ -1308,6 +1378,7 @@ export const translations: Record<Language, Record<string, string>> = {
     "admin.allStatus": "Tous les statuts",
     "admin.statusPending": "En attente",
     "admin.statusConfirmed": "Confirmée",
+    "admin.statusCompleted": "Terminée",
     "admin.statusCheckedIn": "Arrivée effectuée",
     "admin.statusCheckedOut": "Départ effectué",
     "admin.statusCancelled": "Annulée",
@@ -1709,9 +1780,12 @@ export const translations: Record<Language, Record<string, string>> = {
     "calendar.rangeContainsUnavailable":
       "Vous ne pouvez pas séjourner sur des dates réservées ou indisponibles. Choisissez une période continue disponible.",
     "calendar.checkInAdvanceDays": "L'arrivée doit être au moins 3 jours à partir d'aujourd'hui.",
+    "calendar.rangeContainsClosedSeason":
+      "Ce séjour inclut des dates en dehors de la saison d'été (1er juin – 30 septembre). Choisissez l'arrivée et le départ uniquement dans cette période.",
+    "calendar.closedSeasonLegend": "Hors saison (non réservable)",
 
     "admin.title": "Panneau d'administration",
-    "admin.subtitle": "Gérez votre entreprise de location d'hébergements",
+    "admin.subtitle": "Touchez une case colorée pour y aller, ou faites défiler la page.",
     "admin.manageVillas": "Gérez votre entreprise de location d'hébergements",
 
     "property.selectNumber": "Sélectionnez le nombre de",
@@ -2102,6 +2176,25 @@ export const translations: Record<Language, Record<string, string>> = {
     "admin.properties": "Unterkünfte",
     "admin.users": "Benutzer",
     "admin.settings": "Einstellungen",
+    "admin.areasNavLabel": "Zu Bereich springen",
+    "admin.areasNavIntro": "Klicken Sie auf eine farbige Kachel, um zum Bereich zu springen, oder scrollen Sie.",
+    "admin.sectionHelpHint": "Wofür ist dieser Bereich?",
+    "admin.jumpToSectionLabel": "Zu Bereich springen",
+    "admin.jumpToSectionPlaceholder": "Bereich wählen…",
+    "admin.section.dashboard.help": "Buchungen, Umsatz und Auslastung Ihrer Unterkünfte in diesem Monat sehen.",
+    "admin.section.bookings.help": "Gästebuchungen, Zahlungen und Status verwalten.",
+    "admin.section.pricesPeriod.help": "Saisonzeiten und Preise festlegen, die für Ihr Angebot gelten.",
+    "admin.section.pricing.help": "Rabatt-Gutscheincodes für Gäste anlegen und verwalten.",
+    "admin.section.properties.help": "Unterkünfte, Einheiten, Fotos und Preise pro Nacht bearbeiten.",
+    "admin.section.users.help": "Benutzerkonten verwalten, die sich auf der Website anmelden können.",
+    "admin.section.inquiries.help": "Nachrichten von Gästen lesen und Antworten oder Angebote senden.",
+    "admin.section.settings.help": "Steuern, Anzahlungen und Zahlungsregeln für Buchungen.",
+    "admin.inquiriesNewBadgeOne": "1 neue Anfrage",
+    "admin.inquiriesNewBadgeMany": "{count} neue Anfragen",
+    "admin.inquiriesUnreadBanner": "Ungelesene Gastnachrichten oder neue Aktivität ({count}). Öffnen Sie unten eine Anfrage.",
+    "admin.prevMonth": "Vorheriger Monat",
+    "admin.nextMonth": "Nächster Monat",
+    "admin.refreshPanel": "Alles aktualisieren",
     "admin.totalBookings": "Gesamtzahl der Buchungen",
     "admin.revenue": "Umsatz (diesen Monat)",
     "admin.totalUsers": "Gesamtzahl der Benutzer",
@@ -2181,6 +2274,20 @@ export const translations: Record<Language, Record<string, string>> = {
     "admin.login.button": "Anmelden",
     "admin.login.loggingIn": "Anmeldung...",
 
+    // Programmer panel
+    "programmer.title": "Entwickler-Panel",
+    "programmer.subtitle": "Preise, Abrechnung sowie Steuer- und Zahlungseinstellungen.",
+    "programmer.areasNavLabel": "Entwickler-Bereiche",
+    "programmer.login.title": "Entwickler-Anmeldung",
+    "programmer.login.description": "Mit dem Entwicklerkonto anmelden (getrennt vom Admin). Passwort mindestens 12 Zeichen.",
+    "programmer.login.email": "E-Mail",
+    "programmer.login.password": "Passwort",
+    "programmer.login.button": "Anmelden",
+    "programmer.login.loggingIn": "Wird angemeldet...",
+    "programmer.login.notConfigured": "Entwickler-Anmeldung ist auf dem Server nicht konfiguriert.",
+    "programmer.logout": "Abmelden",
+    "programmer.backToSite": "Zur Website",
+
     // Admin - Payment Settings
     "admin.paymentPolicy": "Zahlungsrichtlinie",
     "admin.paymentPolicyDesc": "Konfigurieren Sie Anzahlungsprozentsätze und Zahlungsschwellen.",
@@ -2221,6 +2328,7 @@ export const translations: Record<Language, Record<string, string>> = {
     "admin.allStatus": "Alle Status",
     "admin.statusPending": "Ausstehend",
     "admin.statusConfirmed": "Bestätigt",
+    "admin.statusCompleted": "Abgeschlossen",
     "admin.statusCheckedIn": "Eingecheckt",
     "admin.statusCheckedOut": "Ausgecheckt",
     "admin.statusCancelled": "Storniert",
@@ -2569,9 +2677,12 @@ export const translations: Record<Language, Record<string, string>> = {
     "calendar.rangeContainsUnavailable":
       "Ein Aufenthalt darf nicht über gebuchte oder gesperrte Tage führen. Wählen Sie einen durchgehend freien Zeitraum.",
     "calendar.checkInAdvanceDays": "Die Anreise muss mindestens 3 Tage ab heute sein.",
+    "calendar.rangeContainsClosedSeason":
+      "Dieser Aufenthalt umfasst Tage außerhalb der Sommersaison (1. Juni – 30. September). Wählen Sie An- und Abreise nur innerhalb dieses Zeitraums.",
+    "calendar.closedSeasonLegend": "Außerhalb der Saison (nicht buchbar)",
 
     "admin.title": "Admin-Panel",
-    "admin.subtitle": "Verwalten Sie Ihr Geschäft mit der Vermietung von Unterkünften",
+    "admin.subtitle": "Tippen Sie auf ein farbiges Feld, oder scrollen Sie die Seite.",
     "admin.manageVillas": "Verwalten Sie Ihr Geschäft mit der Vermietung von Unterkünften",
 
     "property.selectNumber": "Wählen Sie die Anzahl der",
@@ -3009,6 +3120,25 @@ export const translations: Record<Language, Record<string, string>> = {
     "admin.properties": "Καταλύματα",
     "admin.users": "Χρήστες",
     "admin.settings": "Ρυθμίσεις",
+    "admin.areasNavLabel": "Μετάβαση σε περιοχή",
+    "admin.areasNavIntro": "Πατήστε ένα χρωματιστό κουτί για μετάβαση, ή κυλήστε τη σελίδα.",
+    "admin.sectionHelpHint": "Τι κάνει αυτή η περιοχή;",
+    "admin.jumpToSectionLabel": "Μετάβαση σε περιοχή",
+    "admin.jumpToSectionPlaceholder": "Επιλέξτε περιοχή…",
+    "admin.section.dashboard.help": "Δείτε κρατήσεις, έσοδα και πόσο γεμάτα είναι τα καταλύματά σας αυτόν τον μήνα.",
+    "admin.section.bookings.help": "Προβολή και διαχείριση κρατήσεων, πληρωμών και καταστάσεων.",
+    "admin.section.pricesPeriod.help": "Ορίστε εποχιακές περιόδους και τιμές που ισχύουν για την επιχείρησή σας.",
+    "admin.section.pricing.help": "Δημιουργήστε και διαχειριστείτε κωδικούς εκπτώσεων (κουπόνια) για επισκέπτες.",
+    "admin.section.properties.help": "Προσθέστε ή επεξεργαστείτε καταλύματα, μονάδες, φωτογραφίες και τιμές ανά νύχτα.",
+    "admin.section.users.help": "Διαχειριστείτε λογαριασμούς χρηστών που μπορούν να συνδεθούν στον ιστότοπο.",
+    "admin.section.inquiries.help": "Διαβάστε μηνύματα επισκεπτών και στείλτε απαντήσεις ή ειδικές προσφορές.",
+    "admin.section.settings.help": "Φόροι, προκαταβολές και κανόνες πληρωμής για κρατήσεις.",
+    "admin.inquiriesNewBadgeOne": "1 νέο αίτημα",
+    "admin.inquiriesNewBadgeMany": "{count} νέα αιτήματα",
+    "admin.inquiriesUnreadBanner": "Έχετε μη αναγνωσμένα μηνύματα ή νέα δραστηριότητα αιτημάτων ({count}). Ανοίξτε ένα αίτημα παρακάτω.",
+    "admin.prevMonth": "Προηγούμενος μήνας",
+    "admin.nextMonth": "Επόμενος μήνας",
+    "admin.refreshPanel": "Ανανέωση όλων",
     "admin.totalBookings": "Συνολό κρατήσεων",
     "admin.revenue": "Έσοδα (αυτό τον μήνα)",
     "admin.totalUsers": "Συνολό χρηστών",
@@ -3088,6 +3218,20 @@ export const translations: Record<Language, Record<string, string>> = {
     "admin.login.button": "Σύνδεση",
     "admin.login.loggingIn": "Σύνδεση...",
 
+    // Programmer panel
+    "programmer.title": "Πίνακας προγραμματιστή",
+    "programmer.subtitle": "Τιμές, τιμολόγηση και ρυθμίσεις φόρου / πληρωμών.",
+    "programmer.areasNavLabel": "Περιοχές προγραμματιστή",
+    "programmer.login.title": "Σύνδεση προγραμματιστή",
+    "programmer.login.description": "Συνδεθείτε με τον λογαριασμό προγραμματιστή (ξεχωριστά από τον διαχειριστή). Ο κωδικός πρέπει να έχει τουλάχιστον 12 χαρακτήρες.",
+    "programmer.login.email": "Email",
+    "programmer.login.password": "Κωδικός",
+    "programmer.login.button": "Σύνδεση",
+    "programmer.login.loggingIn": "Σύνδεση...",
+    "programmer.login.notConfigured": "Η σύνδεση προγραμματιστή δεν είναι ρυθμισμένη στον διακομιστή.",
+    "programmer.logout": "Αποσύνδεση",
+    "programmer.backToSite": "Επιστροφή στο site",
+
     // Admin - Payment Settings
     "admin.paymentPolicy": "Πολιτική πληρωμής",
     "admin.paymentPolicyDesc": "Ρυθμίστε τα ποσοστά προκαταβολής και τα όρια πληρωμής.",
@@ -3128,6 +3272,7 @@ export const translations: Record<Language, Record<string, string>> = {
     "admin.allStatus": "Όλες οι καταστάσεις",
     "admin.statusPending": "Σε αναμονή",
     "admin.statusConfirmed": "Επιβεβαιωμένη",
+    "admin.statusCompleted": "Ολοκληρωμένη",
     "admin.statusCheckedIn": "Άφιξη",
     "admin.statusCheckedOut": "Αναχώρηση",
     "admin.statusCancelled": "Ακυρωμένη",
@@ -3550,7 +3695,7 @@ export const translations: Record<Language, Record<string, string>> = {
     "common.login": "Σύνδεση",
 
     "admin.title": "Πίνακας διαχείρισης",
-    "admin.subtitle": "Διαχείριση της επιχείρησης ενοικίασης καταλυμάτων",
+    "admin.subtitle": "Πατήστε ένα χρωματιστό κουτί για μετάβαση, ή κυλήστε τη σελίδα.",
     "admin.manageVillas": "Διαχείριση της επιχείρησης ενοικίασης καταλυμάτων",
 
     "property.backToProperty": "Επιστροφή στο κατάλυμα",
@@ -3695,6 +3840,9 @@ export const translations: Record<Language, Record<string, string>> = {
     "calendar.rangeContainsUnavailable":
       "Δεν μπορείτε να διαμείνετε σε εύρος που περιλαμβάνει κρατημένες ή μη διαθέσιμες ημερομηνίες. Επιλέξτε μία συνεχή διαθέσιμη περίοδο.",
     "calendar.checkInAdvanceDays": "Η ημερομηνία άφιξης πρέπει να είναι τουλάχιστον 3 ημέρες από σήμερα.",
+    "calendar.rangeContainsClosedSeason":
+      "Η διαμονή περιλαμβάνει ημερομηνίες εκτός καλοκαιριού (1 Ιουνίου – 30 Σεπτεμβρίου). Επιλέξτε άφιξη και αναχώρηση μόνο μέσα σε αυτό το διάστημα.",
+    "calendar.closedSeasonLegend": "Κλειστή περίοδος (χωρίς κράτηση)",
 
     // Inquiry form
     "inquiry.title": "Σχεδιάζετε μεγαλύτερη διαμονή; Στείλτε μας μήνυμα",
@@ -3722,5 +3870,13 @@ export const translations: Record<Language, Record<string, string>> = {
 };
 
 export function t(key: string, lang: Language = "en"): string {
-  return translations[lang][key] || translations["en"][key] || key;
+  if (Object.prototype.hasOwnProperty.call(translations[lang] || {}, key)) {
+    const v = translations[lang][key];
+    return v ?? key;
+  }
+  if (Object.prototype.hasOwnProperty.call(translations.en, key)) {
+    const v = translations.en[key];
+    return v ?? key;
+  }
+  return key;
 }

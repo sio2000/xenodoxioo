@@ -67,6 +67,7 @@ import {
   getClosedBungalowSeasonMessageKey,
   isSmallBungalowUnit,
   isBigBungalowUnit,
+  isSeasonalBungalowUnit,
 } from "@/lib/room-display-order";
 import formatCurrency from "@/lib/currency";
 import { getTieredPricePerNight } from "@/lib/price-tiers";
@@ -642,7 +643,16 @@ export default function PropertyDetail() {
           nightlyRegular,
         )
       : nightlyRegular;
-  const canBook = !!(data && currentUnit && selectedDates) && !isUnitClosed;
+  const seasonalBungalowOffSeasonNotice =
+    !!isUnitClosed &&
+    !!data &&
+    !!currentUnit &&
+    isSeasonalBungalowUnit(currentUnit.name, data.name);
+  const hardClosedNoBooking =
+    !!isUnitClosed && !!currentUnit && !!data && !seasonalBungalowOffSeasonNotice;
+  /** Server-backed quote: valid range, availability, and pricing (bungalows have no client price fallback). */
+  const canBook =
+    !!(data && currentUnit && selectedDates) && !quoteLoading && quotePricing != null;
   const formatDateForApi = (d: Date) =>
     `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 
@@ -1462,6 +1472,8 @@ export default function PropertyDetail() {
 
                   <AvailabilityCalendar
                     unitId={currentUnit.id}
+                    propertyName={data.name}
+                    unitName={currentUnit.name}
                     onSelectDates={(checkIn, checkOut) =>
                       setSelectedDates({ checkIn, checkOut })
                     }
@@ -1537,46 +1549,49 @@ export default function PropertyDetail() {
                     )}
                   </div>
 
-                  {/* Closed room notice or Book Button */}
-                  {isUnitClosed ? (
+                  {/* Seasonal bungalow: info only during off-season; booking still allowed for June–Sept dates. */}
+                  {seasonalBungalowOffSeasonNotice && (
                     <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 mb-3">
                       <p className="font-semibold text-amber-800">{t("property.roomClosed")}</p>
                       {(() => {
-                        const seasonKey =
-                          data && currentUnit
-                            ? getClosedBungalowSeasonMessageKey(
-                                currentUnit.name,
-                                data.name,
-                                isUnitClosed,
-                              )
-                            : null;
-                        if (seasonKey) {
-                          return (
-                            <p className="text-sm text-amber-700 mt-1">{t(seasonKey)}</p>
-                          );
-                        }
-                        if (currentUnit?.reopenDate) {
-                          return (
-                            <p className="text-sm text-amber-700 mt-1">
-                              {t("property.roomReopensOn").replace(
-                                "{date}",
-                                new Date(currentUnit.reopenDate).toLocaleDateString(undefined, {
-                                  day: "numeric",
-                                  month: "long",
-                                  year: "numeric",
-                                }),
-                              )}
-                            </p>
-                          );
-                        }
-                        return null;
+                        const seasonKey = getClosedBungalowSeasonMessageKey(
+                          currentUnit!.name,
+                          data!.name,
+                          true,
+                        );
+                        return seasonKey ? (
+                          <p className="text-sm text-amber-700 mt-1">{t(seasonKey)}</p>
+                        ) : null;
                       })()}
-                      <button disabled className="btn-primary w-full justify-center mt-3 opacity-50 cursor-not-allowed">
+                    </div>
+                  )}
+
+                  {hardClosedNoBooking ? (
+                    <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 mb-3">
+                      <p className="font-semibold text-amber-800">{t("property.roomClosed")}</p>
+                      {currentUnit?.reopenDate ? (
+                        <p className="text-sm text-amber-700 mt-1">
+                          {t("property.roomReopensOn").replace(
+                            "{date}",
+                            new Date(currentUnit.reopenDate).toLocaleDateString(undefined, {
+                              day: "numeric",
+                              month: "long",
+                              year: "numeric",
+                            }),
+                          )}
+                        </p>
+                      ) : null}
+                      <button
+                        type="button"
+                        disabled
+                        className="btn-primary w-full justify-center mt-3 opacity-50 cursor-not-allowed"
+                      >
                         {t("nav.bookNow")}
                       </button>
                     </div>
                   ) : (
                     <button
+                      type="button"
                       onClick={handleBooking}
                       disabled={!canBook}
                       className="btn-primary w-full justify-center mb-3"

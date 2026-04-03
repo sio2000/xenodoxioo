@@ -3,6 +3,7 @@ import { apiUrl } from "@/lib/api";
 import formatCurrency from "@/lib/currency";
 import { Search, Filter, Eye, Edit, Mail, Calendar, BookOpen, Phone, ChevronDown, ChevronUp, ExternalLink } from "lucide-react";
 import { useLanguage } from "@/hooks/useLanguage";
+import { AdminPaginationBar } from "@/components/admin/AdminPaginationBar";
 
 interface User {
   id: string;
@@ -28,6 +29,8 @@ export default function UserManagement() {
   const [totalPages, setTotalPages] = useState(1);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
 
+  const USERS_PAGE_SIZE = 6;
+
   useEffect(() => {
     fetchUsers();
   }, [currentPage, statusFilter, searchTerm]);
@@ -37,7 +40,7 @@ export default function UserManagement() {
     try {
       const params = new URLSearchParams({
         page: currentPage.toString(),
-        pageSize: "10",
+        pageSize: String(USERS_PAGE_SIZE),
         ...(statusFilter !== "ALL" && { status: statusFilter }),
         ...(searchTerm && { search: searchTerm })
       });
@@ -112,7 +115,10 @@ export default function UserManagement() {
                 type="text"
                 placeholder={t("admin.searchUsers")}
                 value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
+                onChange={(e) => {
+                  setSearchTerm(e.target.value);
+                  setCurrentPage(1);
+                }}
                 className="w-full pl-10 pr-4 py-2 border border-border rounded-md bg-background text-foreground"
               />
             </div>
@@ -121,7 +127,10 @@ export default function UserManagement() {
             <Filter size={20} className="text-muted-foreground" />
             <select
               value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
+              onChange={(e) => {
+                setStatusFilter(e.target.value);
+                setCurrentPage(1);
+              }}
               className="px-3 py-2 border border-border rounded-md bg-background text-foreground"
             >
               <option value="ALL">{t("admin.allStatus")}</option>
@@ -221,28 +230,13 @@ export default function UserManagement() {
         )}
       </div>
 
-      {/* Pagination */}
-      {totalPages > 1 && (
-        <div className="flex justify-center items-center gap-2 mt-6">
-          <button
-            onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
-            disabled={currentPage === 1}
-            className="btn-secondary-sm"
-          >
-            {t("admin.previous")}
-          </button>
-          <span className="text-sm text-muted-foreground">
-            {t("admin.pageOf").replace("{current}", String(currentPage)).replace("{total}", String(totalPages))}
-          </span>
-          <button
-            onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
-            disabled={currentPage === totalPages}
-            className="btn-secondary-sm"
-          >
-            {t("admin.next")}
-          </button>
-        </div>
-      )}
+      <AdminPaginationBar
+        currentPage={currentPage}
+        totalPages={totalPages}
+        onPrev={() => setCurrentPage(Math.max(1, currentPage - 1))}
+        onNext={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
+        className="mt-6"
+      />
 
       {/* User Details Modal */}
       {selectedUser && (

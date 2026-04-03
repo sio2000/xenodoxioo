@@ -130,6 +130,23 @@ export const BIG_BUNGALOW_CLOSED_DISPLAY_PRICE = 70;
 /** Small Bungalow — booking-closed listing price (same seasonal logic as Big, different amount). */
 export const SMALL_BUNGALOW_CLOSED_DISPLAY_PRICE = 60;
 
+/** Big or Small Bungalow — seasonal summer-only booking window in the price table. */
+export function isSeasonalBungalowUnit(unitName: string, propertyName = ""): boolean {
+  return isBigBungalowUnit(unitName, propertyName) || isSmallBungalowUnit(unitName, propertyName);
+}
+
+/**
+ * Local calendar date: bookable nights for Big/Small Bungalow are 1 June – 30 September (inclusive).
+ * Matches server price-table closed periods for these units.
+ */
+export function isLocalDateInBungalowOpenSeason(date: Date): boolean {
+  const m = date.getMonth() + 1;
+  const d = date.getDate();
+  if (m < 6 || m > 9) return false;
+  if (m >= 6 && m <= 8) return true;
+  return d <= 30;
+}
+
 /** Small Bungalow – matches unit/property naming (excludes Big Bungalow). */
 export function isSmallBungalowUnit(unitName: string, propertyName = ""): boolean {
   if (isBigBungalowUnit(unitName, propertyName)) return false;

@@ -7,6 +7,7 @@ import fs from "fs";
 import { handleDemo } from "./routes/demo";
 import { paymentRouter } from "./routes/payments";
 import { adminRouter } from "./routes/admin";
+import { programmerRouter } from "./routes/programmer";
 import { authRouter } from "./routes/auth";
 import { bookingRouter } from "./routes/bookings";
 import { propertiesRouter } from "./routes/properties";
@@ -137,6 +138,7 @@ export function createServer() {
 
   app.use("/api/payments", paymentRouter);
   app.use("/api/admin", adminRouter);
+  app.use("/api/programmer", programmerRouter);
   app.use("/api/auth", authRouter);
   app.use("/api/bookings", bookingRouter);
   app.use("/api/properties", propertiesRouter);

@@ -2,6 +2,10 @@ import { useState, useEffect, useRef } from "react";
 import { apiUrl } from "@/lib/api";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useLanguage } from "@/hooks/useLanguage";
+import {
+  isSeasonalBungalowUnit,
+  isLocalDateInBungalowOpenSeason,
+} from "@/lib/room-display-order";
 
 const MIN_NIGHTS = 7;
 const MIN_DAYS_AHEAD_FOR_CHECKIN = 3;
@@ -29,14 +33,29 @@ function stayRangeContainsOccupiedNight(
   return false;
 }
 
+/** Any stay night (check-in .. check-out exclusive) falls outside 1 Jun – 30 Sep for seasonal bungalows. */
+function stayRangeContainsOffSeasonBungalowNight(checkIn: Date, checkOut: Date): boolean {
+  const cur = new Date(checkIn.getFullYear(), checkIn.getMonth(), checkIn.getDate());
+  const end = new Date(checkOut.getFullYear(), checkOut.getMonth(), checkOut.getDate());
+  while (cur < end) {
+    if (!isLocalDateInBungalowOpenSeason(cur)) return true;
+    cur.setDate(cur.getDate() + 1);
+  }
+  return false;
+}
+
 interface AvailabilityCalendarProps {
   unitId?: string;
+  propertyName?: string;
+  unitName?: string;
   onSelectDates?: (checkIn: Date, checkOut: Date) => void;
   onInvalidSelection?: () => void;
 }
 
 export default function AvailabilityCalendar({
   unitId,
+  propertyName = "",
+  unitName = "",
   onSelectDates,
   onInvalidSelection,
 }: AvailabilityCalendarProps) {
@@ -48,6 +67,9 @@ export default function AvailabilityCalendar({
   const [occupancyReady, setOccupancyReady] = useState(() => !unitId);
   const [minNightsError, setMinNightsError] = useState(false);
   const [rangeContainsUnavailable, setRangeContainsUnavailable] = useState(false);
+  const [rangeContainsOffSeason, setRangeContainsOffSeason] = useState(false);
+
+  const seasonalBungalow = isSeasonalBungalowUnit(unitName, propertyName);
 
   const onSelectRef = useRef(onSelectDates);
   const onInvalidRef = useRef(onInvalidSelection);
@@ -89,11 +111,20 @@ export default function AvailabilityCalendar({
       occupiedRanges.length > 0 && stayRangeContainsOccupiedNight(checkIn, checkOut, occupiedRanges);
     if (crosses) {
       setRangeContainsUnavailable(true);
+      setRangeContainsOffSeason(false);
       setMinNightsError(false);
       onInvalidRef.current?.();
       return;
     }
     setRangeContainsUnavailable(false);
+
+    if (seasonalBungalow && stayRangeContainsOffSeasonBungalowNight(checkIn, checkOut)) {
+      setRangeContainsOffSeason(true);
+      setMinNightsError(false);
+      onInvalidRef.current?.();
+      return;
+    }
+    setRangeContainsOffSeason(false);
 
     const nights = Math.ceil((checkOut.getTime() - checkIn.getTime()) / (1000 * 60 * 60 * 24));
     if (nights < MIN_NIGHTS) {
@@ -103,7 +134,7 @@ export default function AvailabilityCalendar({
     }
     setMinNightsError(false);
     onSelectRef.current?.(checkIn, checkOut);
-  }, [checkIn, checkOut, occupancyReady, occupiedRanges]);
+  }, [checkIn, checkOut, occupancyReady, occupiedRanges, seasonalBungalow]);
 
   const daysInMonth = (date: Date) => {
     return new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
@@ -131,21 +162,24 @@ export default function AvailabilityCalendar({
       setCheckOut(null);
       setMinNightsError(false);
       setRangeContainsUnavailable(false);
+      setRangeContainsOffSeason(false);
     } else if (selectedDate > checkIn) {
       setCheckOut(selectedDate);
       setMinNightsError(false);
       setRangeContainsUnavailable(false);
+      setRangeContainsOffSeason(false);
     } else {
       setCheckIn(selectedDate);
       setCheckOut(null);
       setMinNightsError(false);
       setRangeContainsUnavailable(false);
+      setRangeContainsOffSeason(false);
     }
   };
 
   const isInRange = (day: number) => {
     if (!checkIn || !checkOut) return false;
-    if (rangeContainsUnavailable || minNightsError) return false;
+    if (rangeContainsUnavailable || rangeContainsOffSeason || minNightsError) return false;
     const date = new Date(
       currentMonth.getFullYear(),
       currentMonth.getMonth(),
@@ -190,6 +224,12 @@ export default function AvailabilityCalendar({
     const msPerDay = 1000 * 60 * 60 * 24;
     const daysFromToday = Math.floor((dateStart.getTime() - today.getTime()) / msPerDay);
     return daysFromToday < MIN_DAYS_AHEAD_FOR_CHECKIN;
+  };
+
+  const isClosedSeasonDay = (day: number) => {
+    if (!seasonalBungalow) return false;
+    const date = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), day);
+    return !isLocalDateInBungalowOpenSeason(date);
   };
 
   const monthName = currentMonth.toLocaleString("default", {
@@ -258,11 +298,11 @@ export default function AvailabilityCalendar({
             <button
               key={index}
               onClick={() => day && handleDateClick(day)}
-              disabled={!day || isBooked(day!) || isBlocked(day!)}
+              disabled={!day || isBooked(day!) || isBlocked(day!) || isClosedSeasonDay(day!)}
               className={`
                 aspect-square text-sm font-medium rounded transition-all
                 ${
-                  !day || isBooked(day!) || isBlocked(day!)
+                  !day || isBooked(day!) || isBlocked(day!) || isClosedSeasonDay(day!)
                     ? "bg-muted text-muted-foreground cursor-not-allowed opacity-50"
                     : isSelected(day!)
                       ? "bg-primary text-white"
@@ -293,6 +333,12 @@ export default function AvailabilityCalendar({
         </div>
       )}
 
+      {rangeContainsOffSeason && checkIn && checkOut && (
+        <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+          <p className="text-sm font-medium text-amber-800">{t("calendar.rangeContainsClosedSeason")}</p>
+        </div>
+      )}
+
       {/* Legend */}
       <div className="border-t border-border pt-4 space-y-2 text-xs">
         <div className="flex items-center gap-2">
@@ -312,10 +358,16 @@ export default function AvailabilityCalendar({
         <div className="flex items-center gap-2">
           <span className="text-muted-foreground">{t("calendar.checkInAdvanceDays")}</span>
         </div>
+        {seasonalBungalow && (
+          <div className="flex items-center gap-2">
+            <div className="w-3 h-3 bg-muted rounded opacity-50" />
+            <span className="text-muted-foreground">{t("calendar.closedSeasonLegend")}</span>
+          </div>
+        )}
       </div>
 
       {/* Selected Dates Display — hide summary when range is invalid */}
-      {checkIn && checkOut && !minNightsError && !rangeContainsUnavailable && (
+      {checkIn && checkOut && !minNightsError && !rangeContainsUnavailable && !rangeContainsOffSeason && (
         <div className="mt-6 p-4 bg-primary/5 rounded-lg">
           <p className="text-sm text-muted-foreground mb-1">Your Dates:</p>
           <p className="font-semibold text-foreground">

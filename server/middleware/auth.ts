@@ -53,7 +53,7 @@ export function optionalAuthenticate(req: Request, res: Response, next: NextFunc
 /**
  * Middleware to authorize requests based on user role
  */
-export function authorize(roles: ("CUSTOMER" | "ADMIN")[]) {
+export function authorize(roles: ("CUSTOMER" | "ADMIN" | "PROGRAMMER")[]) {
     return (req: Request, res: Response, next: NextFunction) => {
         if (!req.user) {
             return next(new AuthError("Not authenticated"));

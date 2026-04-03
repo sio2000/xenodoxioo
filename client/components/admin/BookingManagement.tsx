@@ -4,6 +4,7 @@ import { Search, Filter, Eye, Calendar, Users, DollarSign, Clock, ArrowRight, Cr
 import { useLanguage } from "@/hooks/useLanguage";
 import formatCurrency from "@/lib/currency";
 import { formatStayDate, stayLocale } from "@/lib/stay-dates";
+import { AdminPaginationBar } from "@/components/admin/AdminPaginationBar";
 
 function formatTimestampLocal(d: string) {
   if (!d) return "—";
@@ -55,6 +56,8 @@ export default function BookingManagement() {
   const [totalPages, setTotalPages] = useState(1);
   const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
 
+  const BOOKINGS_PAGE_SIZE = 5;
+
   useEffect(() => {
     fetchBookings();
   }, [currentPage, statusFilter, searchTerm]);
@@ -64,7 +67,7 @@ export default function BookingManagement() {
     try {
       const params = new URLSearchParams({
         page: currentPage.toString(),
-        pageSize: "10",
+        pageSize: String(BOOKINGS_PAGE_SIZE),
         ...(statusFilter !== "ALL" && { status: statusFilter }),
         ...(searchTerm && { search: searchTerm })
       });
@@ -106,6 +109,7 @@ export default function BookingManagement() {
       case "CANCELLED": return "text-red-700 bg-red-50 border-red-200";
       case "CHECKED_IN": return "text-blue-700 bg-blue-50 border-blue-200";
       case "CHECKED_OUT": return "text-gray-700 bg-gray-50 border-gray-200";
+      case "COMPLETED": return "text-emerald-800 bg-emerald-50 border-emerald-200";
       case "NO_SHOW": return "text-red-700 bg-red-50 border-red-200";
       default: return "text-gray-700 bg-gray-50 border-gray-200";
     }
@@ -157,7 +161,10 @@ export default function BookingManagement() {
                 type="text"
                 placeholder={t("admin.searchBookings")}
                 value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
+                onChange={(e) => {
+                  setSearchTerm(e.target.value);
+                  setCurrentPage(1);
+                }}
                 className="w-full pl-10 pr-4 py-2.5 border border-border rounded-lg bg-background text-foreground text-sm"
               />
             </div>
@@ -166,7 +173,10 @@ export default function BookingManagement() {
             <Filter size={18} className="text-muted-foreground" />
             <select
               value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
+              onChange={(e) => {
+                setStatusFilter(e.target.value);
+                setCurrentPage(1);
+              }}
               className="px-3 py-2.5 border border-border rounded-lg bg-background text-foreground text-sm"
             >
               <option value="ALL">{t("admin.allStatus")}</option>
@@ -175,6 +185,8 @@ export default function BookingManagement() {
               <option value="CHECKED_IN">{t("admin.statusCheckedIn")}</option>
               <option value="CHECKED_OUT">{t("admin.statusCheckedOut")}</option>
               <option value="CANCELLED">{t("admin.statusCancelled")}</option>
+              <option value="NO_SHOW">{t("admin.statusNoShow")}</option>
+              <option value="COMPLETED">{t("admin.statusCompleted")}</option>
             </select>
           </div>
         </div>
@@ -273,28 +285,13 @@ export default function BookingManagement() {
         </div>
       )}
 
-      {/* Pagination */}
-      {totalPages > 1 && (
-        <div className="flex justify-center items-center gap-2 mt-6">
-          <button
-            onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
-            disabled={currentPage === 1}
-            className="btn-secondary-sm"
-          >
-            {t("admin.previous")}
-          </button>
-          <span className="text-sm text-muted-foreground">
-            {t("admin.pageOf").replace("{current}", String(currentPage)).replace("{total}", String(totalPages))}
-          </span>
-          <button
-            onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
-            disabled={currentPage === totalPages}
-            className="btn-secondary-sm"
-          >
-            {t("admin.next")}
-          </button>
-        </div>
-      )}
+      <AdminPaginationBar
+        currentPage={currentPage}
+        totalPages={totalPages}
+        onPrev={() => setCurrentPage(Math.max(1, currentPage - 1))}
+        onNext={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
+        className="mt-6"
+      />
 
       {/* Booking Details Modal */}
       {selectedBooking && (
@@ -428,6 +425,7 @@ function BookingDetailsModal({ booking, onClose, onStatusUpdate }: { booking: Bo
                   <option value="CHECKED_OUT">{t("admin.statusCheckedOut")}</option>
                   <option value="CANCELLED">{t("admin.statusCancelled")}</option>
                   <option value="NO_SHOW">{t("admin.statusNoShow")}</option>
+                  <option value="COMPLETED">{t("admin.statusCompleted")}</option>
                 </select>
               </div>
               <button

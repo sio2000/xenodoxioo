@@ -999,6 +999,11 @@ export const handler = async (event: any, context: any) => {
       if (inquiryRes) return inquiryRes;
     }
 
+    // Programmer panel login (JWT PROGRAMMER — same secret as user auth)
+    if (path === '/api/programmer/login' && method === 'POST') {
+      return await handleProgrammerLogin(event, requestId);
+    }
+
     // Handle admin routes
     if (path.startsWith('/api/admin/')) {
       return await handleAdminRoutes(path, method, supabase, event, requestId);
@@ -2317,6 +2322,118 @@ async function handleInquiriesRoutes(path: string, method: string, supabase: any
   }
 }
 
+const PROGRAMMER_STAFF_USER_ID_NETLIFY = '00000000-0000-4000-8000-000000000001';
+
+/** JWT Bearer required; role ADMIN or PROGRAMMER (pricing / tax / payment / coupons). */
+async function requireStaffAuthNetlify(event: any): Promise<null | { statusCode: number; headers: Record<string, string>; body: string }> {
+  const auth = String(event.headers?.authorization || event.headers?.Authorization || '').trim();
+  const m = /^Bearer\s+(.+)$/i.exec(auth);
+  if (!m) {
+    return {
+      statusCode: 401,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ success: false, error: 'Unauthorized' }),
+    };
+  }
+  try {
+    const jwt = await import('jsonwebtoken');
+    const payload = jwt.verify(m[1], process.env.JWT_SECRET || 'your-secret-key') as { role?: string };
+    if (payload.role === 'ADMIN' || payload.role === 'PROGRAMMER') return null;
+    return {
+      statusCode: 403,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ success: false, error: 'Forbidden' }),
+    };
+  } catch {
+    return {
+      statusCode: 401,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ success: false, error: 'Invalid token' }),
+    };
+  }
+}
+
+async function handleProgrammerLogin(event: any, requestId: string) {
+  try {
+    let body: { email?: string; password?: string } = {};
+    try {
+      body = typeof event.body === 'string' ? JSON.parse(event.body) : event.body || {};
+    } catch {
+      return {
+        statusCode: 400,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ success: false, error: 'Invalid JSON body' }),
+      };
+    }
+    const email = String(body.email || '').trim().toLowerCase();
+    const password = String(body.password || '');
+    const expectedEmail = (process.env.PROGRAMMER_LOGIN_EMAIL || '').trim().toLowerCase();
+    const passwordHash = process.env.PROGRAMMER_LOGIN_PASSWORD_BCRYPT || '';
+    if (!expectedEmail || !passwordHash) {
+      return {
+        statusCode: 503,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ success: false, error: 'Programmer login is not configured on the server' }),
+      };
+    }
+    if (!email || !password) {
+      return {
+        statusCode: 400,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ success: false, error: 'Email and password are required' }),
+      };
+    }
+    if (password.length < 12) {
+      return {
+        statusCode: 400,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ success: false, error: 'Password must be at least 12 characters' }),
+      };
+    }
+    if (email !== expectedEmail) {
+      return {
+        statusCode: 401,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ success: false, error: 'Invalid credentials' }),
+      };
+    }
+    const bcrypt = await import('bcryptjs');
+    const valid = await bcrypt.compare(password, passwordHash);
+    if (!valid) {
+      return {
+        statusCode: 401,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ success: false, error: 'Invalid credentials' }),
+      };
+    }
+    const jwt = await import('jsonwebtoken');
+    const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
+    const JWT_EXPIRY = process.env.JWT_EXPIRY || '7d';
+    const accessToken = jwt.sign(
+      { userId: PROGRAMMER_STAFF_USER_ID_NETLIFY, email: expectedEmail, role: 'PROGRAMMER' },
+      JWT_SECRET,
+      { expiresIn: JWT_EXPIRY } as any,
+    );
+    return {
+      statusCode: 200,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        success: true,
+        accessToken,
+        email: expectedEmail,
+        role: 'PROGRAMMER',
+      }),
+    };
+  } catch (e) {
+    console.error(`❌ [${requestId}] Programmer login:`, e);
+    return {
+      statusCode: 500,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ success: false, error: 'Login failed' }),
+    };
+  }
+}
+
 // Admin routes handler
 async function handleAdminRoutes(path: string, method: string, supabase: any, event: any, requestId: string) {
   console.log(`🔧 [${requestId}] ${method} ${path}`);
@@ -2370,6 +2487,14 @@ async function handleAdminRoutes(path: string, method: string, supabase: any, ev
           body: JSON.stringify({ success: false, error: 'Invalid credentials' })
         };
       }
+      const jwt = await import('jsonwebtoken');
+      const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
+      const JWT_EXPIRY = process.env.JWT_EXPIRY || '7d';
+      const accessToken = jwt.sign(
+        { userId: user.id, email: user.email, role: 'ADMIN' },
+        JWT_SECRET,
+        { expiresIn: JWT_EXPIRY } as any,
+      );
       return {
         statusCode: 200,
         headers: { 'Content-Type': 'application/json' },
@@ -2379,7 +2504,8 @@ async function handleAdminRoutes(path: string, method: string, supabase: any, ev
           email: user.email,
           firstName: user.first_name,
           lastName: user.last_name,
-          role: user.role
+          role: user.role,
+          accessToken
         })
       };
     }
@@ -2499,6 +2625,8 @@ async function handleAdminRoutes(path: string, method: string, supabase: any, ev
 
     // GET /api/admin/prices-and-period
     if (path === '/api/admin/prices-and-period' && method === 'GET') {
+      const authErr = await requireStaffAuthNetlify(event);
+      if (authErr) return authErr;
       try {
         const { getCurrentPeriod, getUpcomingPeriods } = await import('../../server/services/price-table.service');
         const current = getCurrentPeriod();
@@ -2883,6 +3011,8 @@ async function handleAdminRoutes(path: string, method: string, supabase: any, ev
 
     // GET /api/admin/pricing
     if (path === '/api/admin/pricing' && method === 'GET') {
+      const authErr = await requireStaffAuthNetlify(event);
+      if (authErr) return authErr;
       const [couponsRes, seasonalRes] = await Promise.all([
         supabase.from('coupons').select('*').order('created_at', { ascending: false }),
         supabase.from('seasonal_pricing').select('*').order('created_at', { ascending: false })
@@ -2914,6 +3044,8 @@ async function handleAdminRoutes(path: string, method: string, supabase: any, ev
 
     // GET /api/admin/coupons
     if (path === '/api/admin/coupons' && method === 'GET') {
+      const authErr = await requireStaffAuthNetlify(event);
+      if (authErr) return authErr;
       console.log(`🔍 [${requestId}] Fetching coupons from Supabase...`);
       
       const { data: coupons, error } = await supabase
@@ -2942,8 +3074,179 @@ async function handleAdminRoutes(path: string, method: string, supabase: any, ev
       };
     }
 
+    // POST /api/admin/coupons
+    if (path === '/api/admin/coupons' && method === 'POST') {
+      const authErr = await requireStaffAuthNetlify(event);
+      if (authErr) return authErr;
+      let couponData: any = {};
+      try {
+        couponData = typeof event.body === 'string' ? JSON.parse(event.body) : event.body || {};
+      } catch {
+        return {
+          statusCode: 400,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ success: false, error: 'Invalid JSON body' }),
+        };
+      }
+      const code = couponData.code;
+      const description = couponData.description;
+      const discountType = couponData.discountType || couponData.discount_type;
+      const discountValue = couponData.discountValue ?? couponData.discount_value;
+      const validFrom = couponData.validFrom || couponData.valid_from;
+      const validUntil = couponData.validUntil || couponData.valid_until;
+      const minBookingAmount = couponData.minBookingAmount ?? couponData.min_booking_amount;
+      const maxUses = couponData.maxUses ?? couponData.max_uses;
+      const isActive = couponData.isActive !== undefined ? couponData.isActive : couponData.is_active;
+      if (!code || !discountType || discountValue === undefined) {
+        return {
+          statusCode: 400,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ success: false, message: 'Missing required coupon fields' }),
+        };
+      }
+      const { data: existing } = await supabase.from('coupons').select('id').eq('code', String(code).toUpperCase()).maybeSingle();
+      if (existing) {
+        return {
+          statusCode: 400,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ success: false, error: 'A coupon with this code already exists' }),
+        };
+      }
+      const { data: coupon, error } = await supabase
+        .from('coupons')
+        .insert({
+          code: String(code).toUpperCase(),
+          description: description || null,
+          discount_type: discountType,
+          discount_value: parseFloat(discountValue),
+          valid_from: validFrom,
+          valid_until: validUntil,
+          min_booking_amount: minBookingAmount != null && minBookingAmount !== '' ? parseFloat(minBookingAmount) : null,
+          max_uses: maxUses != null && maxUses !== '' ? parseInt(String(maxUses), 10) : null,
+          used_count: 0,
+          is_active: isActive !== undefined ? isActive : true,
+        })
+        .select()
+        .single();
+      if (error) {
+        return {
+          statusCode: 500,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ success: false, message: error.message }),
+        };
+      }
+      const transformedCoupon = {
+        ...coupon,
+        discountValue: coupon.discount_value || 0,
+        discountType: coupon.discount_type,
+        validFrom: coupon.valid_from,
+        validUntil: coupon.valid_until,
+        minBookingAmount: coupon.min_booking_amount,
+        maxUses: coupon.max_uses,
+        usedCount: coupon.used_count,
+        isActive: coupon.is_active,
+      };
+      return {
+        statusCode: 200,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ success: true, data: transformedCoupon }),
+      };
+    }
+
+    // PUT /api/admin/coupons/:id
+    if (path.match(/^\/api\/admin\/coupons\/[^/]+$/) && method === 'PUT') {
+      const authErr = await requireStaffAuthNetlify(event);
+      if (authErr) return authErr;
+      const id = path.split('/').pop() as string;
+      let updateData: any = {};
+      try {
+        updateData = typeof event.body === 'string' ? JSON.parse(event.body) : event.body || {};
+      } catch {
+        return {
+          statusCode: 400,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ success: false, error: 'Invalid JSON body' }),
+        };
+      }
+      const dbUpdateData: any = {};
+      if (updateData.code) dbUpdateData.code = String(updateData.code).toUpperCase();
+      if (updateData.description !== undefined) dbUpdateData.description = updateData.description;
+      if (updateData.discountType || updateData.discount_type)
+        dbUpdateData.discount_type = updateData.discountType || updateData.discount_type;
+      if (updateData.discountValue !== undefined || updateData.discount_value !== undefined) {
+        const value = updateData.discountValue !== undefined ? updateData.discountValue : updateData.discount_value;
+        dbUpdateData.discount_value = parseFloat(value);
+      }
+      if (updateData.validFrom || updateData.valid_from) dbUpdateData.valid_from = updateData.validFrom || updateData.valid_from;
+      if (updateData.validUntil || updateData.valid_until) dbUpdateData.valid_until = updateData.validUntil || updateData.valid_until;
+      if (updateData.minBookingAmount !== undefined || updateData.min_booking_amount !== undefined) {
+        const value = updateData.minBookingAmount !== undefined ? updateData.minBookingAmount : updateData.min_booking_amount;
+        dbUpdateData.min_booking_amount = value ? parseFloat(value) : null;
+      }
+      if (updateData.maxUses !== undefined || updateData.max_uses !== undefined) {
+        const value = updateData.maxUses !== undefined ? updateData.maxUses : updateData.max_uses;
+        dbUpdateData.max_uses = value ? parseInt(String(value), 10) : null;
+      }
+      if (updateData.isActive !== undefined || updateData.is_active !== undefined)
+        dbUpdateData.is_active = updateData.isActive !== undefined ? updateData.isActive : updateData.is_active;
+
+      const { data: coupon, error } = await supabase.from('coupons').update(dbUpdateData).eq('id', id).select().single();
+      if (error) {
+        return {
+          statusCode: 500,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ success: false, message: 'Failed to update coupon' }),
+        };
+      }
+      if (!coupon) {
+        return {
+          statusCode: 404,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ success: false, message: 'Coupon not found' }),
+        };
+      }
+      const transformedCoupon = {
+        ...coupon,
+        discountValue: coupon.discount_value || 0,
+        discountType: coupon.discount_type,
+        validFrom: coupon.valid_from,
+        validUntil: coupon.valid_until,
+        minBookingAmount: coupon.min_booking_amount,
+        maxUses: coupon.max_uses,
+        usedCount: coupon.used_count,
+        isActive: coupon.is_active,
+      };
+      return {
+        statusCode: 200,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ success: true, data: transformedCoupon }),
+      };
+    }
+
+    // DELETE /api/admin/coupons/:id
+    if (path.match(/^\/api\/admin\/coupons\/[^/]+$/) && method === 'DELETE') {
+      const authErr = await requireStaffAuthNetlify(event);
+      if (authErr) return authErr;
+      const id = path.split('/').pop() as string;
+      const { error } = await supabase.from('coupons').delete().eq('id', id);
+      if (error) {
+        return {
+          statusCode: 500,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ success: false, message: 'Failed to delete coupon' }),
+        };
+      }
+      return {
+        statusCode: 200,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ success: true, message: 'Coupon deleted successfully' }),
+      };
+    }
+
     // GET /api/admin/settings/tax
     if (path === '/api/admin/settings/tax' && method === 'GET') {
+      const authErr = await requireStaffAuthNetlify(event);
+      if (authErr) return authErr;
       try {
         const { data: taxSettings, error } = await supabase
           .from('tax_settings')
@@ -2977,6 +3280,8 @@ async function handleAdminRoutes(path: string, method: string, supabase: any, ev
 
     // PUT /api/admin/settings/tax
     if (path === '/api/admin/settings/tax' && method === 'PUT') {
+      const authErrPutTax = await requireStaffAuthNetlify(event);
+      if (authErrPutTax) return authErrPutTax;
       try {
         const body = JSON.parse(event.body || '{}');
         const { taxRate = 15, additionalFees = 0, description } = body;
@@ -3035,6 +3340,8 @@ async function handleAdminRoutes(path: string, method: string, supabase: any, ev
 
     // GET /api/admin/settings/payment
     if (path === '/api/admin/settings/payment' && method === 'GET') {
+      const authErrPayGet = await requireStaffAuthNetlify(event);
+      if (authErrPayGet) return authErrPayGet;
       try {
         const { data, error } = await supabase
           .from('payment_settings')
@@ -3093,6 +3400,8 @@ async function handleAdminRoutes(path: string, method: string, supabase: any, ev
 
     // PUT /api/admin/settings/payment
     if (path === '/api/admin/settings/payment' && method === 'PUT') {
+      const authErrPayPut = await requireStaffAuthNetlify(event);
+      if (authErrPayPut) return authErrPayPut;
       try {
         const body = JSON.parse(event.body || '{}');
         const { depositPercentage, balanceChargeDaysBefore, fullPaymentThresholdDays, refundDepositOnCancel } = body;

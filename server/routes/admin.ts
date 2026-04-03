@@ -1,6 +1,8 @@
 import { Router } from "express";
 import { normalizeUnitImageList } from "../../shared/normalize-unit-images";
 import { supabase } from "../lib/db";
+import { generateToken } from "../services/auth.service";
+import { requireAdminOrProgrammer } from "../middleware/staffAuth";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
@@ -56,6 +58,11 @@ router.post("/login", async (req, res) => {
     if (!valid) {
       return res.status(401).json({ success: false, error: "Invalid credentials" });
     }
+    const accessToken = generateToken({
+      userId: user.id,
+      email: user.email,
+      role: "ADMIN",
+    });
     res.json({
       success: true,
       id: user.id,
@@ -63,6 +70,7 @@ router.post("/login", async (req, res) => {
       firstName: user.first_name,
       lastName: user.last_name,
       role: user.role,
+      accessToken,
     });
   } catch (err) {
     console.error("Admin login error:", err);
@@ -235,7 +243,7 @@ router.get("/stats", async (req, res) => {
 // ── Τιμές & Περίοδος (Prices & Period) ───────────────────────────────
 // Returns current period, room prices, and upcoming periods from price table
 
-router.get("/prices-and-period", async (_req, res, next) => {
+router.get("/prices-and-period", ...requireAdminOrProgrammer, async (_req, res, next) => {
   try {
     const current = getCurrentPeriod();
     const upcoming = getUpcomingPeriods();
@@ -440,7 +448,7 @@ router.delete("/properties/:id", async (req, res) => {
 });
 
 // Admin Coupons Management - FIXED
-router.get("/coupons", async (req, res) => {
+router.get("/coupons", ...requireAdminOrProgrammer, async (req, res) => {
   try {
     console.log("🔍 [COUPONS] Fetching coupons...");
     
@@ -476,7 +484,7 @@ router.get("/coupons", async (req, res) => {
   }
 });
 
-router.post("/coupons", async (req, res) => {
+router.post("/coupons", ...requireAdminOrProgrammer, async (req, res) => {
   try {
     const couponData = req.body;
     console.log("🔍 [COUPONS] Creating coupon:", couponData);
@@ -558,7 +566,7 @@ router.post("/coupons", async (req, res) => {
   }
 });
 
-router.put("/coupons/:id", async (req, res) => {
+router.put("/coupons/:id", ...requireAdminOrProgrammer, async (req, res) => {
   try {
     const { id } = req.params;
     const updateData = req.body;
@@ -623,7 +631,7 @@ router.put("/coupons/:id", async (req, res) => {
   }
 });
 
-router.delete("/coupons/:id", async (req, res) => {
+router.delete("/coupons/:id", ...requireAdminOrProgrammer, async (req, res) => {
   try {
     const { id } = req.params;
     console.log("🔍 [COUPONS] Deleting coupon:", id);
@@ -1005,7 +1013,7 @@ router.get("/users", async (req, res) => {
 });
 
 // Admin Pricing Management
-router.get("/pricing", async (req, res) => {
+router.get("/pricing", ...requireAdminOrProgrammer, async (req, res) => {
   try {
     const { data: coupons } = await supabase
       .from('coupons')
@@ -1403,7 +1411,7 @@ router.delete("/units/:id", async (req, res) => {
 });
 
 // Admin Tax Settings
-router.get("/settings/tax", async (req, res) => {
+router.get("/settings/tax", ...requireAdminOrProgrammer, async (req, res) => {
   try {
     console.log("🔍 [TAX] Fetching tax settings...");
     
@@ -1436,7 +1444,7 @@ router.get("/settings/tax", async (req, res) => {
   }
 });
 
-router.post("/settings/tax", async (req, res) => {
+router.post("/settings/tax", ...requireAdminOrProgrammer, async (req, res) => {
   try {
     const { taxRate, additionalFees, description } = req.body;
     console.log("🔍 [TAX] Saving tax settings:", { taxRate, additionalFees, description });
@@ -1473,7 +1481,7 @@ router.post("/settings/tax", async (req, res) => {
   }
 });
 
-router.put("/settings/tax", async (req, res) => {
+router.put("/settings/tax", ...requireAdminOrProgrammer, async (req, res) => {
   try {
     const { taxRate, additionalFees, description } = req.body;
     console.log("🔍 [TAX] Updating tax settings:", { taxRate, additionalFees, description });
@@ -1512,7 +1520,7 @@ router.put("/settings/tax", async (req, res) => {
 
 // ── Payment Settings ───────────────────────────────────────────────
 
-router.get("/settings/payment", async (_req, res) => {
+router.get("/settings/payment", ...requireAdminOrProgrammer, async (_req, res) => {
   try {
     const { data, error } = await supabase
       .from("payment_settings")
@@ -1539,7 +1547,7 @@ router.get("/settings/payment", async (_req, res) => {
   }
 });
 
-router.put("/settings/payment", async (req, res) => {
+router.put("/settings/payment", ...requireAdminOrProgrammer, async (req, res) => {
   try {
     const { depositPercentage, balanceChargeDaysBefore, fullPaymentThresholdDays, refundDepositOnCancel } = req.body;
 

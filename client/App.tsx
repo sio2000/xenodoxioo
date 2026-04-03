@@ -15,6 +15,8 @@ import Dashboard from "./pages/Dashboard";
 import BookingDetail from "./pages/BookingDetail";
 import Admin from "./pages/Admin";
 import AdminLogin from "./pages/AdminLogin";
+import ProgrammerLogin from "./pages/ProgrammerLogin";
+import Programmer from "./pages/Programmer";
 import AboutPage from "./pages/AboutPage";
 import FAQ from "./pages/FAQ";
 import LegalDetails from "./pages/LegalDetails";
@@ -27,7 +29,7 @@ const queryClient = new QueryClient();
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
+    <TooltipProvider delayDuration={200}>
       <LanguageProvider>
         <Toaster />
         <Sonner />
@@ -44,6 +46,8 @@ const App = () => (
             <Route path="/booking/:id" element={<BookingDetail />} />
             <Route path="/admin/login" element={<AdminLogin />} />
             <Route path="/admin" element={<Admin />} />
+            <Route path="/programmer/login" element={<ProgrammerLogin />} />
+            <Route path="/programmer" element={<Programmer />} />
             <Route path="/about" element={<AboutPage />} />
             <Route path="/faq" element={<FAQ />} />
             <Route path="/legal" element={<LegalDetails />} />
