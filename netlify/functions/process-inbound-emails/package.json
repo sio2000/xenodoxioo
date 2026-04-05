@@ -1,0 +1,9 @@
+{
+  "name": "process-inbound-emails",
+  "private": true,
+  "dependencies": {
+    "imapflow": "^1.2.18",
+    "mailparser": "^3.9.6",
+    "@supabase/supabase-js": "^2.98.0"
+  }
+}

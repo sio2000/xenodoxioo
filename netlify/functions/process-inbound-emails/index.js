@@ -1,8 +1,8 @@
-import { ImapFlow } from "imapflow";
-import { simpleParser } from "mailparser";
-import { createClient } from "@supabase/supabase-js";
+const { ImapFlow } = require("imapflow");
+const { simpleParser } = require("mailparser");
+const { createClient } = require("@supabase/supabase-js");
 
-export const handler = async () => {
+exports.handler = async function () {
   const user = process.env.IMAP_USER;
   const pass = process.env.IMAP_PASS;
 
@@ -12,8 +12,8 @@ export const handler = async () => {
   }
 
   const supabase = createClient(
-    process.env.SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    process.env.SUPABASE_URL,
+    process.env.SUPABASE_SERVICE_ROLE_KEY,
   );
 
   const client = new ImapFlow({
@@ -40,7 +40,7 @@ export const handler = async () => {
         return { statusCode: 200, body: "No new emails" };
       }
 
-      console.log(`[INBOUND] Found ${uids.length} unread email(s)`);
+      console.log("[INBOUND] Found " + uids.length + " unread email(s)");
 
       for (const uid of uids) {
         try {
@@ -55,7 +55,7 @@ export const handler = async () => {
           const replyText = extractReplyText(parsed.text || "");
 
           if (!replyText.trim()) {
-            console.log(`[INBOUND] Empty reply for inquiry ${inquiryId}, marking read`);
+            console.log("[INBOUND] Empty reply for inquiry " + inquiryId + ", marking read");
             await client.messageFlagsAdd(uid, ["\\Seen"], { uid: true });
             continue;
           }
@@ -67,7 +67,7 @@ export const handler = async () => {
             .single();
 
           if (!inquiry) {
-            console.warn(`[INBOUND] Inquiry ${inquiryId} not found, skipping`);
+            console.warn("[INBOUND] Inquiry " + inquiryId + " not found, skipping");
             await client.messageFlagsAdd(uid, ["\\Seen"], { uid: true });
             continue;
           }
@@ -88,9 +88,9 @@ export const handler = async () => {
 
           await client.messageFlagsAdd(uid, ["\\Seen"], { uid: true });
           processed++;
-          console.log(`[INBOUND] Processed reply for inquiry ${inquiryId}`);
-        } catch (msgErr: any) {
-          console.error(`[INBOUND] Error processing UID ${uid}:`, msgErr?.message);
+          console.log("[INBOUND] Processed reply for inquiry " + inquiryId);
+        } catch (msgErr) {
+          console.error("[INBOUND] Error processing UID " + uid + ":", msgErr?.message);
         }
       }
     } finally {
@@ -98,19 +98,19 @@ export const handler = async () => {
     }
 
     await client.logout();
-  } catch (err: any) {
+  } catch (err) {
     console.error("[INBOUND] IMAP error:", err?.message);
   }
 
-  console.log(`[INBOUND] Done — processed ${processed} replies`);
+  console.log("[INBOUND] Done — processed " + processed + " replies");
   return { statusCode: 200, body: JSON.stringify({ processed }) };
 };
 
-function extractReplyText(text: string): string {
+function extractReplyText(text) {
   if (!text) return "";
 
   const lines = text.split("\n");
-  const result: string[] = [];
+  const result = [];
 
   for (const line of lines) {
     const trimmed = line.trim();
