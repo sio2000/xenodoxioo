@@ -42,7 +42,7 @@ exports.handler = async function () {
 
     try {
       const since = new Date(Date.now() - 2 * 60 * 60 * 1000);
-      const uids = await client.search({ since: since });
+      const uids = await client.search({ since: since }, { uid: true });
 
       if (!uids.length) {
         console.log("[INBOUND] No emails in last 2 hours");
@@ -55,60 +55,95 @@ exports.handler = async function () {
 
       for (const uid of uids) {
         try {
-          const raw = await client.fetchOne(uid, { source: true, flags: true }, { uid: true });
-          if (!raw || !raw.source) {
-            console.warn("[INBOUND] UID " + uid + " has no source, skipping");
+          let flags = [];
+          try {
+            const flagsResult = await client.fetchOne(uid, { flags: true }, { uid: true });
+            flags = flagsResult?.flags ? Array.from(flagsResult.flags) : [];
+          } catch (e) {
+            console.warn("[INBOUND] UID " + uid + " could not fetch flags");
+          }
+
+          if (flags.includes(FORWARDED_FLAG)) {
             continue;
           }
-          const parsed = await simpleParser(raw.source);
+
+          let source = null;
+
+          try {
+            const raw = await client.fetchOne(uid, { source: true }, { uid: true });
+            if (raw && raw.source) {
+              source = raw.source;
+            }
+          } catch (e) {
+            console.warn("[INBOUND] UID " + uid + " fetchOne failed, trying download");
+          }
+
+          if (!source) {
+            try {
+              const { content } = await client.download(uid, undefined, { uid: true });
+              const chunks = [];
+              for await (const chunk of content) {
+                chunks.push(chunk);
+              }
+              source = Buffer.concat(chunks);
+            } catch (dlErr) {
+              console.warn("[INBOUND] UID " + uid + " download also failed, skipping");
+              continue;
+            }
+          }
+
+          if (!source || source.length === 0) {
+            console.warn("[INBOUND] UID " + uid + " empty source, skipping");
+            continue;
+          }
+
+          const parsed = await simpleParser(source);
           const subject = parsed.subject || "";
           const senderAddr = parsed.from?.value?.[0]?.address || "";
           const senderName = parsed.from?.value?.[0]?.name || senderAddr;
 
           if (senderAddr.toLowerCase() === infoAddr) {
+            try {
+              await client.messageFlagsAdd(uid, [FORWARDED_FLAG], { uid: true });
+            } catch (e) {}
             continue;
           }
 
-          const flags = raw.flags ? Array.from(raw.flags) : [];
-          const alreadyForwarded = flags.includes(FORWARDED_FLAG);
+          const htmlBody = parsed.html || parsed.textAsHtml || ("<pre>" + (parsed.text || "") + "</pre>");
 
-          if (!alreadyForwarded) {
-            const htmlBody = parsed.html || parsed.textAsHtml || ("<pre>" + (parsed.text || "") + "</pre>");
+          const fwdHtml =
+            '<div style="font-family:sans-serif;color:#333">' +
+              '<p style="color:#666;font-size:13px">' +
+                "<strong>From:</strong> " + senderName + " &lt;" + senderAddr + "&gt;<br/>" +
+                "<strong>Subject:</strong> " + subject + "<br/>" +
+                "<strong>Date:</strong> " + (parsed.date ? parsed.date.toISOString() : "N/A") +
+              "</p>" +
+              "<hr style='border:none;border-top:1px solid #ddd'/>" +
+              htmlBody +
+            "</div>";
 
-            const fwdHtml =
-              '<div style="font-family:sans-serif;color:#333">' +
-                '<p style="color:#666;font-size:13px">' +
-                  "<strong>From:</strong> " + senderName + " &lt;" + senderAddr + "&gt;<br/>" +
-                  "<strong>Subject:</strong> " + subject + "<br/>" +
-                  "<strong>Date:</strong> " + (parsed.date ? parsed.date.toISOString() : "N/A") +
-                "</p>" +
-                "<hr style='border:none;border-top:1px solid #ddd'/>" +
-                htmlBody +
-              "</div>";
-
-            for (const recipient of FORWARD_TO) {
-              try {
-                await resend.emails.send({
-                  from: fromName + " <" + fromEmail + ">",
-                  to: [recipient],
-                  replyTo: senderAddr,
-                  subject: "[FWD] " + subject,
-                  html: fwdHtml,
-                });
-              } catch (sendErr) {
-                console.error("[INBOUND] Failed to forward to " + recipient + ":", sendErr?.message);
-              }
-            }
-
+          for (const recipient of FORWARD_TO) {
             try {
-              await client.messageFlagsAdd(uid, [FORWARDED_FLAG], { uid: true });
-            } catch (flagErr) {
-              console.warn("[INBOUND] Could not set forwarded flag:", flagErr?.message);
+              await resend.emails.send({
+                from: fromName + " <" + fromEmail + ">",
+                to: [recipient],
+                replyTo: senderAddr,
+                subject: "[FWD] " + subject,
+                html: fwdHtml,
+              });
+            } catch (sendErr) {
+              console.error("[INBOUND] Failed to forward to " + recipient + ":", sendErr?.message);
             }
-
-            forwarded++;
-            console.log("[INBOUND] Forwarded email from " + senderAddr + ": " + subject);
           }
+
+          try {
+            await client.messageFlagsAdd(uid, [FORWARDED_FLAG], { uid: true });
+          } catch (flagErr) {
+            console.warn("[INBOUND] Could not set forwarded flag:", flagErr?.message);
+          }
+
+          forwarded++;
+          console.log("[INBOUND] Forwarded email from " + senderAddr + ": " + subject);
 
           const inqMatch = subject.match(/\[INQ#([^\]]+)\]/);
           if (!inqMatch) {
