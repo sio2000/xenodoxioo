@@ -123,7 +123,7 @@ function PrivateBeachesSection() {
   const { t } = useLanguage();
   const [lightbox, setLightbox] = useState<{ images: string[]; index: number } | null>(null);
 
-  const bigBeachImages = ["/uploads/newbeach.jpg", "/uploads/newbeach2.jpg", "/uploads/newbeach3.jpg", "/bigbeach3.jpg", "/bigbeach4.jpg"];
+  const bigBeachImages = ["/newbeach.jpg", "/newbeach2.jpg", "/newbeach3.jpg", "/bigbeach3.jpg", "/bigbeach4.jpg"];
   const smallBeachImages = ["/smallbeach1.jpg", "/smallbeach2.jpg", "/smallbeach3.jpg", "/smallbeach4.jpg"];
 
   const openLightbox = (images: string[], index: number) => {
