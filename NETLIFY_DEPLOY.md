@@ -52,7 +52,7 @@ app.use(cors({ origin: ['https://your-site.netlify.app', 'http://localhost:8080'
 
 Μετά το deploy:
 - **Προτεινόμενα δωμάτια**: Φαίνονται αν το seed τρέξει (περιλαμβάνεται στο Build Command)
-- **Admin login**: admin@booking.com / admin123 (δημιουργείται από το seed)
+- **Admin login**: ο κωδικός ορίζεται ιδιωτικά (δείτε `update-admin-password.sql`). Μην γράφετε ποτέ τον κωδικό σε commit/docs.
 
 Αν το Render "κοιμάται" (free tier), η πρώτη αίτηση μπορεί να καθυστερήσει ~30-60 sec.
 

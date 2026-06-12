@@ -23,15 +23,15 @@ EXCEPTION
   WHEN duplicate_object THEN NULL;
 END $$;
 
--- 3. Admin user (admin@booking.com / admin123)
--- Χρησιμοποιήστε αν δεν υπάρχει ήδη admin
+-- 3. Admin user (admin@booking.com)
+-- Χρησιμοποιήστε αν δεν υπάρχει ήδη admin. Ο κωδικός είναι bcrypt hash (όχι plaintext).
 INSERT INTO public.users (id, email, first_name, last_name, password, role, status, is_email_verified, created_at, updated_at)
 VALUES (
   gen_random_uuid(),
   'admin@booking.com',
   'Admin',
   'User',
-  '$2b$10$vSP/rJmWejLG1t6Y0TdcOeHAIcedy91IMF6vL0vb/wVAOan/4JTY2',
+  '$2b$10$MdwtK8Sggo0nJ8N/MpQ.mu3v8bsZFmeAWjGaMsIo4STjOT6nKmNl2',
   'ADMIN',
   'ACTIVE',
   true,

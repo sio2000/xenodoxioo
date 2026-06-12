@@ -556,7 +556,11 @@ export default function Admin() {
     const m = monthOverride ?? occupancyMonth;
     try {
       const params = new URLSearchParams({ year: String(m.year), month: String(m.month + 1) });
-      const response = await fetch(apiUrl(`/api/admin/stats?${params}`));
+      const admin = localStorage.getItem("admin");
+      const token = admin ? JSON.parse(admin).accessToken : "";
+      const response = await fetch(apiUrl(`/api/admin/stats?${params}`), {
+        headers: { Authorization: `Bearer ${token}` },
+      });
 
       if (response.ok) {
         const response_data = await response.json();

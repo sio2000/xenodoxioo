@@ -54,13 +54,6 @@
   status = 200
   to = "/.netlify/functions/api/:splat"
 
-# Debug endpoint for system verification
-[[redirects]]
-  force = true
-  from = "/debug"
-  status = 200
-  to = "/.netlify/functions/debug"
-
 # Uploads: serve from public folder (static files) instead of redirecting to Supabase
 # This allows images to be served directly from the build output
 [[redirects]]

@@ -2520,6 +2520,36 @@ async function handleAdminRoutes(path: string, method: string, supabase: any, ev
 
     // GET /api/admin/stats (includes custom URL / offer bookings) — same logic as admin-stats
     if (path === '/api/admin/stats' && method === 'GET') {
+      // Require a valid admin JWT — these stats expose revenue/occupancy/users.
+      {
+        const authHeader = event.headers?.authorization || event.headers?.Authorization;
+        const statsToken = typeof authHeader === 'string' && authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
+        const JWT_SECRET = process.env.JWT_SECRET;
+        if (!statsToken || !JWT_SECRET) {
+          return {
+            statusCode: 401,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ success: false, error: 'Unauthorized' })
+          };
+        }
+        try {
+          const jwt = await import('jsonwebtoken');
+          const payload = jwt.verify(statsToken, JWT_SECRET) as { role?: string };
+          if (payload.role !== 'ADMIN') {
+            return {
+              statusCode: 403,
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ success: false, error: 'Admin access required' })
+            };
+          }
+        } catch {
+          return {
+            statusCode: 401,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ success: false, error: 'Invalid or expired token' })
+          };
+        }
+      }
       const [bookingsResult, offersResult, usersResult, propertiesResult, unitsResult, inquiriesRpcResult] = await Promise.all([
         supabase.from('bookings').select('status, unit_id, check_in_date, check_out_date, total_paid, total_price'),
         supabase.from('custom_checkout_offers').select('unit_id, check_in_date, check_out_date').not('used_at', 'is', null),

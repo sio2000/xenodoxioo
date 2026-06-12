@@ -11,7 +11,7 @@ import { useLanguage } from "@/hooks/useLanguage";
 
 export default function AdminLogin() {
   const { t } = useLanguage();
-  const [email, setEmail] = useState("admin@booking.com");
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -37,17 +37,10 @@ export default function AdminLogin() {
         localStorage.setItem("admin", JSON.stringify(admin));
         navigate("/admin");
       } else {
-        const data = await response.json();
-        const msg =
-          data.error === "Invalid credentials"
-            ? "Λάθος email ή κωδικός. Χρησιμοποιήστε admin@booking.com / admin123. Βεβαιωθείτε ότι έχετε τρέξει pnpm db:seed στο backend (Render)."
-            : data.error || "Login failed";
-        setError(msg);
+        setError("Λάθος email ή κωδικός.");
       }
     } catch (err) {
-      setError(
-        "Δεν ήταν δυνατή η σύνδεση με το backend. Ελέγξτε τη σύνδεση και ξαναδοκιμάστε."
-      );
+      setError("Δεν ήταν δυνατή η σύνδεση. Ελέγξτε τη σύνδεσή σας και ξαναδοκιμάστε.");
     } finally {
       setLoading(false);
     }
@@ -61,10 +54,6 @@ export default function AdminLogin() {
             <CardTitle>{t("admin.login.title")}</CardTitle>
             <CardDescription>
               {t("admin.login.description")}
-              <br />
-              <span className="text-xs text-muted-foreground mt-2 block">
-                Demo: admin@booking.com / admin123
-              </span>
             </CardDescription>
           </CardHeader>
           <CardContent>

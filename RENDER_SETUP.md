@@ -24,5 +24,5 @@
 - **DIRECT_URL**: Το **unpooled** Neon connection (απαραίτητο για Prisma `db push/seed`).
 
 Μετά το πρώτο deploy, το seed τρέχει αυτόματα και δημιουργεί:
-- Admin: admin@booking.com / admin123
+- Admin: admin@booking.com (ο κωδικός ορίζεται ιδιωτικά — δείτε `update-admin-password.sql`)
 - 1 δοκιμαστικό property (Luxury Villa)

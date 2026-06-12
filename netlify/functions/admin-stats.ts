@@ -3,10 +3,44 @@
  * Ensures all bookings (including custom URL / offer) are counted — no path routing issues.
  */
 import { createClient } from "@supabase/supabase-js";
+import jwt from "jsonwebtoken";
 
 const ACTIVE_STATUSES = ["CONFIRMED", "COMPLETED", "CHECKED_IN", "CHECKED_OUT", "NO_SHOW"];
 
-export const handler = async (event: { queryStringParameters?: Record<string, string> } = {}) => {
+const unauthorized = (error: string) => ({
+  statusCode: 401,
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({ success: false, error }),
+});
+
+export const handler = async (
+  event: {
+    queryStringParameters?: Record<string, string>;
+    headers?: Record<string, string | undefined>;
+  } = {}
+) => {
+  // Require a valid admin JWT — these stats expose revenue/occupancy/users.
+  const authHeader = event.headers?.authorization || event.headers?.Authorization;
+  const token =
+    typeof authHeader === "string" && authHeader.startsWith("Bearer ")
+      ? authHeader.slice(7)
+      : null;
+  if (!token) return unauthorized("Unauthorized");
+  const JWT_SECRET = process.env.JWT_SECRET;
+  if (!JWT_SECRET) {
+    return {
+      statusCode: 500,
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ success: false, error: "Server auth not configured" }),
+    };
+  }
+  try {
+    const payload = jwt.verify(token, JWT_SECRET) as { role?: string };
+    if (payload.role !== "ADMIN") return unauthorized("Admin access required");
+  } catch {
+    return unauthorized("Invalid or expired token");
+  }
+
   const qs = event?.queryStringParameters || {};
   const now = new Date();
   let year = qs.year ? parseInt(qs.year, 10) : now.getFullYear();
